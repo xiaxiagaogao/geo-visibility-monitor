@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS raw_responses (
     screenshot_path TEXT,
     raw_json JSONB,
     latency_ms INT,
+    answer_status TEXT,
+    annotator_version TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -115,4 +117,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 
 INSERT INTO schema_migrations (id) VALUES ('001_mvp_init')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO schema_migrations (id) VALUES ('002_l1_fields')
 ON CONFLICT (id) DO NOTHING;

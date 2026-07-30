@@ -10,6 +10,7 @@ from app.api.deps import get_db
 from app.models import Prompt, RawResponse
 from app.schemas.crawl import (
     CitationOut,
+    MentionOut,
     CrawlJobCreate,
     CrawlJobDetailOut,
     CrawlJobListOut,
@@ -71,7 +72,10 @@ def get_crawl_job(job_id: int, db: Session = Depends(get_db)):
         row = db.scalars(
             select(RawResponse)
             .where(RawResponse.id == rid)
-            .options(selectinload(RawResponse.citations))
+            .options(
+                selectinload(RawResponse.citations),
+                selectinload(RawResponse.mentions),
+            )
         ).first()
         if row:
             resp = RawResponseOut(
@@ -84,8 +88,11 @@ def get_crawl_job(job_id: int, db: Session = Depends(get_db)):
                 screenshot_path=row.screenshot_path,
                 raw_json=row.raw_json,
                 latency_ms=row.latency_ms,
+                answer_status=row.answer_status,
+                annotator_version=row.annotator_version,
                 created_at=row.created_at,
                 citations=[CitationOut.model_validate(c) for c in row.citations],
+                mentions=[MentionOut.model_validate(m) for m in row.mentions],
             )
     return CrawlJobDetailOut(
         **base,

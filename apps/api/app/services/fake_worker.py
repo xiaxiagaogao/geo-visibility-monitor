@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Brand, BrandAlias, Citation, CrawlJob, Prompt, RawResponse
 from app.services.crawl_jobs import claim_pending_jobs
+from app.services.annotate import annotate_response
 
 logger = logging.getLogger("geo.fake_worker")
 
@@ -131,6 +132,12 @@ def process_job(db: Session, job: CrawlJob) -> RawResponse:
     job.error_message = None
     db.commit()
     db.refresh(resp)
+    # B4: L1 annotation (rules)
+    try:
+        annotate_response(db, resp.id, replace=True)
+        db.refresh(resp)
+    except Exception:
+        logger.exception("L1 annotate failed response_id=%s", resp.id)
     return resp
 
 

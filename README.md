@@ -18,6 +18,7 @@
 - [数据职责 L0–L3 拍板](./docs/10-data-responsibility.md)
 - [指标分工 v0.1](./docs/11-metrics-fe-be-split.md)
 - [B3 抓取任务](./docs/12-b3-crawl-jobs.md)
+- [B4 L1 标注](./docs/13-b4-l1-annotate.md)
 
 ## 仓库结构
 
@@ -50,7 +51,8 @@ pytest -q
 - [x] B1 数据库落地（schema + 连接 + 校验脚本）
 - [x] B2 配置域 API（品牌/Prompt CRUD）
 - [x] B3 任务 + 假 Worker（L0）
-- [ ] B4–B6 标注/抓取/查询
+- [x] B4 L1 规则标注
+- [ ] B5–B6 真抓/查询 counts
 - [ ] B7 后端数据可视化（抓取质量）
 - [ ] 正式前端（B6/B7 之后）
 

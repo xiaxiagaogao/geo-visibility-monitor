@@ -51,6 +51,18 @@ class CitationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MentionOut(BaseModel):
+    id: int
+    brand_id: int
+    mentioned: bool
+    mention_type: str
+    position_bucket: Optional[str] = None
+    position_rank: Optional[int] = None
+    evidence_snippet: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class RawResponseOut(BaseModel):
     id: int
     job_id: int
@@ -61,8 +73,11 @@ class RawResponseOut(BaseModel):
     screenshot_path: Optional[str] = None
     raw_json: Optional[Dict[str, Any]] = None
     latency_ms: Optional[int] = None
+    answer_status: Optional[str] = None
+    annotator_version: Optional[str] = None
     created_at: datetime
     citations: List[CitationOut] = Field(default_factory=list)
+    mentions: List[MentionOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

@@ -22,11 +22,13 @@ from app.api import crawl_jobs as crawl_jobs_router
 from app.api import prompts as prompts_router
 from app.api import responses as responses_router
 from app.core.db import check_connection
+from app.core.schema import ensure_schema
 from app.worker_loop import start_worker_loop, stop_worker_loop
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_schema()
     start_worker_loop()
     yield
     stop_worker_loop()
@@ -34,8 +36,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GEO Demo API",
-    version="0.3.0",
-    description="GEO learning API — B2 config + B3 crawl jobs & fake L0 worker",
+    version="0.4.0",
+    description="GEO learning API — B2 config + B3 jobs + B4 L1 annotate",
     lifespan=lifespan,
 )
 
@@ -64,7 +66,7 @@ class AnalyzeResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "geo-api", "version": "0.3.0", "b3": "crawl-jobs+fake-worker"}
+    return {"ok": True, "service": "geo-api", "version": "0.4.0", "b4": "l1-annotate"}
 
 
 @app.get("/health/db")

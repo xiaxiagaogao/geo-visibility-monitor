@@ -109,6 +109,8 @@ class RawResponse(Base):
     screenshot_path: Mapped[Optional[str]] = mapped_column(Text)
     raw_json: Mapped[Optional[Any]] = mapped_column(JSONB)
     latency_ms: Mapped[Optional[int]] = mapped_column(Integer)
+    answer_status: Mapped[Optional[str]] = mapped_column(Text)  # ok|empty|too_short|error
+    annotator_version: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
