@@ -1,11 +1,10 @@
 # crawler
 
-Playwright 抓取 Worker（学习项目）。
+实现已并入 `apps/api`：
 
-## 计划
+- `app/providers/deepseek_web.py` — DeepSeek Web（B5）
+- `app/providers/fake.py` — 假数据
+- `app/worker_main.py` — 独立 worker 进程
+- Docker：`deploy/Dockerfile.crawler`（Playwright 镜像）
 
-- `providers/base.py` — Provider 接口
-- `providers/deepseek_web.py` — DeepSeek Web POC
-- `core/pipeline.py` — 抓取 → 解析 → 调 metrics/API 入库
-
-对照开源：`geo_marketing`（拦截模式）、`gitgeo`（probe 配置），自行实现，不粘贴无 License 源码。
+详见 `docs/14-b5-deepseek.md`。

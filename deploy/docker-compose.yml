@@ -1,6 +1,6 @@
 # geo-demo — VPS compose
-# Postgres: 127.0.0.1:5433 (no public DB)
-# API: 0.0.0.0:8200 (public for learning access)
+# API :8200  Postgres :127.0.0.1:5433
+# Optional crawler profile for Playwright DeepSeek (B5)
 
 services:
   postgres:
@@ -31,8 +31,36 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://geo:geo@postgres:5432/geo}
       API_PORT: "8200"
+      # When crawler profile is on, set FAKE_WORKER_ENABLED=false to avoid double claim
+      FAKE_WORKER_ENABLED: ${FAKE_WORKER_ENABLED:-true}
+      CRAWL_MODE: ${CRAWL_MODE:-fake}
+      DEEPSEEK_STORAGE_STATE: ${DEEPSEEK_STORAGE_STATE:-}
+      PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
     ports:
       - "8200:8200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  crawler:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.crawler
+    container_name: geo-crawler
+    restart: unless-stopped
+    profiles: ["crawl"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://geo:geo@postgres:5432/geo}
+      CRAWL_MODE: ${CRAWL_MODE:-real}
+      FAKE_WORKER_INTERVAL_SEC: ${FAKE_WORKER_INTERVAL_SEC:-3}
+      FAKE_WORKER_BATCH_SIZE: ${FAKE_WORKER_BATCH_SIZE:-1}
+      DEEPSEEK_STORAGE_STATE: ${DEEPSEEK_STORAGE_STATE:-/data/deepseek_storage.json}
+      DEEPSEEK_USER_DATA_DIR: ${DEEPSEEK_USER_DATA_DIR:-}
+      PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
+      CRAWL_TIMEOUT_MS: ${CRAWL_TIMEOUT_MS:-120000}
+      SCREENSHOT_DIR: ${SCREENSHOT_DIR:-/data/screenshots}
+    volumes:
+      - crawl_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,3 +76,4 @@ services:
 
 volumes:
   pgdata:
+  crawl_data:

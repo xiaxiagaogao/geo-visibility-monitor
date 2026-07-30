@@ -36,8 +36,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GEO Demo API",
-    version="0.4.0",
-    description="GEO learning API — B2 config + B3 jobs + B4 L1 annotate",
+    version="0.5.0",
+    description="GEO learning API — B2–B5: config, jobs, L1, DeepSeek provider",
     lifespan=lifespan,
 )
 
@@ -66,7 +66,16 @@ class AnalyzeResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "geo-api", "version": "0.4.0", "b4": "l1-annotate"}
+    from app.core.config import get_settings
+    s = get_settings()
+    return {
+        "ok": True,
+        "service": "geo-api",
+        "version": "0.5.0",
+        "b5": "deepseek-web-provider",
+        "crawl_mode": s.crawl_mode,
+        "worker_enabled": s.fake_worker_enabled,
+    }
 
 
 @app.get("/health/db")

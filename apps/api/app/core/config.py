@@ -16,10 +16,18 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
-    # B3: in-process fake worker (DB poll). Real browser comes in B5.
+    # Worker loop (API process and/or crawler process)
     fake_worker_enabled: bool = True
     fake_worker_interval_sec: float = 2.0
     fake_worker_batch_size: int = 5
+
+    # B5 crawl mode: fake | real
+    crawl_mode: str = "fake"
+    crawl_timeout_ms: int = 120_000
+    playwright_headless: bool = True
+    deepseek_storage_state: str = ""
+    deepseek_user_data_dir: str = ""
+    screenshot_dir: str = ""
 
 
 @lru_cache

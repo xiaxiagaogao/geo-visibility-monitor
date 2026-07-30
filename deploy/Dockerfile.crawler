@@ -1,0 +1,15 @@
+FROM mcr.microsoft.com/playwright/python:v1.49.1-jammy
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+COPY packages/metrics /app/packages/metrics
+COPY apps/api /app/apps/api
+
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install -e /app/packages/metrics \
+    && pip install -e /app/apps/api
+
+WORKDIR /app/apps/api
+# browsers already in base image
+CMD ["python", "-m", "app.worker_main"]
