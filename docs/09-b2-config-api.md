@@ -36,3 +36,7 @@ curl -s -X POST $BASE/v1/brands -H 'Content-Type: application/json' \
 
 curl -s $BASE/v1/brands
 ```
+
+## VPS 验收记录
+
+- 2026-07-30：`geo-api` + CRUD 全流程通过；公网 `http://96.9.213.230:8200/docs`；样例品牌土巴兔 id=1。
