@@ -12,6 +12,7 @@
 - [前后端架构（详细）](./docs/04-architecture.md)
 - [Git 工作流](./docs/05-git-workflow.md)
 - [B1 数据库](./docs/06-b1-database.md)
+- [Docker 安装验收](./docs/07-docker-setup.md)
 
 ## 仓库结构
 

@@ -40,3 +40,6 @@ deploy/pgdata/
 # Playwright
 playwright-report/
 test-results/
+
+# local install logs
+docker-install.log
