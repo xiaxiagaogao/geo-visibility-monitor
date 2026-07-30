@@ -43,3 +43,9 @@ test-results/
 
 # local install logs
 docker-install.log
+
+*.pem
+
+deploy/.env
+
+.deploy-ssh.sh

@@ -1,18 +1,22 @@
-# B1: PostgreSQL (+ Redis 预留给后续队列)
-# 用法（需本机已装 Docker）:
+# geo-demo — VPS / 生产向 compose
+# Postgres 仅绑定 127.0.0.1，不暴露公网。
+# 用法：
 #   cd deploy && docker compose up -d postgres
+#   docker compose ps
 #   docker compose exec postgres psql -U geo -d geo -c '\dt'
 
 services:
   postgres:
     image: postgres:16-alpine
     container_name: geo-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-geo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geo}
       POSTGRES_DB: ${POSTGRES_DB:-geo}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 宿主机 5433 → 容器 5432（避免与其他服务冲突；仅本机可连）
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
@@ -25,8 +29,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: geo-redis
+    restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:6380:6379"
     profiles:
       - full
 
