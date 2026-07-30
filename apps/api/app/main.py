@@ -6,19 +6,28 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from geo_metrics import (
+    aggregate_visibility,
+    composite_score,
     is_recommended,
     match_brand,
     position_bucket,
     position_score,
     score_sentiment,
-    aggregate_visibility,
-    composite_score,
 )
 from geo_metrics.aggregate import ResponseObservation
 
+from app.api import brands as brands_router
+from app.api import prompts as prompts_router
 from app.core.db import check_connection
 
-app = FastAPI(title="GEO Demo API", version="0.1.0")
+app = FastAPI(
+    title="GEO Demo API",
+    version="0.2.0",
+    description="GEO learning project API — config domain (B2) + analyze helpers",
+)
+
+app.include_router(brands_router.router)
+app.include_router(prompts_router.router)
 
 
 class AnalyzeRequest(BaseModel):
@@ -40,12 +49,11 @@ class AnalyzeResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "geo-api"}
+    return {"ok": True, "service": "geo-api", "version": "0.2.0"}
 
 
 @app.get("/health/db")
 def health_db():
-    """B1: probe database. Returns 200 only if DB is reachable."""
     try:
         info = check_connection()
         return {"ok": True, "database": info}

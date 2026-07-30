@@ -14,6 +14,7 @@
 - [B1 数据库](./docs/06-b1-database.md)
 - [Docker 安装验收](./docs/07-docker-setup.md)（本机可选）
 - [VPS 部署](./docs/08-vps-deploy.md)（**当前运行环境**）
+- [B2 配置域 API](./docs/09-b2-config-api.md)
 
 ## 仓库结构
 
@@ -44,7 +45,7 @@ pytest -q
 - [x] metrics 包 + 单测
 - [x] Git 规范
 - [x] B1 数据库落地（schema + 连接 + 校验脚本）
-- [ ] B2 配置域 API（品牌/Prompt CRUD）
+- [x] B2 配置域 API（品牌/Prompt CRUD）
 - [ ] B3–B6 任务/抓取/查询
 - [ ] B7 后端数据可视化（抓取质量）
 - [ ] 正式前端（B6/B7 之后）

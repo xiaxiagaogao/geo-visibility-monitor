@@ -1,9 +1,6 @@
-# geo-demo — VPS / 生产向 compose
-# Postgres 仅绑定 127.0.0.1，不暴露公网。
-# 用法：
-#   cd deploy && docker compose up -d postgres
-#   docker compose ps
-#   docker compose exec postgres psql -U geo -d geo -c '\dt'
+# geo-demo — VPS compose
+# Postgres: 127.0.0.1:5433 (no public DB)
+# API: 0.0.0.0:8200 (public for learning access)
 
 services:
   postgres:
@@ -15,7 +12,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geo}
       POSTGRES_DB: ${POSTGRES_DB:-geo}
     ports:
-      # 宿主机 5433 → 容器 5432（避免与其他服务冲突；仅本机可连）
       - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -25,6 +21,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    container_name: geo-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://geo:geo@postgres:5432/geo}
+      API_PORT: "8200"
+    ports:
+      - "8200:8200"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine

@@ -1,0 +1,9 @@
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.git
+**/node_modules
+**/.next
+**/browser_data
+**/data

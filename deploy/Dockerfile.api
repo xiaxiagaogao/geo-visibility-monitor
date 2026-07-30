@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY packages/metrics /app/packages/metrics
+COPY apps/api /app/apps/api
+
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install -e /app/packages/metrics \
+    && pip install -e /app/apps/api
+
+WORKDIR /app/apps/api
+EXPOSE 8200
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200"]
