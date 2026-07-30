@@ -24,19 +24,20 @@
 
 ```text
 ┌─────────────┐   ┌──────────────┐   ┌─────────────┐   ┌──────────────┐
-│ 配置域       │ → │ 采集域        │ → │ 分析域       │ → │ 呈现域        │
-│ 品牌/竞品    │   │ 任务/抓取     │   │ 提及/指标    │   │ 看板/钻取     │
-│ Prompt 库    │   │ 原始回答/证据 │   │ SoV/趋势     │   │ 设置         │
-└─────────────┘   └──────────────┘   └─────────────┘   └──────────────┘
-     后端为主              后端为主            后端为主           前端为主
+│ 配置域       │ → │ 采集域        │ → │ L1 轻结构    │ → │ 呈现 + L2 派生 │
+│ 品牌/竞品    │   │ 任务/抓取     │   │ 命中/位置    │   │ 看板/钻取/指标 │
+│ Prompt 库    │   │ 原文/引用/证据 │   │ （后端）     │   │ （前端为主）   │
+└─────────────┘   └──────────────┘   └─────────────┘   └────────────────┘
+     后端为主              后端为主            后端               前端为主
 ```
 
 | 能力域 | 用户可感知结果 | 主责 |
 |--------|----------------|------|
 | 配置 | 管品牌、别名、竞品、问题库 | 后端 API + 前端表单 |
 | 采集 | 对某 Prompt×平台跑任务，看到成功/失败 | 后端 Worker + 队列 |
-| 分析 | 提及率、位置、情感、SoV、趋势 | 后端 metrics + 聚合 Job |
-| 呈现 | 总览、对比、点进看原文 | 前端；读后端查询 API |
+| 分析（L1） | 命中别名、首次位置等轻结构化 | **后端**入库时写入（质检 + 减前端压力） |
+| 分析（L2） | 提及率、SoV、综合分、趋势 | **前端派生**为主；后端不强制聚合 Job |
+| 呈现 | 总览、对比、点进看原文 | 前端；读 raw + L1 |
 
 ### 2.1 竞品能力对标（产品层）
 
@@ -96,9 +97,10 @@
 |------|------|
 | 前后端分离 | 前端不直连数据库、不内嵌抓取 |
 | 采集与查询分离 | Worker 可独立扩缩/重启，不影响读 API |
-| 指标可解释 | 聚合公式集中在 `metrics`，前后端不各写一套 |
+| 指标分层 | **L0 原文 / L1 轻结构后端；L2 看板指标前端派生**（见 §4.4） |
 | 证据可钻取 | 凡看板数字应能回到 `raw_responses` 全文（及可选截图） |
 | 平台可插拔 | `BaseProvider` + 每平台一个实现，改版只动 Provider |
+| 前端减负 | L1 入库时算好命中，避免看板每次全量扫全文 |
 
 ---
 
@@ -109,7 +111,7 @@
 | 进程 | 职责 | 不负责 |
 |------|------|--------|
 | **api** | REST、参数校验、编排「创建任务」、只读聚合查询、同步试算分析 | 长时间 Playwright、浏览器生命周期 |
-| **worker** | 消费抓取任务、调 Provider、写 raw/mention/citation、触发指标快照 | 复杂前端逻辑 |
+| **worker** | 消费抓取任务、调 Provider、写 raw/citation、**L1 轻结构 mention** | 看板级 SoV/趋势聚合（前端做） |
 | **postgres** | 持久化 | — |
 | **redis** | 任务队列（及可选缓存） | 作为唯一业务库 |
 
@@ -175,26 +177,31 @@ CrawlJob(pending)
 - 超时与并发：单机限制并行 browser 数  
 - 证据：`full_text` 必填；`screenshot_path` / `raw_json` 可选  
 
-### 4.4 分析子系统（metrics）
-
-位置：`packages/metrics`（已有纯函数与单测），供 **api 试算** 与 **worker 落库** 共用。
+### 4.4 数据与指标分层（2026-07-30 修订）
 
 ```text
-RawResponse + Brand(aliases)
-    → mention / position / recommend / sentiment   （单次回答）
-    → 按窗口聚合 visibility / recommend_rate / SoV  （快照）
-    → composite_score（可选 0–100）
+L0 原始（后端必存）
+  full_text, citations[], platform, prompt_text, created_at, screenshot_path?
+
+L1 轻结构化（后端写入，服务质检 + 减前端压力）
+  mentioned / mention_type / first offset → position_bucket
+  （可选）evidence_snippet；本品+竞品各一行 mention
+
+L2 看板指标（前端派生，主路径）
+  visibility_rate, SoV, composite_score, 趋势序列, 平台对比图
 ```
 
-| 能力 | 规格文档 | 算法对照（实现自研/可移植 MIT 思路） |
-|------|----------|--------------------------------------|
-| 提及判定 | [03-metrics-spec §1.1](./03-metrics-spec.md) | [aeo-platform `lib/mention.js` / `brand-match.js`](https://github.com/webappski/aeo-platform) |
-| 多采样折叠 | §3 | [aeo-platform `lib/sampling.js`](https://github.com/webappski/aeo-platform) |
-| 可见性指数 / 报告向指标 | §2 综合分 | [aeo-platform `visibility-index`](https://github.com/webappski/aeo-platform)；权重叙事 [ai-visibility](https://github.com/sharozdawa/ai-visibility)（注意其 demo 数据为模拟） |
-| 结构化打分字段 | 提及/排名/情感/风险 | [GEO-Insight judge 节点](https://github.com/huanghfzhufeng/GEO-Insight) JSON schema **字段集合** |
-| SoV / 引用源洞察 | 数据模型 citations + SoV | geo_marketing `stats` 的信任源/SoV 分析维度 |
+| 层级 | 谁 | 存储 / 接口 |
+|------|----|-------------|
+| L0 | Worker | `raw_responses` + `citations` |
+| L1 | Worker（可用 `packages/metrics` 纯函数） | `mentions` 表；B7 质量页直接读 |
+| L2 | **前端** | 浏览器内聚合；**不强制** `metric_snapshots` / `/v1/.../metrics` |
 
-**禁止**：在 React 组件里重写一套提及率；前端只展示 API 返回值。
+`packages/metrics`：保留，用于 L1、可选 `/v1/analyze/*` 试算、算法对照；**不是**看板唯一权威服务。
+
+算法对照仍见 [03-metrics-spec](./03-metrics-spec.md) 与 aeo-platform / GEO-Insight judge 字段思路。
+
+**前端约定**：L2 公式建议与 `packages/metrics` / 规格文档对齐，避免魔法数；但运行时以前端实现为准（学习分工）。
 
 ### 4.5 数据存储架构
 
@@ -243,13 +250,14 @@ RawResponse + Brand(aliases)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/v1/responses/{id}` | 全文 + citations + mentions（钻取） |
-| GET | `/v1/brands/{id}/metrics` | 窗口、platform 聚合；趋势点 |
-| GET | `/v1/brands/{id}/compare` | 本品 vs 竞品 SoV/提及 |
-| POST | `/v1/analyze/response` | 同步试算（已有骨架，不入库） |
+| GET | `/v1/responses/{id}` | **L0+L1**：全文 + citations + mentions（钻取） |
+| GET | `/v1/responses` | 按 brand/prompt/platform/时间过滤列表（供前端拉样做 L2） |
+| GET | `/v1/brands/{id}/metrics` | **可选 / MVP 可砍**（L2 改前端） |
+| GET | `/v1/brands/{id}/compare` | **可选 / MVP 可砍** |
+| POST | `/v1/analyze/response` | 同步 L1 试算（已有骨架，不入库） |
 | GET | `/health` | 探活 |
 
-前端看板**只依赖查询域 + 配置域**；触发监测走采集域。
+前端看板依赖：**配置域 + 采集状态 + 查询域（L0/L1）**；L2 在前端算。触发监测走采集域。
 
 ### 4.7 后端推荐技术栈（学习默认，可改）
 
@@ -274,10 +282,10 @@ RawResponse + Brand(aliases)
 | **B1** | DB 落地 | 迁移/init 与连接配置 | compose 起 PG，表存在 |
 | **B2** | 配置域 API | brands / aliases / competitors / prompts CRUD | curl/httpie 可走通 |
 | **B3** | 任务模型 + 假 Worker | crawl_jobs 入队；worker 写一条假 raw_response | 不打开浏览器也能跑通状态机 |
-| **B4** | metrics 接入落库 | 假文本 → mentions + 可选 snapshot | 库中可见 mention 字段 |
-| **B5** | DeepSeek Provider POC | 真抓 1 条 Prompt | success + full_text 非空 |
-| **B6** | 查询域 API | responses 详情、metrics 聚合 | 满足前端最小读模型 |
-| **B7** | **后端数据可视化（质量预览）** | 简易 HTML/API 页：浏览 jobs、raw_responses、mentions、抽样质量 | 不接正式前端也能判断抓取质量 |
+| **B4** | **L1 轻结构化落库**（原 metrics 步骤降级） | 假文本或抓取结果 → `mentions`（命中/位置）；**不做**看板 snapshot 强依赖 | 库中可见 L1 mention |
+| **B5** | DeepSeek Provider POC | 真抓 1 条 Prompt | success + **full_text** 非空（+ 尽量 citations） |
+| **B6** | 查询域 API（L0/L1） | responses 列表/详情、按条件过滤；**聚合 metrics 可选砍** | 前端能拉齐做 L2 与钻取 |
+| **B7** | **后端数据可视化（质量预览）** | 简易页：jobs / raw_responses / L1 mentions | 不接正式前端也能看抓取质量 |
 | **B7+** | 第二平台 / 定时 / 截图 | 按你优先级插入 | 另定 |
 
 **当前进度锚点**：metrics 包与 analyze 试算骨架已有；**B1 起未正式按上表推进**。  
@@ -293,9 +301,9 @@ RawResponse + Brand(aliases)
 
 | 做 | 不做 |
 |----|------|
-| 路由与布局、图表、表格、表单 | 指标公式、抓取、直连 PG |
-| 调用 REST、展示加载/错误/空态 | 浏览器自动化 |
-| 下钻到原文抽屉/详情页 | 私自缓存「自己算的提及率」当权威 |
+| 路由与布局、图表、表格、表单 | 抓取、直连 PG |
+| 调用 REST 取 L0/L1，**派生 L2 指标**并可视化 | 浏览器自动化 |
+| 下钻到原文抽屉/详情页 | 另起一套与 L0 对不上的「黑盒分」却不提供钻取 |
 
 ### 5.2 页面信息架构
 
@@ -345,7 +353,7 @@ RawResponse + Brand(aliases)
 | F1 | 布局 + 路由空壳 | 无 |
 | F2 | 品牌/Prompt 配置页 | B2 |
 | F3 | 任务触发与列表 | B3+ |
-| F4 | 总览 + 趋势 | B6 |
+| F4 | 总览 + 趋势（**前端 L2 派生**） | B6（有 L0/L1 即可） |
 | F5 | 原文钻取 + 竞品对比 | B6 |
 
 ---
@@ -478,3 +486,4 @@ geo-demo/
 |------|------|
 | 2026-07-30 | 初版：前后端详细架构 + 竞品/开源引用挂载到模块 + 后端分步 B0–B7 |
 | 2026-07-30 | **路线确认**：Git 规范后开工；先 B1；前端等后端 B6 后；**B7=后端数据可视化看抓取质量**，再做前端；需要时对照开源减负 |
+| 2026-07-30 | **数据职责折中**：L0/L1 后端，L2 前端派生；减轻前端全量扫文压力；B4/B6 metrics 聚合降级 |
