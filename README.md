@@ -15,7 +15,8 @@
 - [Docker 安装验收](./docs/07-docker-setup.md)（本机可选）
 - [VPS 部署](./docs/08-vps-deploy.md)（**当前运行环境**）
 - [B2 配置域 API](./docs/09-b2-config-api.md)
-- [数据职责 L0/L1/L2](./docs/10-data-responsibility.md)
+- [数据职责 L0–L3 拍板](./docs/10-data-responsibility.md)
+- [指标分工 v0.1](./docs/11-metrics-fe-be-split.md)
 
 ## 仓库结构
 
@@ -54,7 +55,7 @@ pytest -q
 ## 路线（已确认）
 
 - **运行环境：VPS**（本机只写代码 + git push，不做本地 Docker 验收）
-- **数据职责**：后端 L0+L1；**L2 看板指标前端派生**（见 docs/10）
+- **数据职责（已拍板）**：L0/L1/L2 后端（L2=counts）；**L3 比率前端**（见 docs/10、docs/11）
 
 后端 B1→…→B6 → **B7 后端数据预览** → 前端。  
 实现中按需对照开源，减少重复劳动。

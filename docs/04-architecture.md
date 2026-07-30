@@ -35,9 +35,10 @@
 |--------|----------------|------|
 | 配置 | 管品牌、别名、竞品、问题库 | 后端 API + 前端表单 |
 | 采集 | 对某 Prompt×平台跑任务，看到成功/失败 | 后端 Worker + 队列 |
-| 分析（L1） | 命中别名、首次位置等轻结构化 | **后端**入库时写入（质检 + 减前端压力） |
-| 分析（L2） | 提及率、SoV、综合分、趋势 | **前端派生**为主；后端不强制聚合 Job |
-| 呈现 | 总览、对比、点进看原文 | 前端；读 raw + L1 |
+| L1 标注 | answer_status、提及、位置… | **后端必做** |
+| L2 计数 | 整数 m/n/… | **后端 counts API** |
+| L3 比率 | 提及率、SoV、综合分、趋势 | **前端** |
+| 呈现 | 看板 + 钻取 | 前端 |
 
 ### 2.1 竞品能力对标（产品层）
 
@@ -177,31 +178,18 @@ CrawlJob(pending)
 - 超时与并发：单机限制并行 browser 数  
 - 证据：`full_text` 必填；`screenshot_path` / `raw_json` 可选  
 
-### 4.4 数据与指标分层（2026-07-30 修订）
+### 4.4 数据与指标分层（拍板：L0–L3）
 
 ```text
-L0 原始（后端必存）
-  full_text, citations[], platform, prompt_text, created_at, screenshot_path?
-
-L1 轻结构化（后端写入，服务质检 + 减前端压力）
-  mentioned / mention_type / first offset → position_bucket
-  （可选）evidence_snippet；本品+竞品各一行 mention
-
-L2 看板指标（前端派生，主路径）
-  visibility_rate, SoV, composite_score, 趋势序列, 平台对比图
+L0 Raw        后端  原文/引用/平台/prompt/时间/截图
+L1 Annotation 后端  answer_status、提及、类型、首次位置（必做）
+L2 Counts     后端  纯整数；MVP=计数 API（2B），日表后置
+L3 Rates      前端  比率/SoV/综合分/趋势（只吃 counts）
 ```
 
-| 层级 | 谁 | 存储 / 接口 |
-|------|----|-------------|
-| L0 | Worker | `raw_responses` + `citations` |
-| L1 | Worker（可用 `packages/metrics` 纯函数） | `mentions` 表；B7 质量页直接读 |
-| L2 | **前端** | 浏览器内聚合；**不强制** `metric_snapshots` / `/v1/.../metrics` |
-
-`packages/metrics`：保留，用于 L1、可选 `/v1/analyze/*` 试算、算法对照；**不是**看板唯一权威服务。
-
-算法对照仍见 [03-metrics-spec](./03-metrics-spec.md) 与 aeo-platform / GEO-Insight judge 字段思路。
-
-**前端约定**：L2 公式建议与 `packages/metrics` / 规格文档对齐，避免魔法数；但运行时以前端实现为准（学习分工）。
+- 权威说明：[10-data-responsibility](./10-data-responsibility.md)、[11-metrics-fe-be-split](./11-metrics-fe-be-split.md)  
+- `packages/metrics`：L1 + 试算/校验；**不是**返回 rates 的看板中台  
+- LLM 情感：后置后端 L1，不进浏览器  
 
 ### 4.5 数据存储架构
 
@@ -282,9 +270,9 @@ L2 看板指标（前端派生，主路径）
 | **B1** | DB 落地 | 迁移/init 与连接配置 | compose 起 PG，表存在 |
 | **B2** | 配置域 API | brands / aliases / competitors / prompts CRUD | curl/httpie 可走通 |
 | **B3** | 任务模型 + 假 Worker | crawl_jobs 入队；worker 写一条假 raw_response | 不打开浏览器也能跑通状态机 |
-| **B4** | **L1 轻结构化落库**（原 metrics 步骤降级） | 假文本或抓取结果 → `mentions`（命中/位置）；**不做**看板 snapshot 强依赖 | 库中可见 L1 mention |
-| **B5** | DeepSeek Provider POC | 真抓 1 条 Prompt | success + **full_text** 非空（+ 尽量 citations） |
-| **B6** | 查询域 API（L0/L1） | responses 列表/详情、按条件过滤；**聚合 metrics 可选砍** | 前端能拉齐做 L2 与钻取 |
+| **B4** | **L1 标注落库** | answer_status、本品/竞品提及、type、首次位置 | 库中可见 L1 |
+| **B5** | DeepSeek Provider POC | 真抓 1 条 Prompt | success + full_text（+ citations） |
+| **B6** | 明细 API + **counts API（L2）** | 列表/详情 + group by 计数（无比率） | 前端可做 L3 |
 | **B7** | **后端数据可视化（质量预览）** | 简易页：jobs / raw_responses / L1 mentions | 不接正式前端也能看抓取质量 |
 | **B7+** | 第二平台 / 定时 / 截图 | 按你优先级插入 | 另定 |
 
@@ -302,7 +290,7 @@ L2 看板指标（前端派生，主路径）
 | 做 | 不做 |
 |----|------|
 | 路由与布局、图表、表格、表单 | 抓取、直连 PG |
-| 调用 REST 取 L0/L1，**派生 L2 指标**并可视化 | 浏览器自动化 |
+| 调用 REST 取 L0/L1 与 **L2 counts**，**L3 派生比率**并可视化 | 浏览器自动化 |
 | 下钻到原文抽屉/详情页 | 另起一套与 L0 对不上的「黑盒分」却不提供钻取 |
 
 ### 5.2 页面信息架构
@@ -353,7 +341,7 @@ L2 看板指标（前端派生，主路径）
 | F1 | 布局 + 路由空壳 | 无 |
 | F2 | 品牌/Prompt 配置页 | B2 |
 | F3 | 任务触发与列表 | B3+ |
-| F4 | 总览 + 趋势（**前端 L2 派生**） | B6（有 L0/L1 即可） |
+| F4 | 总览 + 趋势（**前端 L3**，输入为 counts） | B6（有 L0/L1 即可） |
 | F5 | 原文钻取 + 竞品对比 | B6 |
 
 ---
@@ -486,4 +474,5 @@ geo-demo/
 |------|------|
 | 2026-07-30 | 初版：前后端详细架构 + 竞品/开源引用挂载到模块 + 后端分步 B0–B7 |
 | 2026-07-30 | **路线确认**：Git 规范后开工；先 B1；前端等后端 B6 后；**B7=后端数据可视化看抓取质量**，再做前端；需要时对照开源减负 |
-| 2026-07-30 | **数据职责折中**：L0/L1 后端，L2 前端派生；减轻前端全量扫文压力；B4/B6 metrics 聚合降级 |
+| 2026-07-30 | **数据职责折中**（已被下一行拍板取代） |
+| 2026-07-30 | **拍板**：同意 v0.1；1A 四层命名；2B counts API；L1 白名单；4A；情感 LLM 后端后置 |

@@ -5,7 +5,7 @@
 
 ## 一句话
 
-配置品牌与 Prompt → 抓取 AI 回答（原文 + 引用 + 轻结构化）→ 前端看板派生指标与展示 + 原文钻取。
+配置品牌与 Prompt → 抓取 L0 → 标注 L1 → 计数 L2(API) → 前端 L3 比率与看板 + 原文钻取。
 
 ## In Scope（做）
 
@@ -14,9 +14,9 @@
 | 品牌 | 主品牌 + 别名 + 竞品列表（单用户/单工作区即可） |
 | Prompt | 手动录入、列表、标签（可选批量 CSV） |
 | 抓取 | Playwright Worker；优先 DeepSeek，其次豆包；手动触发 + 简单定时 |
-| 存储 | PostgreSQL：**必存**原始回答全文、引用、平台/Prompt/时间、可选截图；**轻结构化**提及命中/首次位置（便于 B7 质检） |
-| 指标 | **看板级**（提及率、SoV、综合分、趋势等）以**前端派生**为主；后端不强制提供聚合 metrics API |
-| 前端 | 总览看板、Prompt 列表+原文、趋势图、竞品对比、设置页；读取 raw + 轻结构化后算展示指标 |
+| 存储 | L0 raw + L1 标注（mentions 等）；L2 以 counts API 为主 |
+| 指标 | L2 后端只出**计数**；L3 前端出**比率/综合分/趋势** |
+| 前端 | 看板 L3 + 原文钻取；不跑 Playwright、不做 LLM 情感 |
 | 部署 | docker-compose：web / api / worker / postgres / redis |
 
 ## Out of Scope（MVP 不做）
@@ -49,15 +49,19 @@
 | M0 | 文档 + monorepo + metrics 单测 |
 | M1 | API + DB + 品牌/Prompt CRUD |
 | M2 | DeepSeek 抓取 POC + 入库 |
-| M3 | 查询原文/轻结构化 API + 前端基础看板（前端派生指标） |
+| M3 | 明细 API + counts API + 前端 L3 基础看板 |
 | M4 | 竞品对比 + 第二平台 |
 
 
-## 前后端数据职责（2026-07-30 确认）
+## 前后端数据职责（2026-07-30 拍板 · 以 docs/10 为准）
 
-| 侧 | 负责 | 不负责（默认） |
-|----|------|----------------|
-| **后端** | 配置 CRUD；抓取任务；**必存** full_text / citations / platform / prompt / 时间 / 截图路径；**轻结构化**（是否命中别名、首次出现位置等，服务 B7 质量预览） | 看板级聚合曲线、SoV 排行、综合可见性分的权威计算（交给前端） |
-| **前端** | 用后端返回的原文 + 轻结构化字段，**派生**提及率/SoV/趋势/综合分并可视化 | 浏览器自动化抓取；直连数据库 |
+| 层 | 谁 | MVP |
+|----|----|-----|
+| L0 Raw | 后端 | 原文/引用/平台/prompt/时间/截图 |
+| L1 标注 | 后端 | answer_status、本品/竞品提及、mention_type、首次位置 |
+| L2 计数 | 后端 | **counts API**（日表物化后置） |
+| L3 比率 | 前端 | 提及率/SoV/综合分/趋势；只吃 counts |
 
-> 后端已有的 `packages/metrics` 可保留作**可选工具/试算/B7**，不作为看板唯一真相源。详见 [03-metrics-spec](./03-metrics-spec.md)、[04-architecture](./04-architecture.md)。
+- 首抓平台：**DeepSeek Web**  
+- LLM 情感：**不放前端**；后置后端 L1  
+- 详见 [10-data-responsibility](./10-data-responsibility.md)、[11-metrics-fe-be-split](./11-metrics-fe-be-split.md)
