@@ -21,6 +21,7 @@ from app.api import brands as brands_router
 from app.api import crawl_jobs as crawl_jobs_router
 from app.api import prompts as prompts_router
 from app.api import responses as responses_router
+from app.api import counts as counts_router
 from app.core.db import check_connection
 from app.core.schema import ensure_schema
 from app.worker_loop import start_worker_loop, stop_worker_loop
@@ -36,8 +37,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GEO Demo API",
-    version="0.5.0",
-    description="GEO learning API — B2–B5: config, jobs, L1, DeepSeek provider",
+    version="0.6.0",
+    description="GEO learning API — B2–B6: config, jobs, L1, DeepSeek, counts API",
     lifespan=lifespan,
 )
 
@@ -45,6 +46,7 @@ app.include_router(brands_router.router)
 app.include_router(prompts_router.router)
 app.include_router(crawl_jobs_router.router)
 app.include_router(responses_router.router)
+app.include_router(counts_router.router)
 
 
 class AnalyzeRequest(BaseModel):
@@ -71,8 +73,8 @@ def health():
     return {
         "ok": True,
         "service": "geo-api",
-        "version": "0.5.0",
-        "b5": "deepseek-web-provider",
+        "version": "0.6.0",
+        "b6": "counts-api",
         "crawl_mode": s.crawl_mode,
         "worker_enabled": s.fake_worker_enabled,
     }

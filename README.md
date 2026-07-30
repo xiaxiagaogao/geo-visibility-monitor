@@ -20,6 +20,7 @@
 - [B3 抓取任务](./docs/12-b3-crawl-jobs.md)
 - [B4 L1 标注](./docs/13-b4-l1-annotate.md)
 - [B5 DeepSeek](./docs/14-b5-deepseek.md)
+- [B6 Counts API](./docs/15-b6-counts-api.md)
 
 ## 仓库结构
 
@@ -54,7 +55,7 @@ pytest -q
 - [x] B3 任务 + 假 Worker（L0）
 - [x] B4 L1 规则标注
 - [x] B5 DeepSeek Web Provider（fake/real）
-- [ ] B6 counts API
+- [x] B6 counts API
 - [ ] B7 后端数据可视化（抓取质量）
 - [ ] 正式前端（B6/B7 之后）
 

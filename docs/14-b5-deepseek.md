@@ -64,3 +64,26 @@ crawl_job pending → provider.search → raw_responses + citations (L0) → L1 
 - 豆包/Kimi（后续平台）
 - LLM 情感（后置）
 - 账号池 / 代理池规模化
+
+
+## 登录时机（什么时候登录？）
+
+**不是**每条任务登录一次。
+
+| 时机 | 做什么 |
+|------|--------|
+| **首次启用真抓之前（一次性）** | 在浏览器登录 DeepSeek，导出 Playwright `storage_state` JSON |
+| **部署时** | 把 JSON 放到 crawler 的 `DEEPSEEK_STORAGE_STATE`（如 `/data/deepseek_storage.json`） |
+| **日常跑 crawl_job** | Worker 自动带登录态打开页面；**无需再登录** |
+| **登录过期 / 任务大量 failed 且报 login** | 重新导出 storage_state 并替换文件，重启 crawler |
+
+推荐流程：
+
+```text
+1. 本机/有界面环境登录 DeepSeek → 保存 storage_state
+2. 上传到 VPS crawler volume
+3. CRAWL_MODE=real + 启动 geo-crawler
+4. 之后只调 API 建任务即可
+```
+
+假数据模式（`CRAWL_MODE=fake`）**完全不需要**登录。
