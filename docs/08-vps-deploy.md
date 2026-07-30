@@ -130,3 +130,7 @@ python -m app.scripts.verify_db
 | 日期 | 说明 |
 |------|------|
 | 2026-07-30 | 初版：改 VPS 运行时；本地不测 Docker |
+
+### 验收记录
+
+- 2026-07-30：VPS `geo-postgres` healthy，`verify_db` 通过（10 表）；sillytavern/dashboard 仍运行。
