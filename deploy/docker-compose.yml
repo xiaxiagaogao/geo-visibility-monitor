@@ -1,0 +1,34 @@
+# B1: PostgreSQL (+ Redis 预留给后续队列)
+# 用法（需本机已装 Docker）:
+#   cd deploy && docker compose up -d postgres
+#   docker compose exec postgres psql -U geo -d geo -c '\dt'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: geo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-geo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geo}
+      POSTGRES_DB: ${POSTGRES_DB:-geo}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geo} -d ${POSTGRES_DB:-geo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: geo-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    profiles:
+      - full
+
+volumes:
+  pgdata:
