@@ -1,0 +1,91 @@
+{% extends "qa/base.html" %}
+{% block title %}GEO QA 总览{% endblock %}
+{% block content %}
+<h1>数据质量总览</h1>
+<p class="muted">查看抓取任务、原始回答与 L1 标注是否正常。正式看板指标（L3）由前端用 counts 计算。</p>
+
+<div class="grid">
+  <div class="card"><div class="label">品牌</div><div class="value">{{ n_brands }}</div></div>
+  <div class="card"><div class="label">Prompt</div><div class="value">{{ n_prompts }}</div></div>
+  <div class="card"><div class="label">回答 L0</div><div class="value">{{ n_responses }}</div></div>
+  <div class="card"><div class="label">Mentions L1</div><div class="value">{{ n_mentions }}</div></div>
+</div>
+
+<div class="grid">
+  {% for st, c in job_by_status.items() %}
+  <div class="card">
+    <div class="label">Job · {{ st }}</div>
+    <div class="value">{{ c }}</div>
+  </div>
+  {% else %}
+  <div class="card"><div class="label">Jobs</div><div class="value">0</div></div>
+  {% endfor %}
+  {% for st, c in answer_by_status.items() %}
+  <div class="card">
+    <div class="label">answer_status · {{ st }}</div>
+    <div class="value">{{ c }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if brand1 and counts %}
+<section class="card" style="margin-bottom:20px;">
+  <h2>Counts 快照 · {{ brand1.name }} (id={{ brand1.id }})</h2>
+  <p class="muted">{{ counts.note }} · 分母：{{ counts.denominator.definition }}</p>
+  <div class="grid">
+    <div class="card"><div class="label">n_valid</div><div class="value">{{ counts.denominator.n_valid }}</div></div>
+    <div class="card"><div class="label">m_mentioned</div><div class="value">{{ counts.brand.m_mentioned }}</div></div>
+    <div class="card"><div class="label">m_body</div><div class="value">{{ counts.brand.m_body }}</div></div>
+    <div class="card"><div class="label">m_head</div><div class="value">{{ counts.brand.m_head }}</div></div>
+  </div>
+  <p class="muted">前端示例：提及率 ≈ {{ counts.brand.m_mentioned }} / {{ counts.denominator.n_valid }}{% if counts.denominator.n_valid %} = {{ '%.1f'|format(100 * counts.brand.m_mentioned / counts.denominator.n_valid) }}%{% endif %}</p>
+  <p><a href="/v1/counts?brand_id={{ brand1.id }}" target="_blank">打开 JSON counts</a></p>
+</section>
+{% endif %}
+
+<section style="margin-bottom:24px;">
+  <h2>最近任务</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>平台</th><th>状态</th><th>sample</th><th>prompt_id</th><th>错误</th></tr>
+    </thead>
+    <tbody>
+      {% for j in recent_jobs %}
+      <tr>
+        <td><a href="/qa/jobs">#{{ j.id }}</a></td>
+        <td>{{ j.platform }}</td>
+        <td><span class="badge {{ j.status }}">{{ j.status }}</span></td>
+        <td>{{ j.sample_index }}</td>
+        <td>{{ j.prompt_id }}</td>
+        <td class="muted">{{ j.error_message or '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">暂无任务</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>最近回答</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>平台</th><th>answer_status</th><th>annotator</th><th>mentions</th><th>摘要</th></tr>
+    </thead>
+    <tbody>
+      {% for r in recent_responses %}
+      <tr>
+        <td><a href="/qa/responses/{{ r.id }}">#{{ r.id }}</a></td>
+        <td>{{ r.platform }}</td>
+        <td><span class="badge {% if r.answer_status=='ok' %}ok{% else %}warn{% endif %}">{{ r.answer_status or 'null' }}</span></td>
+        <td class="muted">{{ r.annotator_version or '-' }}</td>
+        <td>{{ r.mentions|length }}</td>
+        <td class="muted">{{ r.full_text[:80] }}{% if r.full_text|length > 80 %}…{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">暂无回答</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

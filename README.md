@@ -21,6 +21,7 @@
 - [B4 L1 标注](./docs/13-b4-l1-annotate.md)
 - [B5 DeepSeek](./docs/14-b5-deepseek.md)
 - [B6 Counts API](./docs/15-b6-counts-api.md)
+- [B7 QA 预览](./docs/16-b7-qa-preview.md)
 
 ## 仓库结构
 
@@ -56,7 +57,7 @@ pytest -q
 - [x] B4 L1 规则标注
 - [x] B5 DeepSeek Web Provider（fake/real）
 - [x] B6 counts API
-- [ ] B7 后端数据可视化（抓取质量）
+- [x] B7 后端质量预览 /qa
 - [ ] 正式前端（B6/B7 之后）
 
 ## 路线（已确认）

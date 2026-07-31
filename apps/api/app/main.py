@@ -22,6 +22,7 @@ from app.api import crawl_jobs as crawl_jobs_router
 from app.api import prompts as prompts_router
 from app.api import responses as responses_router
 from app.api import counts as counts_router
+from app.api import qa as qa_router
 from app.core.db import check_connection
 from app.core.schema import ensure_schema
 from app.worker_loop import start_worker_loop, stop_worker_loop
@@ -37,8 +38,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GEO Demo API",
-    version="0.6.0",
-    description="GEO learning API — B2–B6: config, jobs, L1, DeepSeek, counts API",
+    version="0.7.0",
+    description="GEO learning API — B2–B7 backend ready; QA preview at /qa",
     lifespan=lifespan,
 )
 
@@ -47,6 +48,7 @@ app.include_router(prompts_router.router)
 app.include_router(crawl_jobs_router.router)
 app.include_router(responses_router.router)
 app.include_router(counts_router.router)
+app.include_router(qa_router.router)
 
 
 class AnalyzeRequest(BaseModel):
@@ -66,6 +68,12 @@ class AnalyzeResponse(BaseModel):
     sentiment_score: float
 
 
+@app.get("/")
+def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/qa")
+
+
 @app.get("/health")
 def health():
     from app.core.config import get_settings
@@ -73,8 +81,9 @@ def health():
     return {
         "ok": True,
         "service": "geo-api",
-        "version": "0.6.0",
-        "b6": "counts-api",
+        "version": "0.7.0",
+        "b7": "qa-preview",
+        "qa": "/qa",
         "crawl_mode": s.crawl_mode,
         "worker_enabled": s.fake_worker_enabled,
     }

@@ -1,0 +1,38 @@
+{% extends "qa/base.html" %}
+{% block title %}任务 · GEO QA{% endblock %}
+{% block content %}
+<h1>抓取任务</h1>
+<div class="filters">
+  <a href="/qa/jobs" class="{% if not status %}active{% endif %}">全部</a>
+  {% for s in ['pending','running','success','failed'] %}
+  <a href="/qa/jobs?status={{ s }}" class="{% if status==s %}active{% endif %}">{{ s }}</a>
+  {% endfor %}
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>ID</th><th>状态</th><th>平台</th><th>sample</th><th>Prompt</th>
+      <th>开始</th><th>结束</th><th>错误</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for j in jobs %}
+    <tr>
+      <td>#{{ j.id }}</td>
+      <td><span class="badge {{ j.status }}">{{ j.status }}</span></td>
+      <td>{{ j.platform }}</td>
+      <td>{{ j.sample_index }}</td>
+      <td>
+        #{{ j.prompt_id }}
+        <div class="muted">{{ (prompts.get(j.prompt_id).text if prompts.get(j.prompt_id) else '')[:60] }}</div>
+      </td>
+      <td class="muted">{{ j.started_at or '-' }}</td>
+      <td class="muted">{{ j.finished_at or '-' }}</td>
+      <td class="muted">{{ j.error_message or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" class="muted">无数据</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

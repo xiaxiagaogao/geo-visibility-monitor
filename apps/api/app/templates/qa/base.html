@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}GEO QA{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --border: #2a3548;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: #121a24;
+      position: sticky;
+      top: 0;
+    }
+    header .brand { font-weight: 700; letter-spacing: 0.02em; }
+    nav a { margin-right: 12px; color: var(--muted); }
+    nav a:hover { color: var(--text); }
+    main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    h1, h2 { margin: 0 0 12px; }
+    .muted { color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th { color: var(--muted); font-weight: 600; background: #152031; }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .badge.ok { color: var(--ok); border-color: #14532d; }
+    .badge.bad { color: var(--bad); border-color: #7f1d1d; }
+    .badge.warn { color: var(--warn); border-color: #78350f; }
+    .badge.success { color: var(--ok); border-color: #14532d; }
+    .badge.failed { color: var(--bad); border-color: #7f1d1d; }
+    .badge.pending, .badge.running { color: var(--warn); border-color: #78350f; }
+    pre, .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .fulltext {
+      background: #0c1118;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 420px;
+      overflow: auto;
+    }
+    .filters { margin-bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .filters a, .filters span {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .filters a.active { color: var(--text); border-color: var(--accent); }
+    footer { padding: 20px; color: var(--muted); font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">GEO QA · B7</div>
+    <nav>
+      <a href="/qa">总览</a>
+      <a href="/qa/jobs">任务</a>
+      <a href="/qa/responses">回答 L0/L1</a>
+      <a href="/docs" target="_blank">API Docs</a>
+      <a href="/health" target="_blank">Health</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer>后端质量预览 · 非正式前端 · L0/L1 优先 · counts 辅助</footer>
+</body>
+</html>

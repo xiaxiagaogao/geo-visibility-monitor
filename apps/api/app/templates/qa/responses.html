@@ -1,0 +1,44 @@
+{% extends "qa/base.html" %}
+{% block title %}回答 · GEO QA{% endblock %}
+{% block content %}
+<h1>回答 L0 / L1</h1>
+<div class="filters">
+  <a href="/qa/responses" class="{% if not answer_status and not platform %}active{% endif %}">全部</a>
+  {% for s in ['ok','empty','too_short','error'] %}
+  <a href="/qa/responses?answer_status={{ s }}" class="{% if answer_status==s %}active{% endif %}">{{ s }}</a>
+  {% endfor %}
+  <a href="/qa/responses?platform=deepseek" class="{% if platform=='deepseek' %}active{% endif %}">deepseek</a>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>ID</th><th>job</th><th>平台</th><th>status</th><th>L1</th>
+      <th>命中摘要</th><th>正文预览</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/qa/responses/{{ r.id }}">#{{ r.id }}</a></td>
+      <td>{{ r.job_id }}</td>
+      <td>{{ r.platform }}</td>
+      <td><span class="badge {% if r.answer_status=='ok' %}ok{% else %}warn{% endif %}">{{ r.answer_status or 'null' }}</span></td>
+      <td class="muted">{{ r.annotator_version or '-' }}</td>
+      <td>
+        {% for m in r.mentions %}
+          <div class="muted">b{{ m.brand_id }}:
+            {% if m.mentioned %}<span class="badge ok">{{ m.mention_type }}{% if m.position_bucket %}/{{ m.position_bucket }}{% endif %}</span>
+            {% else %}<span class="badge">none</span>{% endif %}
+          </div>
+        {% else %}
+          <span class="muted">无 mentions</span>
+        {% endfor %}
+      </td>
+      <td class="muted">{{ r.full_text[:100] }}{% if r.full_text|length > 100 %}…{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="muted">无数据</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

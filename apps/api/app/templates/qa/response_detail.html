@@ -1,0 +1,92 @@
+{% extends "qa/base.html" %}
+{% block title %}回答 #{{ row.id if row else '?' }} · GEO QA{% endblock %}
+{% block content %}
+{% if not row %}
+  <h1>未找到</h1>
+  <p class="muted">response 不存在</p>
+{% else %}
+  <p class="muted"><a href="/qa/responses">← 返回列表</a></p>
+  <h1>回答 #{{ row.id }}</h1>
+  <div class="grid">
+    <div class="card"><div class="label">平台</div><div class="value" style="font-size:18px">{{ row.platform }}</div></div>
+    <div class="card"><div class="label">answer_status</div><div class="value" style="font-size:18px">{{ row.answer_status or 'null' }}</div></div>
+    <div class="card"><div class="label">annotator</div><div class="value" style="font-size:18px">{{ row.annotator_version or '-' }}</div></div>
+    <div class="card"><div class="label">latency_ms</div><div class="value" style="font-size:18px">{{ row.latency_ms or '-' }}</div></div>
+  </div>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>任务 / Prompt</h2>
+    <p>job_id={{ row.job_id }}
+      {% if job %} · status=<span class="badge {{ job.status }}">{{ job.status }}</span>{% endif %}
+    </p>
+    {% if prompt %}
+    <p><strong>Prompt #{{ prompt.id }}</strong> · brand_id={{ prompt.brand_id }}</p>
+    <p class="mono">{{ prompt.text }}</p>
+    {% endif %}
+    {% if job and job.error_message %}
+    <p class="badge bad">{{ job.error_message }}</p>
+    {% endif %}
+  </section>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>L0 全文</h2>
+    <div class="fulltext mono">{{ row.full_text }}</div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>Citations ({{ row.citations|length }})</h2>
+    {% if row.citations %}
+    <table>
+      <thead><tr><th>#</th><th>domain</th><th>title</th><th>url</th></tr></thead>
+      <tbody>
+        {% for c in row.citations %}
+        <tr>
+          <td>{{ c.cite_index }}</td>
+          <td>{{ c.domain }}</td>
+          <td>{{ c.title }}</td>
+          <td class="muted"><a href="{{ c.url }}" target="_blank">{{ c.url }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">无引用</p>
+    {% endif %}
+  </section>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>L1 Mentions ({{ row.mentions|length }})</h2>
+    <table>
+      <thead>
+        <tr><th>brand</th><th>mentioned</th><th>type</th><th>position</th><th>evidence</th></tr>
+      </thead>
+      <tbody>
+        {% for m in row.mentions %}
+        <tr>
+          <td>
+            #{{ m.brand_id }}
+            {% if brands.get(m.brand_id) %}
+            <div class="muted">{{ brands[m.brand_id].name }}</div>
+            {% endif %}
+          </td>
+          <td>{% if m.mentioned %}<span class="badge ok">yes</span>{% else %}<span class="badge">no</span>{% endif %}</td>
+          <td>{{ m.mention_type }}</td>
+          <td>{{ m.position_bucket or '-' }}</td>
+          <td class="muted mono">{{ m.evidence_snippet or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">无标注（可 POST /v1/responses/{{ row.id }}/annotate）</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>raw_json</h2>
+    <pre class="fulltext">{{ row.raw_json }}</pre>
+    <p class="muted">
+      <a href="/v1/responses/{{ row.id }}" target="_blank">JSON API</a>
+    </p>
+  </section>
+{% endif %}
+{% endblock %}
