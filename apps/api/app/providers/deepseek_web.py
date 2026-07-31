@@ -370,67 +370,103 @@ def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> N
 
     time.sleep(0.4)
 
-    # expand overflow on main content so scrollHeight reflects full answer
+    # DeepSeek is a SPA: content often lives in an INTERNAL scroll container.
+    # window scrollHeight stays ~viewport (900). Expand that container first.
     try:
-        page.evaluate(
+        meta = page.evaluate(
             """() => {
-              const nodes = document.querySelectorAll('.ds-markdown, [class*="ds-markdown"], main, [class*="chat"], [class*="message"]');
-              nodes.forEach((el) => {
-                el.style.overflow = 'visible';
-                el.style.maxHeight = 'none';
-                el.style.height = 'auto';
-              });
-              // force reflow
+              const answers = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
+              let best = null, bestLen = 0;
+              for (const n of answers) {
+                const t = (n.innerText || '').trim();
+                if (t.length > bestLen) { bestLen = t.length; best = n; }
+              }
+              if (!best) return { ok: false };
+
+              const scrollParent = (el) => {
+                let p = el.parentElement;
+                while (p && p !== document.body) {
+                  const st = getComputedStyle(p);
+                  const oy = st.overflowY;
+                  if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && p.scrollHeight > p.clientHeight + 20) {
+                    return p;
+                  }
+                  p = p.parentElement;
+                }
+                return document.scrollingElement || document.documentElement;
+              };
+
+              const sp = scrollParent(best);
+              // expand ancestors so full content participates in layout height
+              let cur = best;
+              for (let i = 0; i < 14 && cur; i++) {
+                cur.style.setProperty('overflow', 'visible', 'important');
+                cur.style.setProperty('max-height', 'none', 'important');
+                cur.style.setProperty('height', 'auto', 'important');
+                cur = cur.parentElement;
+              }
+              // expand scroll parent to its full scrollHeight (key for full_page)
+              if (sp && sp !== document.documentElement && sp !== document.body) {
+                const sh = sp.scrollHeight;
+                sp.style.setProperty('overflow', 'visible', 'important');
+                sp.style.setProperty('max-height', 'none', 'important');
+                sp.style.setProperty('height', sh + 'px', 'important');
+              }
+              // also expand document
+              document.documentElement.style.setProperty('height', 'auto', 'important');
+              document.body.style.setProperty('height', 'auto', 'important');
+              document.documentElement.style.setProperty('overflow', 'visible', 'important');
+              document.body.style.setProperty('overflow', 'visible', 'important');
+
               void document.body.offsetHeight;
+              return {
+                ok: true,
+                answerLen: bestLen,
+                docScrollHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+                spTag: sp ? sp.tagName : null,
+                spScrollHeight: sp ? sp.scrollHeight : null,
+              };
             }"""
         )
-    except Exception:
-        pass
+        logger.info("expand scroll containers: %s", meta)
+    except Exception as exc:
+        logger.warning("expand scroll containers failed: %s", exc)
 
-    # 2) scroll to load lazy content
+    # 2) scroll document (and internal parents if any remaining) to trigger lazy load
     try:
-        _scroll_page_for_lazy_load(page, step=450, pause_ms=120)
+        _scroll_page_for_lazy_load(page, step=500, pause_ms=100)
     except Exception as exc:
         logger.warning("lazy scroll failed: %s", exc)
 
-    # 3) back to top + settle
     try:
         page.evaluate("window.scrollTo(0, 0)")
     except Exception:
         pass
-    time.sleep(0.6)
+    time.sleep(0.5)
 
-    # optional: wait until scrollHeight stable
     try:
-        last_h = 0
-        for _ in range(8):
-            h = page.evaluate(
-                """() => Math.max(
-                  document.body?.scrollHeight || 0,
-                  document.documentElement?.scrollHeight || 0
-                )"""
-            )
-            if h == last_h and h > 0:
-                break
-            last_h = h
-            time.sleep(0.2)
-        logger.info("full_page capture scrollHeight=%s", last_h)
+        h = page.evaluate(
+            """() => Math.max(
+              document.body?.scrollHeight || 0,
+              document.documentElement?.scrollHeight || 0
+            )"""
+        )
+        logger.info("full_page capture scrollHeight=%s", h)
     except Exception:
-        pass
+        h = 0
 
-    # 4) core: full_page=True
+    # 3) primary: full_page=True (after expanding internal scrollers)
     page.screenshot(path=shot_path, full_page=True, type="png")
     logger.info("evidence full_page screenshot saved %s", shot_path)
 
-    # If image is still too short vs answer text, try element screenshot as supplement path
-    # (overwrite only if element is clearly taller)
+    # 4) if still short, element screenshot of longest answer (full element box)
     try:
         from PIL import Image
 
         im = Image.open(shot_path)
-        w, h = im.size
-        # if suspiciously short for a long answer, try answer element full shot
-        if expected_text and len(expected_text) > 400 and h < 1200:
+        w, h0 = im.size
+        need_taller = (expected_text and len(expected_text) > 300 and h0 < 1500) or h0 <= 1000
+        if need_taller:
             loc = page.locator(".ds-markdown")
             best_i, best_len = -1, 0
             for i in range(loc.count()):
@@ -443,34 +479,36 @@ def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> N
                     best_i = i
             if best_i >= 0:
                 node = loc.nth(best_i)
-                page.evaluate(
-                    """(el) => {
-                      let cur = el;
-                      for (let i = 0; i < 12 && cur; i++) {
-                        cur.style.overflow = 'visible';
-                        cur.style.maxHeight = 'none';
-                        cur.style.height = 'auto';
-                        cur = cur.parentElement;
-                      }
-                    }""",
-                    node.element_handle(),
-                )
+                handle = node.element_handle()
+                if handle:
+                    page.evaluate(
+                        """(el) => {
+                          let cur = el;
+                          for (let i = 0; i < 14 && cur; i++) {
+                            cur.style.setProperty('overflow', 'visible', 'important');
+                            cur.style.setProperty('max-height', 'none', 'important');
+                            cur.style.setProperty('height', 'auto', 'important');
+                            cur = cur.parentElement;
+                          }
+                        }""",
+                        handle,
+                    )
                 time.sleep(0.3)
                 alt = shot_path.replace(".png", "_elem.png")
                 node.screenshot(path=alt, type="png")
                 im2 = Image.open(alt)
-                if im2.height > h * 1.2:
+                if im2.height > h0:
                     im2.save(shot_path)
                     logger.info(
-                        "replaced with taller element shot %s (%dx%d -> %dx%d)",
+                        "using taller element shot %s (%dx%d -> %dx%d)",
                         shot_path,
                         w,
-                        h,
+                        h0,
                         im2.width,
                         im2.height,
                     )
     except Exception as exc:
-        logger.debug("post full_page height check skipped: %s", exc)
+        logger.debug("element height boost skipped: %s", exc)
 
 
 
