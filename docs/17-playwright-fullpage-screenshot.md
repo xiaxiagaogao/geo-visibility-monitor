@@ -21,6 +21,9 @@ QA 预览：`/qa/media/screenshots/{filename}`
 
 **部署注意：** `post-receive` 默认会 rebuild api；crawler 有容器时一并 rebuild。代码进 worktree ≠ 进镜像，必须 rebuild crawler。
 
+**踩坑长文：** 见 `docs/18-screenshot-evidence-postmortem.md`（#14–#18 失败原因与正确实现）。
+
+
 ---
 
 > 适用于无头 Chromium（Headless Chromium）场景  
