@@ -87,3 +87,15 @@ crawl_job pending → provider.search → raw_responses + citations (L0) → L1 
 ```
 
 假数据模式（`CRAWL_MODE=fake`）**完全不需要**登录。
+
+## Chrome 已登录桥接（本机跑通真回答）
+
+当 VPS Playwright 没有 storage_state 时，可用 **本机已登录 Chrome** 抓到回答后：
+
+```bash
+POST /v1/ingest/l0
+```
+
+body 含 `prompt_id` + `full_text`（+ 可选 citations），服务端会建 success job、写 L0、跑 L1。
+
+这是当前最稳的「已登录就先跑通」路径。

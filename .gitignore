@@ -49,3 +49,9 @@ docker-install.log
 deploy/.env
 
 .deploy-ssh.sh
+
+deploy/deepseek_storage.json
+
+deploy/deepseek_live_answer.json
+
+**/deepseek_storage.json
