@@ -1,7 +1,7 @@
 # 最小数据治理（L2 后 / L3 前）
 
 > 日期：2026-07-31  
-> 状态：执行中 → 完成后可进 L3  
+> 状态：**已完成（VPS 2026-07-31）** → 可进 L3  
 > 范围：**短步**，不做多平台、不做前端
 
 ---
@@ -47,3 +47,18 @@ curl -s 'http://127.0.0.1:8200/v1/counts?brand_id=1&source=deepseek_web'
 - `n_valid` 不再含侧栏脏抓  
 - `verify_l2` PASS  
 - 本品 `m_mentioned` 在默认口径下 **不因 fake 虚高**
+
+## 执行结果（VPS）
+
+| 项 | 结果 |
+|----|------|
+| 删除 fake | response `#1–#5` |
+| 侧栏脏抓 | `#7/#8` → `answer_status=error` |
+| 空 job | 已删一批无 response 的 crawl_jobs |
+| 剩余 | 13 条（chrome_bridge 1 + deepseek_web 12） |
+| n_valid | **11**（error 2 不进分母） |
+| 土巴兔 m_mentioned | **0**（假数据虚高已消除） |
+| verify_l2 | **PASS** |
+| commit | `fe78c4d` |
+
+说明：真抓样本当前未命中「土巴兔」别名，L3 上将看到 0% 提及率——这是真实口径，不是计数 bug。
