@@ -362,4 +362,9 @@ def _wait_for_answer(page, stream_chunks: List[str], timeout_ms: int) -> str:
         if last and len(last) > 120 and stable_hits >= 8:
             break
         time.sleep(0.5)
+    # strip common stream glue artifacts
+    last = (last or "").strip()
+    for junk in ("FINISHEDSEARCH", "FINISHED", "SEARCH"):
+        if last.startswith(junk) and len(last) > len(junk) + 10:
+            last = last[len(junk):].lstrip(" :|-")
     return last
