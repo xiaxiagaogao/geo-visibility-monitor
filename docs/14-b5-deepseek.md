@@ -99,3 +99,17 @@ POST /v1/ingest/l0
 body 含 `prompt_id` + `full_text`（+ 可选 citations），服务端会建 success job、写 L0、跑 L1。
 
 这是当前最稳的「已登录就先跑通」路径。
+
+
+## 独立 Playwright 导出 storage_state（推荐 · 不碰主 Chrome）
+
+```bash
+cd /Users/xiagao/Desktop/geo-demo
+apps/api/.venv/bin/python scripts/export_deepseek_storage.py
+# 独立窗口登录 DeepSeek → 终端回车
+./scripts/deploy_deepseek_storage_to_vps.sh
+```
+
+- 不使用日常 Chrome，不读 Chrome Safe Storage 钥匙串
+- 生成 `deploy/deepseek_storage.json`（已 gitignore）
+- VPS: `CRAWL_MODE=real` + crawler 容器挂载该文件
