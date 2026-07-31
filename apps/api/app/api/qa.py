@@ -173,3 +173,33 @@ def qa_response_detail(
             "display_raw_json": display_raw,
         },
     )
+
+
+@router.get("/qa/media/screenshots/{filename}")
+def qa_screenshot(filename: str):
+    """Serve crawl evidence screenshots (basename only)."""
+    import os
+
+    safe = Path(filename).name
+    if safe != filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="bad filename")
+
+    roots = []
+    env_dir = os.environ.get("SCREENSHOT_DIR")
+    if env_dir:
+        roots.append(Path(env_dir))
+    roots.extend([
+        Path("/data/screenshots"),
+        Path("/app/data/screenshots"),
+    ])
+
+    for root in roots:
+        path = (root / safe).resolve()
+        try:
+            # must stay under root
+            path.relative_to(root.resolve())
+        except Exception:
+            continue
+        if path.is_file():
+            return FileResponse(str(path), media_type="image/png")
+    raise HTTPException(status_code=404, detail=f"screenshot not found: {safe}")
