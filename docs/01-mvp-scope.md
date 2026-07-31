@@ -65,3 +65,8 @@
 - 首抓平台：**DeepSeek Web**  
 - LLM 情感：**不放前端**；后置后端 L1  
 - 详见 [10-data-responsibility](./10-data-responsibility.md)、[11-metrics-fe-be-split](./11-metrics-fe-be-split.md)
+
+## L3 方案与路线图
+
+- [21-l3-frontend-plan](./21-l3-frontend-plan.md) — L3 主线（待确认启动）
+- [22-roadmap-next](./22-roadmap-next.md) — 后续方向清单

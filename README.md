@@ -67,3 +67,12 @@ pytest -q
 
 后端 B1→…→B6 → **B7 后端数据预览** → 前端。  
 实现中按需对照开源，减少重复劳动。
+
+## 文档速览
+
+| 文档 | 说明 |
+|------|------|
+| [docs/21-l3-frontend-plan.md](docs/21-l3-frontend-plan.md) | L3 前端主线方案（待确认） |
+| [docs/22-roadmap-next.md](docs/22-roadmap-next.md) | 后续方向清单 |
+| [docs/10-data-responsibility.md](docs/10-data-responsibility.md) | L0–L3 职责 |
+| [docs/20-data-governance-min.md](docs/20-data-governance-min.md) | 最小数据治理 |
