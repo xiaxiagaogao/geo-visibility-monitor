@@ -303,19 +303,43 @@ def _looks_like_login(page) -> bool:
 
 
 
+
+def _scroll_page_for_lazy_load(page, step: int = 400, pause_ms: int = 150) -> None:
+    """Scroll through the page to trigger lazy-loaded content (doc 4.1)."""
+    page.evaluate(
+        """async ({ step, pause }) => {
+          await new Promise((resolve) => {
+            let total = 0;
+            const timer = setInterval(() => {
+              const sh = Math.max(
+                document.body?.scrollHeight || 0,
+                document.documentElement?.scrollHeight || 0
+              );
+              window.scrollBy(0, step);
+              total += step;
+              if (total >= sh - window.innerHeight - 10) {
+                clearInterval(timer);
+                resolve(null);
+              }
+            }, pause);
+          });
+        }""",
+        {"step": step, "pause": pause_ms},
+    )
+
+
 def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> None:
-    """Capture evidence in the shape of a clean DeepSeek answer card.
+    """Full-page evidence shot for headless Chromium.
 
-    Desired (user reference ~ full answer export):
-      - question chip (optional but preferred)
-      - full assistant content (tables/lists/citations)
-      - no left history rail, no bottom composer
-      - tall image if answer is long (not one short viewport)
+    Approach from project note (Playwright 全页面截图功能说明):
+      1) hide non-content chrome (sidebar/composer) so the long page is the answer column
+      2) scroll through page to trigger lazy load
+      3) scroll back to top
+      4) page.screenshot(full_page=True)  ← real full scroll-range capture
 
-    Critical: getBoundingClientRect() height is ONLY the visible part for
-    overflow-hidden parents. Prefer Playwright element.screenshot() after
-    forcing overflow:visible on ancestors — that captures full layout size.
+    Do NOT use viewport-only shots; do NOT rely on clip rect (height is viewport-limited).
     """
+    # 1) hide left rail + bottom input so full_page is mostly the answer stream
     try:
         page.add_style_tag(
             content="""
@@ -323,143 +347,130 @@ def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> N
             [class*='sidebar' i], [class*='SideBar'], [class*='sider'],
             [class*='history' i], [class*='History'] {
               display: none !important;
+              width: 0 !important;
+              min-width: 0 !important;
             }
-            textarea, [class*='composer' i] {
+            textarea {
               visibility: hidden !important;
+            }
+            /* reduce sticky/fixed chrome repeating in fullPage stitches */
+            [style*='position: fixed'], [style*='position:fixed'],
+            [class*='fixed' i], header {
+              position: absolute !important;
+            }
+            html, body {
+              height: auto !important;
+              max-height: none !important;
+              overflow: auto !important;
             }
             """
         )
     except Exception:
         pass
+
     time.sleep(0.4)
 
-    # Pick best assistant markdown node index via JS scoring
-    idx = page.evaluate(
-        """(expected) => {
-          const nodes = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
-          let best = -1, bestScore = -1;
-          for (let i = 0; i < nodes.length; i++) {
-            const t = (nodes[i].innerText || '').trim();
-            if (t.length < 80) continue;
-            if (t.startsWith('开启新对话') && t.length < 800) continue;
-            let score = t.length;
-            if (nodes[i].querySelector('table')) score += 3000;
-            if (nodes[i].querySelector('li')) score += 300;
-            if (expected) {
-              const s = expected.slice(0, 50);
-              if (s && t.includes(s)) score += 100000;
-            }
-            if (score > bestScore) { bestScore = score; best = i; }
-          }
-          return best;
-        }""",
-        expected_text or "",
-    )
+    # expand overflow on main content so scrollHeight reflects full answer
+    try:
+        page.evaluate(
+            """() => {
+              const nodes = document.querySelectorAll('.ds-markdown, [class*="ds-markdown"], main, [class*="chat"], [class*="message"]');
+              nodes.forEach((el) => {
+                el.style.overflow = 'visible';
+                el.style.maxHeight = 'none';
+                el.style.height = 'auto';
+              });
+              // force reflow
+              void document.body.offsetHeight;
+            }"""
+        )
+    except Exception:
+        pass
 
-    if idx is not None and int(idx) >= 0:
-        answer = page.locator(".ds-markdown, [class*='ds-markdown']").nth(int(idx))
-        # Expand capture root: answer node, then climb to a reasonable turn container
-        # and also try previous siblings for question chip via JS handle
-        try:
-            handle = answer.element_handle(timeout=5000)
-            if handle:
-                # force full expand
+    # 2) scroll to load lazy content
+    try:
+        _scroll_page_for_lazy_load(page, step=450, pause_ms=120)
+    except Exception as exc:
+        logger.warning("lazy scroll failed: %s", exc)
+
+    # 3) back to top + settle
+    try:
+        page.evaluate("window.scrollTo(0, 0)")
+    except Exception:
+        pass
+    time.sleep(0.6)
+
+    # optional: wait until scrollHeight stable
+    try:
+        last_h = 0
+        for _ in range(8):
+            h = page.evaluate(
+                """() => Math.max(
+                  document.body?.scrollHeight || 0,
+                  document.documentElement?.scrollHeight || 0
+                )"""
+            )
+            if h == last_h and h > 0:
+                break
+            last_h = h
+            time.sleep(0.2)
+        logger.info("full_page capture scrollHeight=%s", last_h)
+    except Exception:
+        pass
+
+    # 4) core: full_page=True
+    page.screenshot(path=shot_path, full_page=True, type="png")
+    logger.info("evidence full_page screenshot saved %s", shot_path)
+
+    # If image is still too short vs answer text, try element screenshot as supplement path
+    # (overwrite only if element is clearly taller)
+    try:
+        from PIL import Image
+
+        im = Image.open(shot_path)
+        w, h = im.size
+        # if suspiciously short for a long answer, try answer element full shot
+        if expected_text and len(expected_text) > 400 and h < 1200:
+            loc = page.locator(".ds-markdown")
+            best_i, best_len = -1, 0
+            for i in range(loc.count()):
+                try:
+                    txt = (loc.nth(i).inner_text(timeout=800) or "").strip()
+                except Exception:
+                    continue
+                if len(txt) > best_len and not _is_noise_text(txt):
+                    best_len = len(txt)
+                    best_i = i
+            if best_i >= 0:
+                node = loc.nth(best_i)
                 page.evaluate(
                     """(el) => {
                       let cur = el;
-                      for (let i = 0; i < 10 && cur; i++) {
-                        const st = cur.style;
-                        st.overflow = 'visible';
-                        st.maxHeight = 'none';
-                        st.height = 'auto';
+                      for (let i = 0; i < 12 && cur; i++) {
+                        cur.style.overflow = 'visible';
+                        cur.style.maxHeight = 'none';
+                        cur.style.height = 'auto';
                         cur = cur.parentElement;
                       }
-                      // choose root: climb while parent isn't huge body/app
-                      let root = el;
-                      for (let i = 0; i < 8; i++) {
-                        const p = root.parentElement;
-                        if (!p || p === document.body || p === document.documentElement) break;
-                        const pt = (p.innerText || '').length;
-                        const rt = (root.innerText || '').length;
-                        if (pt > rt * 6) break; // parent includes too much chrome
-                        root = p;
-                      }
-                      // include previous sibling question chips
-                      let top = root;
-                      let prev = root.previousElementSibling;
-                      for (let i = 0; i < 4 && prev; i++) {
-                        const t = (prev.innerText || '').trim();
-                        if (!t) { prev = prev.previousElementSibling; continue; }
-                        if (t.length <= 400 || t.includes('？') || t.includes('?') || t.includes('已阅读')) {
-                          top = prev;
-                        }
-                        prev = prev.previousElementSibling;
-                      }
-                      // create a temporary wrapper range by scrolling each into view
-                      top.scrollIntoView({block: 'start'});
-                      return true;
                     }""",
-                    handle,
+                    node.element_handle(),
                 )
                 time.sleep(0.3)
-
-                # Prefer screenshot of a wrapper spanning question..answer
-                root_handle = page.evaluate_handle(
-                    """(el) => {
-                      let root = el;
-                      for (let i = 0; i < 8; i++) {
-                        const p = root.parentElement;
-                        if (!p || p === document.body || p === document.documentElement) break;
-                        const pt = (p.innerText || '').length;
-                        const rt = (root.innerText || '').length;
-                        if (pt > rt * 6) break;
-                        root = p;
-                      }
-                      let top = root;
-                      let prev = root.previousElementSibling;
-                      for (let i = 0; i < 4 && prev; i++) {
-                        const t = (prev.innerText || '').trim();
-                        if (t && (t.length <= 400 || t.includes('？') || t.includes('已阅读'))) {
-                          // if we can, use parent that contains both
-                          if (root.parentElement && prev.parentElement === root.parentElement) {
-                            return root.parentElement;
-                          }
-                        }
-                        prev = prev.previousElementSibling;
-                      }
-                      return root;
-                    }""",
-                    handle,
-                )
-                try:
-                    element = root_handle.as_element()
-                    if element:
-                        element.scroll_into_view_if_needed(timeout=5000)
-                        time.sleep(0.25)
-                        element.screenshot(path=shot_path, type="png")
-                        logger.info("evidence full-element screenshot saved %s", shot_path)
-                        return
-                except Exception as exc:
-                    logger.warning("wrapper element screenshot failed: %s", exc)
-
-                # last try: pure answer node full element
-                answer.scroll_into_view_if_needed(timeout=5000)
-                time.sleep(0.2)
-                answer.screenshot(path=shot_path, type="png")
-                logger.info("evidence answer-node screenshot saved %s", shot_path)
-                return
-        except Exception as exc:
-            logger.warning("element evidence failed: %s", exc)
-
-    # fallback full page after hiding chrome
-    try:
-        page.evaluate("window.scrollTo(0, 0)")
-        time.sleep(0.2)
-        page.screenshot(path=shot_path, full_page=True, type="png")
-        logger.info("evidence full_page fallback saved %s", shot_path)
+                alt = shot_path.replace(".png", "_elem.png")
+                node.screenshot(path=alt, type="png")
+                im2 = Image.open(alt)
+                if im2.height > h * 1.2:
+                    im2.save(shot_path)
+                    logger.info(
+                        "replaced with taller element shot %s (%dx%d -> %dx%d)",
+                        shot_path,
+                        w,
+                        h,
+                        im2.width,
+                        im2.height,
+                    )
     except Exception as exc:
-        logger.warning("full_page failed: %s", exc)
-        page.screenshot(path=shot_path, full_page=False, type="png")
+        logger.debug("post full_page height check skipped: %s", exc)
 
 
 

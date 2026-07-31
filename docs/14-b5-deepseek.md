@@ -125,3 +125,14 @@ apps/api/.venv/bin/python scripts/export_deepseek_storage.py
 4. 长回答用 **主列 clip + 纵向拼接**，避免只截一屏
 
 实现：`providers/deepseek_web.py` → `_capture_answer_evidence`
+
+
+## 截图实现（按全页面截图说明）
+
+参考 `docs/17-playwright-fullpage-screenshot.md`：
+
+1. 隐藏侧栏/输入框（避免 fullPage 拼进无关 chrome）
+2. **先滚动整页触发懒加载**
+3. 滚回顶部
+4. **`page.screenshot(full_page=True)`** 截取滚动范围内全部内容
+5. 若仍过短，再用回答节点 element 截图补高
