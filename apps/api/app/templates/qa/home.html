@@ -38,7 +38,7 @@
     <div class="card"><div class="label">m_body</div><div class="value">{{ counts.brand.m_body }}</div></div>
     <div class="card"><div class="label">m_head</div><div class="value">{{ counts.brand.m_head }}</div></div>
   </div>
-  <p class="muted">前端示例：提及率 ≈ {{ counts.brand.m_mentioned }} / {{ counts.denominator.n_valid }}{% if counts.denominator.n_valid %} = {{ '%.1f'|format(100 * counts.brand.m_mentioned / counts.denominator.n_valid) }}%{% endif %}</p>
+  <p class="muted">前端示例：提及率 ≈ {{ counts.brand.m_mentioned }} / {{ counts.denominator.n_valid }}{% if counts.denominator.n_valid %}（前端可自行相除）{% endif %}</p>
   <p><a href="/v1/counts?brand_id={{ brand1.id }}" target="_blank">打开 JSON counts</a></p>
 </section>
 {% endif %}

@@ -58,9 +58,9 @@ def qa_home(request: Request, db: Session = Depends(get_db)):
             counts = None
 
     return templates.TemplateResponse(
+        request,
         "qa/home.html",
         {
-            "request": request,
             "job_by_status": job_by_status,
             "answer_by_status": answer_by_status,
             "n_responses": n_responses,
@@ -93,9 +93,9 @@ def qa_jobs(
         for p in db.scalars(select(Prompt).where(Prompt.id.in_(prompt_ids))).all():
             prompts[p.id] = p
     return templates.TemplateResponse(
+        request,
         "qa/jobs.html",
         {
-            "request": request,
             "jobs": jobs,
             "prompts": prompts,
             "status": status,
@@ -122,9 +122,9 @@ def qa_responses(
         q = q.where(RawResponse.platform == platform)
     rows = list(db.scalars(q.limit(limit)).all())
     return templates.TemplateResponse(
+        request,
         "qa/responses.html",
         {
-            "request": request,
             "rows": rows,
             "answer_status": answer_status,
             "platform": platform,
@@ -150,9 +150,9 @@ def qa_response_detail(
     job = db.get(CrawlJob, row.job_id) if row else None
     prompt = db.get(Prompt, job.prompt_id) if job else None
     return templates.TemplateResponse(
+        request,
         "qa/response_detail.html",
         {
-            "request": request,
             "row": row,
             "job": job,
             "prompt": prompt,
