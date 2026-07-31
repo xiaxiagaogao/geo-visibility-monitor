@@ -309,7 +309,8 @@ def _clean_answer_text(text: str) -> str:
     text = re.sub(r"(FINISHEDSEARCH|FINISHED|SEARCH)[\w\u4e00-\u9fff]*$", "", text, flags=re.I).strip()
     # common broken year prefix after stripping FINISHEDSEARCH2026 -> if starts with lone 6年 fix
     if re.match(r"^6年", text):
-        text = "2026年" + text[2:]
+        text = "2026年" + text[len("6年"):]
+    text = re.sub(r"^2026年6年", "2026年", text)
     return text.strip()
 
 
