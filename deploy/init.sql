@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS citations (
     snippet TEXT
 );
 
+-- NOTE (L2 policy): metric_snapshots may hold *optional* cached rates for UI later.
+-- MVP authority is GET /v1/counts (integers only). Do not treat this table as L2 source of truth.
 CREATE TABLE IF NOT EXISTS metric_snapshots (
     id SERIAL PRIMARY KEY,
     brand_id INT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
@@ -107,6 +109,9 @@ CREATE INDEX IF NOT EXISTS idx_brand_aliases_brand ON brand_aliases(brand_id);
 CREATE INDEX IF NOT EXISTS idx_prompts_brand ON prompts(brand_id);
 CREATE INDEX IF NOT EXISTS idx_raw_responses_created ON raw_responses(created_at);
 CREATE INDEX IF NOT EXISTS idx_mentions_brand ON mentions(brand_id, response_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_mentions_response_brand ON mentions(response_id, brand_id);
+CREATE INDEX IF NOT EXISTS idx_mentions_response ON mentions(response_id);
+CREATE INDEX IF NOT EXISTS idx_raw_responses_platform_created ON raw_responses(platform, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON crawl_jobs(status, platform);
 CREATE INDEX IF NOT EXISTS idx_metrics_brand_window ON metric_snapshots(brand_id, platform, window_end);
 
@@ -120,4 +125,7 @@ INSERT INTO schema_migrations (id) VALUES ('001_mvp_init')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO schema_migrations (id) VALUES ('002_l1_fields')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO schema_migrations (id) VALUES ('003_l2_mentions_unique')
 ON CONFLICT (id) DO NOTHING;

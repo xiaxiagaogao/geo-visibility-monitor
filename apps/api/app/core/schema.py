@@ -17,6 +17,17 @@ _MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_raw_responses_answer_status ON raw_responses(answer_status);
         """,
     ),
+    (
+        "003_l2_mentions_unique",
+        """
+        -- L2 integrity: one mention row per (response, brand)
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_mentions_response_brand
+            ON mentions(response_id, brand_id);
+        CREATE INDEX IF NOT EXISTS idx_raw_responses_platform_created
+            ON raw_responses(platform, created_at);
+        CREATE INDEX IF NOT EXISTS idx_mentions_response ON mentions(response_id);
+        """,
+    ),
 ]
 
 

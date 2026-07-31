@@ -30,3 +30,7 @@
 ## DeepSeek 登录何时做？
 
 见下文与 `docs/14-b5-deepseek.md`：**在打开 `CRAWL_MODE=real` 之前**准备登录态；日常跑任务时 worker 自动用已保存的 state，不必每次人手点登录。
+
+## 验收
+
+正式验收与 DB 加固见 [19-l2-acceptance.md](./19-l2-acceptance.md)。
