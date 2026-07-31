@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import List, Optional
 from pathlib import Path
 from urllib.parse import urlparse
@@ -120,7 +121,15 @@ def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
 
     try:
         provider = _build_provider(db, job, prompt)
-        result = provider.search(prompt.text)
+        settings = get_settings()
+        # hard cap slightly above provider timeout so zombies cannot stick job forever
+        timeout_sec = max(60, int(settings.crawl_timeout_ms / 1000) + 45)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(provider.search, prompt.text)
+            try:
+                result = fut.result(timeout=timeout_sec)
+            except FuturesTimeout:
+                raise RuntimeError(f"crawl timed out after {timeout_sec}s")
         return _persist_result(db, job, prompt, result)
     except DeepSeekLoginRequired as exc:
         job.status = "failed"

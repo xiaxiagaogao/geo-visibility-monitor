@@ -52,6 +52,9 @@ services:
     container_name: geo-crawler
     restart: unless-stopped
     profiles: ["crawl"]
+    # Playwright/Chromium in Docker: avoid /dev/shm crashes & zombies
+    shm_size: "1gb"
+    init: true
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://geo:geo@postgres:5432/geo}
       CRAWL_MODE: ${CRAWL_MODE:-real}

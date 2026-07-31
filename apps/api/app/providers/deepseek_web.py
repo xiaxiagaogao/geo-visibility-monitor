@@ -359,6 +359,7 @@ def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> N
             time.sleep(0.3)
             # element screenshot includes full scroll height of the node
             best.screenshot(path=shot_path, type="png")
+            logger.info("evidence element screenshot saved %s", shot_path)
             return
         except Exception as exc:
             logger.warning("element screenshot failed: %s", exc)
@@ -445,7 +446,7 @@ def _wait_for_answer(page, stream_chunks: List[str], timeout_ms: int) -> str:
         else:
             stable_hits = 0
         # require substantial answer + stability ~4s
-        if last and len(last) > 120 and stable_hits >= 8:
+        if last and len(last) > 120 and stable_hits >= 5:
             break
         time.sleep(0.5)
     # strip common stream glue artifacts
