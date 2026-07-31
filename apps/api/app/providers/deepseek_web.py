@@ -96,7 +96,7 @@ class DeepSeekWebProvider(BaseProvider):
                     context = p.chromium.launch_persistent_context(
                         self.user_data_dir,
                         headless=self.headless,
-                        viewport={"width": 1280, "height": 900},
+                        viewport={"width": 1400, "height": 1200},
                         locale="zh-CN",
                     )
                     page = context.new_page()
@@ -182,12 +182,11 @@ class DeepSeekWebProvider(BaseProvider):
 
                 shot = None
                 if self.screenshot_dir:
-                    import os
-                    from pathlib import Path
+                    from pathlib import Path as P
 
-                    Path(self.screenshot_dir).mkdir(parents=True, exist_ok=True)
-                    shot = str(Path(self.screenshot_dir) / f"deepseek_{int(time.time())}.png")
-                    page.screenshot(path=shot, full_page=True)
+                    P(self.screenshot_dir).mkdir(parents=True, exist_ok=True)
+                    shot = str(P(self.screenshot_dir) / f"deepseek_{int(time.time())}.png")
+                    _capture_answer_evidence(page, shot, expected_text=full_text)
 
                 latency = int((time.time() - t0) * 1000)
                 # dedupe citations
@@ -299,6 +298,79 @@ def _looks_like_login(page) -> bool:
     except Exception:
         return False
     return False
+
+
+
+def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> None:
+    """Capture complete answer evidence: hide chrome, screenshot answer node fully.
+
+    Viewport-only screenshots are useless for long answers. Prefer element
+    screenshot of the longest assistant markdown bubble (full element height).
+    """
+    try:
+        page.add_style_tag(
+            content="""
+            /* hide left conversation rail / nav chrome for cleaner evidence */
+            aside, nav, [class*='sidebar'], [class*='SideBar'], [class*='sider'],
+            [class*='history'], [class*='History'] {
+              display: none !important;
+            }
+            body { overflow: auto !important; }
+            """
+        )
+    except Exception:
+        pass
+
+    # give layout a moment after CSS
+    time.sleep(0.4)
+
+    # pick best answer element by text length / overlap with extracted text
+    best = None
+    best_score = -1
+    for sel in (".ds-markdown", "[class*='ds-markdown']", ".message-content"):
+        try:
+            loc = page.locator(sel)
+            n = loc.count()
+        except Exception:
+            continue
+        for i in range(n):
+            node = loc.nth(i)
+            try:
+                txt = (node.inner_text(timeout=1500) or "").strip()
+            except Exception:
+                continue
+            if len(txt) < 80 or _is_noise_text(txt):
+                continue
+            score = len(txt)
+            if expected_text:
+                # bonus if shares prefix/content with extracted answer
+                sample = expected_text[:80]
+                if sample and sample in txt:
+                    score += 10000
+                elif txt[:60] in expected_text:
+                    score += 5000
+            if score > best_score:
+                best_score = score
+                best = node
+
+    if best is not None:
+        try:
+            best.scroll_into_view_if_needed(timeout=5000)
+            time.sleep(0.3)
+            # element screenshot includes full scroll height of the node
+            best.screenshot(path=shot_path, type="png")
+            return
+        except Exception as exc:
+            logger.warning("element screenshot failed: %s", exc)
+
+    # fallback: scroll main to top then full page
+    try:
+        page.evaluate("window.scrollTo(0, 0)")
+        time.sleep(0.2)
+        page.screenshot(path=shot_path, full_page=True, type="png")
+    except Exception as exc:
+        logger.warning("full_page screenshot failed: %s", exc)
+        page.screenshot(path=shot_path, full_page=False, type="png")
 
 
 def _clean_answer_text(text: str) -> str:

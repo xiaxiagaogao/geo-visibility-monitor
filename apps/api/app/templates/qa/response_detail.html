@@ -36,13 +36,15 @@
   <section class="card" style="margin-bottom:16px;">
     <h2>截图证据</h2>
     {% if screenshot_url %}
-      <p class="muted">证据只保留截图，不保留 DeepSeek 对话 URL（避免多会话串上下文）。</p>
+      <p class="muted">证据为<strong>完整回答区域</strong>截图（隐藏侧栏；非整页侧栏缩略）。不保留 DeepSeek 对话 URL。</p>
+      <p><a href="{{ screenshot_url }}" target="_blank">打开原图（新标签）</a></p>
       <a href="{{ screenshot_url }}" target="_blank">
-        <img src="{{ screenshot_url }}" alt="crawl screenshot" style="max-width:100%;border:1px solid var(--border);border-radius:8px;" />
+        <img src="{{ screenshot_url }}" alt="answer evidence screenshot"
+             style="max-width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:#0c1118;" />
       </a>
       <p class="muted mono">{{ row.screenshot_path }}</p>
     {% else %}
-      <p class="muted">暂无截图（旧数据或假数据）。真抓任务会写入 `screenshot_path`。</p>
+      <p class="muted">暂无截图（旧数据/假数据，或截图失败）。新真抓任务会生成完整回答截图。</p>
     {% endif %}
   </section>
 
