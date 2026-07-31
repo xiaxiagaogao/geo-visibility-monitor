@@ -186,7 +186,7 @@ class DeepSeekWebProvider(BaseProvider):
 
                     P(self.screenshot_dir).mkdir(parents=True, exist_ok=True)
                     shot = str(P(self.screenshot_dir) / f"deepseek_{int(time.time())}.png")
-                    _capture_answer_evidence(page, shot, expected_text=full_text)
+                    _capture_answer_evidence(page, shot, expected_text=full_text, question=prompt)
 
                 latency = int((time.time() - t0) * 1000)
                 # dedupe citations
@@ -329,153 +329,202 @@ def _scroll_page_for_lazy_load(page, step: int = 400, pause_ms: int = 150) -> No
 
 
 
-def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> None:
-    """Clean complete answer evidence via isolated HTML render + full_page.
+def _capture_answer_evidence(
+    page,
+    shot_path: str,
+    expected_text: str = "",
+    question: str = "",
+) -> None:
+    """Clean complete-answer evidence screenshot.
 
-    Target (user reference): one clean card with full answer (tables/lists),
-    optional question chip; no left history, no floating composer.
-
-    Primary path:
-      extract answer HTML -> blank page set_content -> full_page=True
-    Fallback:
-      hide chrome on live page, expand scroll parents, full_page=True
+    Where: VPS crawler container (Playwright headless Chromium), NOT Mac Chrome.
+    How:
+      1) Extract answer HTML via Playwright locators (avoid fragile page.evaluate)
+      2) Open a blank page, set_content a dark card document with Q + full answer
+      3) screenshot(full_page=True) so tables/lists are fully visible
+    Fallback: hide chrome on live page + expand scroll parents + full_page
     """
     import html as html_lib
     import re as _re
 
-    payload = page.evaluate(
-        """(expected) => {
-          const isNoise = (s) => {
-            if (!s || s.trim().length < 40) return true;
-            const t = s.trim();
-            if (t.startsWith('开启新对话') && t.length < 900) return true;
-            return false;
-          };
-          const nodes = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
-          let best = null, bestScore = -1;
-          for (const n of nodes) {
-            const text = (n.innerText || '').trim();
-            if (isNoise(text)) continue;
-            let score = text.length;
-            if (n.querySelector('table')) score += 4000;
-            if (n.querySelector('li')) score += 400;
-            if (expected) {
-              const sample = expected.slice(0, 48);
-              if (sample && text.includes(sample)) score += 100000;
-            }
-            if (score > bestScore) { bestScore = score; best = n; }
-          }
-          if (!best) return null;
+    sample = (expected_text or "").strip()[:80]
+    answer_html = ""
+    answer_text = ""
+    best_score = -1
 
-          let question = '';
-          let cur = best.parentElement;
-          for (let depth = 0; depth < 6 && cur; depth++) {
-            let prev = cur.previousElementSibling;
-            for (let i = 0; i < 5 && prev; i++) {
-              const t = (prev.innerText || '').trim();
-              if (t && t.length <= 300 && (t.includes('？') || t.includes('?') || t.length < 100)) {
-                question = t.split('\n')[0].trim();
-              }
-              prev = prev.previousElementSibling;
-            }
-            cur = cur.parentElement;
-          }
-          if (!question) {
-            const candidates = Array.from(document.querySelectorAll('div, span, p'))
-              .map(el => (el.innerText || '').trim())
-              .filter(t => t.length > 4 && t.length < 120 && (t.includes('？') || t.includes('?')));
-            if (candidates.length) question = candidates[candidates.length - 1];
-          }
+    # Prefer Playwright locator API over complex evaluate (avoids SyntaxError edge cases)
+    for sel in (".ds-markdown", "[class*='ds-markdown']", ".message-content"):
+        try:
+            nodes = page.locator(sel)
+            n = nodes.count()
+        except Exception:
+            continue
+        for i in range(min(n, 40)):
+            try:
+                node = nodes.nth(i)
+                txt = (node.inner_text(timeout=2000) or "").strip()
+                if not txt or len(txt) < 40:
+                    continue
+                if txt.startswith("开启新对话") and len(txt) < 900:
+                    continue
+                score = len(txt)
+                try:
+                    if node.locator("table").count() > 0:
+                        score += 4000
+                    if node.locator("li").count() > 0:
+                        score += 400
+                except Exception:
+                    pass
+                if sample and sample[:24] in txt:
+                    score += 100000
+                if score > best_score:
+                    best_score = score
+                    answer_text = txt
+                    answer_html = node.inner_html(timeout=2000) or ""
+            except Exception:
+                continue
+        if answer_html:
+            break
 
-          let status = '';
-          const allText = document.body.innerText || '';
-          const m = allText.match(/已阅读\s*\d+\s*个网页/);
-          if (m) status = m[0];
+    if not answer_html and answer_text:
+        answer_html = f"<pre style='white-space:pre-wrap;font:inherit'>{html_lib.escape(answer_text)}</pre>"
 
-          return {
-            question,
-            status,
-            answerHtml: best.innerHTML,
-            answerText: (best.innerText || '').trim(),
-          };
-        }""",
-        expected_text or "",
-    )
+    q = (question or "").strip()
+    if not q:
+        # best-effort: short line ending with ? from page text
+        try:
+            body = page.locator("body").inner_text(timeout=2000) or ""
+            for line in reversed(body.splitlines()):
+                t = line.strip()
+                if 4 < len(t) < 120 and ("？" in t or "?" in t):
+                    q = t
+                    break
+        except Exception:
+            q = ""
 
-    if payload and payload.get("answerHtml"):
-        q = (payload.get("question") or "").strip()
-        status = (payload.get("status") or "").strip()
-        answer_html = payload["answerHtml"]
+    status = ""
+    try:
+        body = page.locator("body").inner_text(timeout=2000) or ""
+        m = _re.search(r"已阅读\s*\d+\s*个网页", body)
+        if m:
+            status = m.group(0)
+    except Exception:
+        pass
+
+    if answer_html:
         answer_html = _re.sub(r"<script[\s\S]*?</script>", "", answer_html, flags=_re.I)
-        answer_html = _re.sub(r"on\w+=\"([^\"]*)\"", "", answer_html, flags=_re.I)
+        answer_html = _re.sub(r"\son\w+=([\"']).*?\1", "", answer_html, flags=_re.I)
+        answer_html = _re.sub(r"\son\w+=\{[^}]*\}", "", answer_html, flags=_re.I)
 
-        q_html = f'<div class="q">{html_lib.escape(q)}</div>' if q else ""
-        status_html = f'<div class="meta">{html_lib.escape(status)}</div>' if status else ""
+        q_html = (
+            f'<div class="q">{html_lib.escape(q)}</div>' if q else ""
+        )
+        status_html = (
+            f'<div class="meta">{html_lib.escape(status)}</div>' if status else ""
+        )
         doc = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 *{{box-sizing:border-box}}
-body{{margin:0;padding:32px 40px 48px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e8eaed;line-height:1.65;font-size:15px}}
+html,body{{margin:0;padding:0;background:#0f1115;color:#e8eaed}}
+body{{padding:28px 36px 56px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;line-height:1.7;font-size:15px}}
 .wrap{{max-width:920px;margin:0 auto}}
-.q{{display:block;margin:0 0 18px auto;padding:10px 14px;border-radius:16px;background:#2a2f3a;color:#f3f4f6;max-width:85%;width:fit-content;margin-left:auto}}
-.meta{{color:#9aa3b2;font-size:13px;margin:0 0 16px}}
-.answer{{background:#161b22;border:1px solid #2a3344;border-radius:14px;padding:20px 22px}}
+.q{{display:block;margin:0 0 16px auto;padding:10px 16px;border-radius:18px;background:#2a2f3a;color:#f3f4f6;max-width:88%;width:fit-content;margin-left:auto;white-space:pre-wrap}}
+.meta{{color:#9aa3b2;font-size:13px;margin:0 0 14px}}
+.answer{{background:#161b22;border:1px solid #2a3344;border-radius:14px;padding:22px 24px}}
+.answer p{{margin:0 0 0.85em}}
+.answer h1,.answer h2,.answer h3,.answer h4{{margin:1em 0 0.5em;line-height:1.35}}
 .answer table{{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}}
 .answer th,.answer td{{border:1px solid #3a455a;padding:8px 10px;vertical-align:top}}
-.answer th{{background:#1e2633}}
-.answer a{{color:#8ab4ff}}
-.answer ul,.answer ol{{padding-left:1.3em}}
+.answer th{{background:#1e2633;text-align:left}}
+.answer a{{color:#8ab4ff;text-decoration:none}}
+.answer ul,.answer ol{{padding-left:1.35em;margin:0.4em 0 0.9em}}
+.answer li{{margin:0.25em 0}}
+.answer code{{background:#1e2633;padding:0.1em 0.35em;border-radius:4px;font-size:0.92em}}
+.answer pre{{background:#1e2633;padding:12px;border-radius:8px;overflow:auto}}
+.answer strong{{font-weight:600}}
 </style></head><body><div class="wrap">
 {q_html}{status_html}<div class="answer">{answer_html}</div>
 </div></body></html>"""
+        evidence = None
         try:
             evidence = page.context.new_page()
             evidence.set_viewport_size({"width": 1100, "height": 900})
             evidence.set_content(doc, wait_until="load")
-            evidence.wait_for_timeout(500)
+            evidence.wait_for_timeout(400)
+            # ensure full document height is measured after fonts/layout
             try:
-                _scroll_page_for_lazy_load(evidence, step=700, pause_ms=60)
-                evidence.evaluate("window.scrollTo(0,0)")
-                evidence.wait_for_timeout(200)
+                evidence.evaluate(
+                    """async () => {
+                      window.scrollTo(0, document.body.scrollHeight);
+                      await new Promise(r => setTimeout(r, 120));
+                      window.scrollTo(0, 0);
+                    }"""
+                )
+                evidence.wait_for_timeout(150)
             except Exception:
                 pass
             evidence.screenshot(path=shot_path, full_page=True, type="png")
-            evidence.close()
-            logger.info("evidence clean-render full_page saved %s", shot_path)
+            logger.info(
+                "evidence clean-render full_page saved %s html_len=%s text_len=%s",
+                shot_path,
+                len(answer_html),
+                len(answer_text),
+            )
             return
         except Exception as exc:
             logger.warning("clean-render screenshot failed: %s", exc)
+        finally:
+            if evidence is not None:
+                try:
+                    evidence.close()
+                except Exception:
+                    pass
 
-    # fallback live page
+    # Fallback: live page full_page after hiding chrome / expanding scrollers
     try:
-        page.add_style_tag(content="aside,nav,[class*='sidebar' i],[class*='history' i]{display:none!important}textarea{visibility:hidden!important}")
+        page.add_style_tag(
+            content=(
+                "aside,nav,[class*='sidebar' i],[class*='history' i],"
+                "[class*='side-bar' i]{display:none!important}"
+                "textarea,[contenteditable='true'],[class*='composer' i],"
+                "[class*='input-area' i]{visibility:hidden!important;height:0!important;overflow:hidden!important}"
+            )
+        )
         page.evaluate(
             """() => {
-              const answers=Array.from(document.querySelectorAll('.ds-markdown'));
-              let best=null,n=0;
-              for (const a of answers){const t=(a.innerText||'').trim(); if(t.length>n){n=t.length;best=a;}}
-              if(!best) return;
-              let p=best;
-              while(p && p!==document.body){
-                const st=getComputedStyle(p);
-                if((st.overflowY==='auto'||st.overflowY==='scroll') && p.scrollHeight>p.clientHeight+20){
-                  p.style.setProperty('height', p.scrollHeight+'px','important');
-                  p.style.setProperty('overflow','visible','important');
-                }
-                p.style.setProperty('max-height','none','important');
-                p=p.parentElement;
+              const answers = Array.from(document.querySelectorAll('.ds-markdown'));
+              let best = null, n = 0;
+              for (const a of answers) {
+                const t = (a.innerText || '').trim();
+                if (t.length > n) { n = t.length; best = a; }
               }
+              if (!best) return false;
+              let p = best;
+              while (p && p !== document.body) {
+                const st = getComputedStyle(p);
+                if ((st.overflowY === 'auto' || st.overflowY === 'scroll') && p.scrollHeight > p.clientHeight + 20) {
+                  p.style.setProperty('height', p.scrollHeight + 'px', 'important');
+                  p.style.setProperty('max-height', 'none', 'important');
+                  p.style.setProperty('overflow', 'visible', 'important');
+                }
+                p.style.setProperty('max-height', 'none', 'important');
+                p = p.parentElement;
+              }
+              document.documentElement.style.overflow = 'visible';
+              document.body.style.overflow = 'visible';
+              return true;
             }"""
         )
-        _scroll_page_for_lazy_load(page, step=500, pause_ms=100)
+        _scroll_page_for_lazy_load(page, step=500, pause_ms=80)
         page.evaluate("window.scrollTo(0,0)")
-        time.sleep(0.4)
+        time.sleep(0.3)
         page.screenshot(path=shot_path, full_page=True, type="png")
         logger.info("evidence live full_page fallback saved %s", shot_path)
     except Exception as exc:
         logger.warning("live full_page failed: %s", exc)
         page.screenshot(path=shot_path, full_page=False, type="png")
-
 
 
 def _clean_answer_text(text: str) -> str:

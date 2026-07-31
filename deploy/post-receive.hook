@@ -33,6 +33,19 @@ fi
 cd "$TARGET/deploy"
 echo "docker compose up postgres api..."
 docker compose up -d --build postgres api
+
+# crawler holds Playwright code; rebuild if container already exists
+if docker ps -a --format '{{.Names}}' | grep -qx geo-crawler; then
+  echo "docker compose rebuild crawler..."
+  docker compose --profile crawl up -d --build crawler
+  # storage_state lives on volume /data; re-seed only if missing
+  if [ -f deepseek_storage.json ]; then
+    if ! docker exec geo-crawler test -f /data/deepseek_storage.json 2>/dev/null; then
+      echo "seed deepseek_storage.json into crawler volume"
+      docker cp deepseek_storage.json geo-crawler:/data/deepseek_storage.json || true
+    fi
+  fi
+fi
 for i in $(seq 1 90); do
   if docker exec geo-postgres pg_isready -U geo -d geo >/dev/null 2>&1; then
     echo "postgres ready"

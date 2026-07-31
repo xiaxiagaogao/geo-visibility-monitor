@@ -1,5 +1,28 @@
 # Playwright 全页面截图功能说明
 
+## 0. 本项目（geo-demo）实际用法
+
+**截图在哪里抓？**  
+在 **VPS 的 `geo-crawler` 容器**里，用 Playwright 无头 Chromium 抓，**不是**你 Mac 本机 Chrome。
+
+**为什么不能直接对 DeepSeek 页面 `full_page=True`？**  
+DeepSeek 聊天 UI 有左侧历史、底部输入框、内部滚动容器。直接整页截图会得到「侧栏+半截回答+输入框」——就像 QA 里 #17 那种坏证据。
+
+**当前策略（干净证据）：**
+
+1. 用 Playwright locator 从 `.ds-markdown` 抽出**完整回答 HTML**（表格/列表保留）
+2. `context.new_page()` + `set_content` 渲染一张**深色卡片**（问题气泡 + 回答正文）
+3. 对这张独立页 `screenshot(full_page=True)`  
+4. 失败才 fallback：隐藏侧栏/输入框 → 撑开内部 scroller → live `full_page`
+
+代码：`apps/api/app/providers/deepseek_web.py` → `_capture_answer_evidence`  
+产物：`/data/screenshots/deepseek_*.png`（volume `crawl_data`）  
+QA 预览：`/qa/media/screenshots/{filename}`
+
+**部署注意：** `post-receive` 默认会 rebuild api；crawler 有容器时一并 rebuild。代码进 worktree ≠ 进镜像，必须 rebuild crawler。
+
+---
+
 > 适用于无头 Chromium（Headless Chromium）场景  
 > 实现真正的**全量页面截图**（包含滚动条范围内的所有内容），而非仅可视区域截图。
 
