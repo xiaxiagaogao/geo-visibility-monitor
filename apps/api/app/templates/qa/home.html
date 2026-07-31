@@ -1,5 +1,6 @@
 {% extends "qa/base.html" %}
-{% block title %}GEO QA 总览{% endblock %}
+{% block title %}GEO QA 总览<style>tr.click-row:hover{background:#1e2a3d}</style>
+{% endblock %}
 {% block content %}
 <h1>数据质量总览</h1>
 <p class="muted">查看抓取任务、原始回答与 L1 标注是否正常。正式看板指标（L3）由前端用 counts 计算。</p>
@@ -74,13 +75,13 @@
     </thead>
     <tbody>
       {% for r in recent_responses %}
-      <tr>
-        <td><a href="/qa/responses/{{ r.id }}">#{{ r.id }}</a></td>
+      <tr class="click-row" style="cursor:pointer" onclick="location.href='/qa/responses/{{ r.id }}'">
+        <td><a href="/qa/responses/{{ r.id }}" onclick="event.stopPropagation()">#{{ r.id }}</a></td>
         <td>{{ r.platform }}</td>
         <td><span class="badge {% if r.answer_status=='ok' %}ok{% else %}warn{% endif %}">{{ r.answer_status or 'null' }}</span></td>
         <td class="muted">{{ r.annotator_version or '-' }}</td>
         <td>{{ r.mentions|length }}</td>
-        <td class="muted">{{ r.full_text[:80] }}{% if r.full_text|length > 80 %}…{% endif %}</td>
+        <td class="muted"><a href="/qa/responses/{{ r.id }}" style="color:inherit" onclick="event.stopPropagation()">{{ r.full_text[:80] }}{% if r.full_text|length > 80 %}…{% endif %}</a></td>
       </tr>
       {% else %}
       <tr><td colspan="6" class="muted">暂无回答</td></tr>
@@ -88,4 +89,5 @@
     </tbody>
   </table>
 </section>
+<style>tr.click-row:hover{background:#1e2a3d}</style>
 {% endblock %}

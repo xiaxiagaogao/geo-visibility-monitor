@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional
+from pathlib import Path
 from urllib.parse import urlparse
 
 from sqlalchemy import select
@@ -78,7 +79,7 @@ def _persist_result(db: Session, job: CrawlJob, prompt: Prompt, result: CrawlRes
         full_text=result.full_text,
         raw_json=result.raw_json,
         latency_ms=result.latency_ms,
-        screenshot_path=result.screenshot_path,
+        screenshot_path=(Path(result.screenshot_path).name if result.screenshot_path else None),
         html_path=None,
     )
     db.add(resp)

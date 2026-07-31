@@ -2,6 +2,7 @@
 {% block title %}回答 · GEO QA{% endblock %}
 {% block content %}
 <h1>回答 L0 / L1</h1>
+<p class="muted">点击整行进入详情（全文 + L1 + 截图证据）。不依赖 DeepSeek 对话 URL。</p>
 <div class="filters">
   <a href="/qa/responses" class="{% if not answer_status and not platform %}active{% endif %}">全部</a>
   {% for s in ['ok','empty','too_short','error'] %}
@@ -13,13 +14,13 @@
   <thead>
     <tr>
       <th>ID</th><th>job</th><th>平台</th><th>status</th><th>L1</th>
-      <th>命中摘要</th><th>正文预览</th>
+      <th>命中摘要</th><th>截图</th><th>正文预览</th>
     </tr>
   </thead>
   <tbody>
     {% for r in rows %}
-    <tr>
-      <td><a href="/qa/responses/{{ r.id }}">#{{ r.id }}</a></td>
+    <tr class="click-row" onclick="location.href='/qa/responses/{{ r.id }}'" style="cursor:pointer">
+      <td><a href="/qa/responses/{{ r.id }}" onclick="event.stopPropagation()">#{{ r.id }}</a></td>
       <td>{{ r.job_id }}</td>
       <td>{{ r.platform }}</td>
       <td><span class="badge {% if r.answer_status=='ok' %}ok{% else %}warn{% endif %}">{{ r.answer_status or 'null' }}</span></td>
@@ -34,11 +35,27 @@
           <span class="muted">无 mentions</span>
         {% endfor %}
       </td>
-      <td class="muted">{{ r.full_text[:100] }}{% if r.full_text|length > 100 %}…{% endif %}</td>
+      <td>
+        {% if r.screenshot_path %}
+          <span class="badge ok">有</span>
+        {% else %}
+          <span class="badge">无</span>
+        {% endif %}
+      </td>
+      <td class="muted preview-cell">
+        <a class="preview-link" href="/qa/responses/{{ r.id }}" onclick="event.stopPropagation()">
+          {{ (r.full_text or '')[:120] }}{% if r.full_text and r.full_text|length > 120 %}…{% endif %}
+        </a>
+      </td>
     </tr>
     {% else %}
-    <tr><td colspan="7" class="muted">无数据</td></tr>
+    <tr><td colspan="8" class="muted">无数据</td></tr>
     {% endfor %}
   </tbody>
 </table>
+<style>
+  tr.click-row:hover { background: #1e2a3d; }
+  a.preview-link { color: var(--text); text-decoration: none; display: block; }
+  a.preview-link:hover { color: var(--accent); text-decoration: underline; }
+</style>
 {% endblock %}

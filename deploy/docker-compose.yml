@@ -36,8 +36,11 @@ services:
       CRAWL_MODE: ${CRAWL_MODE:-fake}
       DEEPSEEK_STORAGE_STATE: ${DEEPSEEK_STORAGE_STATE:-}
       PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
+      SCREENSHOT_DIR: ${SCREENSHOT_DIR:-/data/screenshots}
     ports:
       - "8200:8200"
+    volumes:
+      - crawl_data:/data
     depends_on:
       postgres:
         condition: service_healthy

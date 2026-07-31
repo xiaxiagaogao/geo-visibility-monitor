@@ -207,7 +207,7 @@ class DeepSeekWebProvider(BaseProvider):
                 return CrawlResult(
                     platform="deepseek",
                     prompt=prompt,
-                    full_text=full_text.strip(),
+                    full_text=_clean_answer_text(full_text),
                     citations=uniq_cites,
                     raw_json={
                         "source": "deepseek_web",
@@ -301,7 +301,17 @@ def _looks_like_login(page) -> bool:
     return False
 
 
+def _clean_answer_text(text: str) -> str:
+    text = (text or "").strip()
+    # stream glue / status tokens sometimes prepended
+    import re
+    text = re.sub(r"^(FINISHEDSEARCH|FINISHED|SEARCH)+", "", text, flags=re.I).lstrip(" :|-")
+    text = re.sub(r"^(FINISHEDSEARCH|FINISHED|SEARCH)+", "", text, flags=re.I).lstrip(" :|-")
+    return text.strip()
+
+
 def _is_noise_text(text: str) -> bool:
+
     if not text or len(text.strip()) < 40:
         return True
     # pure sidebar: many short history titles, no paragraph structure

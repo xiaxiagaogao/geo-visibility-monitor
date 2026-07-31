@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
@@ -149,6 +149,18 @@ def qa_response_detail(
     }
     job = db.get(CrawlJob, row.job_id) if row else None
     prompt = db.get(Prompt, job.prompt_id) if job else None
+    screenshot_url = None
+    display_raw = None
+    if row:
+        display_raw = dict(row.raw_json or {})
+        # never surface conversation URLs in QA
+        for k in list(display_raw.keys()):
+            if "url" in k.lower() or "chat" in k.lower():
+                if isinstance(display_raw.get(k), str) and "deepseek.com" in display_raw[k]:
+                    display_raw[k] = "[redacted-conversation-url]"
+        if row.screenshot_path:
+            name = Path(row.screenshot_path).name
+            screenshot_url = f"/qa/media/screenshots/{name}"
     return templates.TemplateResponse(
         request,
         "qa/response_detail.html",
@@ -157,5 +169,7 @@ def qa_response_detail(
             "job": job,
             "prompt": prompt,
             "brands": brands,
+            "screenshot_url": screenshot_url,
+            "display_raw_json": display_raw,
         },
     )

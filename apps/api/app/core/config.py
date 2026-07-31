@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     playwright_headless: bool = True
     deepseek_storage_state: str = ""
     deepseek_user_data_dir: str = ""
-    screenshot_dir: str = ""
+    screenshot_dir: str = "/data/screenshots"
 
 
 @lru_cache

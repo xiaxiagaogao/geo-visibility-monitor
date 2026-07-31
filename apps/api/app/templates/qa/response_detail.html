@@ -6,7 +6,7 @@
   <p class="muted">response 不存在</p>
 {% else %}
   <p class="muted"><a href="/qa/responses">← 返回列表</a></p>
-  <h1>回答 #{{ row.id }}</h1>
+  <h1>回答 #{{ row.id }} · 详情</h1>
   <div class="grid">
     <div class="card"><div class="label">平台</div><div class="value" style="font-size:18px">{{ row.platform }}</div></div>
     <div class="card"><div class="label">answer_status</div><div class="value" style="font-size:18px">{{ row.answer_status or 'null' }}</div></div>
@@ -29,28 +29,41 @@
   </section>
 
   <section class="card" style="margin-bottom:16px;">
-    <h2>L0 全文</h2>
-    <div class="fulltext mono">{{ row.full_text }}</div>
+    <h2>L0 全文（可完整阅读）</h2>
+    <div class="fulltext mono" style="max-height:none">{{ row.full_text }}</div>
   </section>
 
   <section class="card" style="margin-bottom:16px;">
-    <h2>Citations ({{ row.citations|length }})</h2>
+    <h2>截图证据</h2>
+    {% if screenshot_url %}
+      <p class="muted">证据只保留截图，不保留 DeepSeek 对话 URL（避免多会话串上下文）。</p>
+      <a href="{{ screenshot_url }}" target="_blank">
+        <img src="{{ screenshot_url }}" alt="crawl screenshot" style="max-width:100%;border:1px solid var(--border);border-radius:8px;" />
+      </a>
+      <p class="muted mono">{{ row.screenshot_path }}</p>
+    {% else %}
+      <p class="muted">暂无截图（旧数据或假数据）。真抓任务会写入 `screenshot_path`。</p>
+    {% endif %}
+  </section>
+
+  <section class="card" style="margin-bottom:16px;">
+    <h2>页面内引用片段 ({{ row.citations|length }}) — 非对话 URL</h2>
     {% if row.citations %}
     <table>
-      <thead><tr><th>#</th><th>domain</th><th>title</th><th>url</th></tr></thead>
+      <thead><tr><th>#</th><th>domain</th><th>title</th><th>snippet</th></tr></thead>
       <tbody>
         {% for c in row.citations %}
         <tr>
           <td>{{ c.cite_index }}</td>
           <td>{{ c.domain }}</td>
           <td>{{ c.title }}</td>
-          <td class="muted"><a href="{{ c.url }}" target="_blank">{{ c.url }}</a></td>
+          <td class="muted">{{ c.snippet or '' }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <p class="muted">无引用</p>
+    <p class="muted">无结构化引用</p>
     {% endif %}
   </section>
 
@@ -75,18 +88,16 @@
           <td class="muted mono">{{ m.evidence_snippet or '' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="muted">无标注（可 POST /v1/responses/{{ row.id }}/annotate）</td></tr>
+        <tr><td colspan="5" class="muted">无标注</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </section>
 
   <section class="card">
-    <h2>raw_json</h2>
-    <pre class="fulltext">{{ row.raw_json }}</pre>
-    <p class="muted">
-      <a href="/v1/responses/{{ row.id }}" target="_blank">JSON API</a>
-    </p>
+    <h2>raw_json（已脱敏对话 URL）</h2>
+    <pre class="fulltext">{{ display_raw_json }}</pre>
+    <p class="muted"><a href="/v1/responses/{{ row.id }}" target="_blank">JSON API</a></p>
   </section>
 {% endif %}
 {% endblock %}
