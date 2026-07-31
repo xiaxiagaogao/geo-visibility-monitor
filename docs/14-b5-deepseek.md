@@ -113,3 +113,15 @@ apps/api/.venv/bin/python scripts/export_deepseek_storage.py
 - 不使用日常 Chrome，不读 Chrome Safe Storage 钥匙串
 - 生成 `deploy/deepseek_storage.json`（已 gitignore）
 - VPS: `CRAWL_MODE=real` + crawler 容器挂载该文件
+
+
+## 截图证据结构（目标形态）
+
+理想证据图应接近「对话导出」而不是「浏览器整页缩略」：
+
+1. **含问题气泡**（用户问句）
+2. **含完整助手回答**（表格/列表/引用角标都在）
+3. **无左侧历史栏、无底部输入框**
+4. 长回答用 **主列 clip + 纵向拼接**，避免只截一屏
+
+实现：`providers/deepseek_web.py` → `_capture_answer_evidence`
