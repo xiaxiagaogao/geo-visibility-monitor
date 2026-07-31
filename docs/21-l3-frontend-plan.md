@@ -3,7 +3,9 @@
 > 日期：2026-07-31  
 > 状态：**方案待确认 · 未开工**  
 > 前置：L0 / L1 / L2 已验收；最小数据治理已完成（docs/19、docs/20）  
-> 原则：后端 counts only；前端 rates；一步一步，不擅自扩范围
+> 原则：后端 counts only；前端 rates；一步一步，不擅自扩范围  
+> **页面版式需求（g1geo 对标）：** [23-l3-ui-pages](./23-l3-ui-pages.md) — 实施以 21 步骤 + 23 版式为准  
+> **主对标：** [极义 GEO g1geo.com](https://g1geo.com/) 的监测/平台/报告信息架构（风格自定，不做商用全链路）
 
 ---
 
@@ -62,8 +64,10 @@ SoV(本品)   = m_brand / (m_brand + Σ m_comp) （分母为 0 则 —）
 | 请求 | fetch + TanStack Query（可选第一期只用 fetch） | |
 | 部署 | 构建静态资源由 **geo-api 挂载** 或 nginx 反代 `/` → web、`/v1` → api | 与现 VPS `:8200` 对齐方案在 F0 定 |
 
-**开源只借鉴交互/信息架构，不拷贝商用代码：**  
-GEO-Insight dashboard 分区、g1geo 监测感、elmo 可审计下钻、deepseek-geo 管理台菜单（仅壳）。
+**对标与借鉴：**  
+- **主对标版式/IA：** [g1geo](https://g1geo.com/)（监测台、平台维度、报告式总览）→ 详见 [23](./23-l3-ui-pages.md)  
+- **辅：** GEO-Insight 分区、elmo 可审计下钻、deepseek-geo 菜单壳  
+- 只借鉴结构，不拷贝商用代码/视觉皮肤；风格自定  
 
 ---
 
@@ -173,6 +177,7 @@ CORS：若跨端口，API 需允许 web origin（F5 处理）。
 
 ## 相关文档
 
+- [23-l3-ui-pages](./23-l3-ui-pages.md) — **页面级需求（g1geo 排版对照）**  
 - [10-data-responsibility](./10-data-responsibility.md) · [11-metrics-fe-be-split](./11-metrics-fe-be-split.md)  
 - [15-b6-counts-api](./15-b6-counts-api.md) · [19-l2-acceptance](./19-l2-acceptance.md) · [20-data-governance-min](./20-data-governance-min.md)  
 - [04-architecture §5](./04-architecture.md) · [22-roadmap-next](./22-roadmap-next.md)  

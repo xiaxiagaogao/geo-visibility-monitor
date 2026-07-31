@@ -73,6 +73,7 @@ pytest -q
 | 文档 | 说明 |
 |------|------|
 | [docs/21-l3-frontend-plan.md](docs/21-l3-frontend-plan.md) | L3 前端主线方案（待确认） |
+| [docs/23-l3-ui-pages.md](docs/23-l3-ui-pages.md) | L3 页面需求（g1geo 排版对照） |
 | [docs/22-roadmap-next.md](docs/22-roadmap-next.md) | 后续方向清单 |
 | [docs/10-data-responsibility.md](docs/10-data-responsibility.md) | L0–L3 职责 |
 | [docs/20-data-governance-min.md](docs/20-data-governance-min.md) | 最小数据治理 |
