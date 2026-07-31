@@ -328,187 +328,153 @@ def _scroll_page_for_lazy_load(page, step: int = 400, pause_ms: int = 150) -> No
     )
 
 
+
 def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> None:
-    """Full-page evidence shot for headless Chromium.
+    """Clean complete answer evidence via isolated HTML render + full_page.
 
-    Approach from project note (Playwright 全页面截图功能说明):
-      1) hide non-content chrome (sidebar/composer) so the long page is the answer column
-      2) scroll through page to trigger lazy load
-      3) scroll back to top
-      4) page.screenshot(full_page=True)  ← real full scroll-range capture
+    Target (user reference): one clean card with full answer (tables/lists),
+    optional question chip; no left history, no floating composer.
 
-    Do NOT use viewport-only shots; do NOT rely on clip rect (height is viewport-limited).
+    Primary path:
+      extract answer HTML -> blank page set_content -> full_page=True
+    Fallback:
+      hide chrome on live page, expand scroll parents, full_page=True
     """
-    # 1) hide left rail + bottom input so full_page is mostly the answer stream
-    try:
-        page.add_style_tag(
-            content="""
-            aside, nav,
-            [class*='sidebar' i], [class*='SideBar'], [class*='sider'],
-            [class*='history' i], [class*='History'] {
-              display: none !important;
-              width: 0 !important;
-              min-width: 0 !important;
-            }
-            textarea {
-              visibility: hidden !important;
-            }
-            /* reduce sticky/fixed chrome repeating in fullPage stitches */
-            [style*='position: fixed'], [style*='position:fixed'],
-            [class*='fixed' i], header {
-              position: absolute !important;
-            }
-            html, body {
-              height: auto !important;
-              max-height: none !important;
-              overflow: auto !important;
-            }
-            """
-        )
-    except Exception:
-        pass
+    import html as html_lib
+    import re as _re
 
-    time.sleep(0.4)
+    payload = page.evaluate(
+        """(expected) => {
+          const isNoise = (s) => {
+            if (!s || s.trim().length < 40) return true;
+            const t = s.trim();
+            if (t.startsWith('开启新对话') && t.length < 900) return true;
+            return false;
+          };
+          const nodes = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
+          let best = null, bestScore = -1;
+          for (const n of nodes) {
+            const text = (n.innerText || '').trim();
+            if (isNoise(text)) continue;
+            let score = text.length;
+            if (n.querySelector('table')) score += 4000;
+            if (n.querySelector('li')) score += 400;
+            if (expected) {
+              const sample = expected.slice(0, 48);
+              if (sample && text.includes(sample)) score += 100000;
+            }
+            if (score > bestScore) { bestScore = score; best = n; }
+          }
+          if (!best) return null;
 
-    # DeepSeek is a SPA: content often lives in an INTERNAL scroll container.
-    # window scrollHeight stays ~viewport (900). Expand that container first.
+          let question = '';
+          let cur = best.parentElement;
+          for (let depth = 0; depth < 6 && cur; depth++) {
+            let prev = cur.previousElementSibling;
+            for (let i = 0; i < 5 && prev; i++) {
+              const t = (prev.innerText || '').trim();
+              if (t && t.length <= 300 && (t.includes('？') || t.includes('?') || t.length < 100)) {
+                question = t.split('\n')[0].trim();
+              }
+              prev = prev.previousElementSibling;
+            }
+            cur = cur.parentElement;
+          }
+          if (!question) {
+            const candidates = Array.from(document.querySelectorAll('div, span, p'))
+              .map(el => (el.innerText || '').trim())
+              .filter(t => t.length > 4 && t.length < 120 && (t.includes('？') || t.includes('?')));
+            if (candidates.length) question = candidates[candidates.length - 1];
+          }
+
+          let status = '';
+          const allText = document.body.innerText || '';
+          const m = allText.match(/已阅读\s*\d+\s*个网页/);
+          if (m) status = m[0];
+
+          return {
+            question,
+            status,
+            answerHtml: best.innerHTML,
+            answerText: (best.innerText || '').trim(),
+          };
+        }""",
+        expected_text or "",
+    )
+
+    if payload and payload.get("answerHtml"):
+        q = (payload.get("question") or "").strip()
+        status = (payload.get("status") or "").strip()
+        answer_html = payload["answerHtml"]
+        answer_html = _re.sub(r"<script[\s\S]*?</script>", "", answer_html, flags=_re.I)
+        answer_html = _re.sub(r"on\w+=\"([^\"]*)\"", "", answer_html, flags=_re.I)
+
+        q_html = f'<div class="q">{html_lib.escape(q)}</div>' if q else ""
+        status_html = f'<div class="meta">{html_lib.escape(status)}</div>' if status else ""
+        doc = f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8" />
+<style>
+*{{box-sizing:border-box}}
+body{{margin:0;padding:32px 40px 48px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0f1115;color:#e8eaed;line-height:1.65;font-size:15px}}
+.wrap{{max-width:920px;margin:0 auto}}
+.q{{display:block;margin:0 0 18px auto;padding:10px 14px;border-radius:16px;background:#2a2f3a;color:#f3f4f6;max-width:85%;width:fit-content;margin-left:auto}}
+.meta{{color:#9aa3b2;font-size:13px;margin:0 0 16px}}
+.answer{{background:#161b22;border:1px solid #2a3344;border-radius:14px;padding:20px 22px}}
+.answer table{{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}}
+.answer th,.answer td{{border:1px solid #3a455a;padding:8px 10px;vertical-align:top}}
+.answer th{{background:#1e2633}}
+.answer a{{color:#8ab4ff}}
+.answer ul,.answer ol{{padding-left:1.3em}}
+</style></head><body><div class="wrap">
+{q_html}{status_html}<div class="answer">{answer_html}</div>
+</div></body></html>"""
+        try:
+            evidence = page.context.new_page()
+            evidence.set_viewport_size({"width": 1100, "height": 900})
+            evidence.set_content(doc, wait_until="load")
+            evidence.wait_for_timeout(500)
+            try:
+                _scroll_page_for_lazy_load(evidence, step=700, pause_ms=60)
+                evidence.evaluate("window.scrollTo(0,0)")
+                evidence.wait_for_timeout(200)
+            except Exception:
+                pass
+            evidence.screenshot(path=shot_path, full_page=True, type="png")
+            evidence.close()
+            logger.info("evidence clean-render full_page saved %s", shot_path)
+            return
+        except Exception as exc:
+            logger.warning("clean-render screenshot failed: %s", exc)
+
+    # fallback live page
     try:
-        meta = page.evaluate(
+        page.add_style_tag(content="aside,nav,[class*='sidebar' i],[class*='history' i]{display:none!important}textarea{visibility:hidden!important}")
+        page.evaluate(
             """() => {
-              const answers = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
-              let best = null, bestLen = 0;
-              for (const n of answers) {
-                const t = (n.innerText || '').trim();
-                if (t.length > bestLen) { bestLen = t.length; best = n; }
-              }
-              if (!best) return { ok: false };
-
-              const scrollParent = (el) => {
-                let p = el.parentElement;
-                while (p && p !== document.body) {
-                  const st = getComputedStyle(p);
-                  const oy = st.overflowY;
-                  if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && p.scrollHeight > p.clientHeight + 20) {
-                    return p;
-                  }
-                  p = p.parentElement;
+              const answers=Array.from(document.querySelectorAll('.ds-markdown'));
+              let best=null,n=0;
+              for (const a of answers){const t=(a.innerText||'').trim(); if(t.length>n){n=t.length;best=a;}}
+              if(!best) return;
+              let p=best;
+              while(p && p!==document.body){
+                const st=getComputedStyle(p);
+                if((st.overflowY==='auto'||st.overflowY==='scroll') && p.scrollHeight>p.clientHeight+20){
+                  p.style.setProperty('height', p.scrollHeight+'px','important');
+                  p.style.setProperty('overflow','visible','important');
                 }
-                return document.scrollingElement || document.documentElement;
-              };
-
-              const sp = scrollParent(best);
-              // expand ancestors so full content participates in layout height
-              let cur = best;
-              for (let i = 0; i < 14 && cur; i++) {
-                cur.style.setProperty('overflow', 'visible', 'important');
-                cur.style.setProperty('max-height', 'none', 'important');
-                cur.style.setProperty('height', 'auto', 'important');
-                cur = cur.parentElement;
+                p.style.setProperty('max-height','none','important');
+                p=p.parentElement;
               }
-              // expand scroll parent to its full scrollHeight (key for full_page)
-              if (sp && sp !== document.documentElement && sp !== document.body) {
-                const sh = sp.scrollHeight;
-                sp.style.setProperty('overflow', 'visible', 'important');
-                sp.style.setProperty('max-height', 'none', 'important');
-                sp.style.setProperty('height', sh + 'px', 'important');
-              }
-              // also expand document
-              document.documentElement.style.setProperty('height', 'auto', 'important');
-              document.body.style.setProperty('height', 'auto', 'important');
-              document.documentElement.style.setProperty('overflow', 'visible', 'important');
-              document.body.style.setProperty('overflow', 'visible', 'important');
-
-              void document.body.offsetHeight;
-              return {
-                ok: true,
-                answerLen: bestLen,
-                docScrollHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
-                spTag: sp ? sp.tagName : null,
-                spScrollHeight: sp ? sp.scrollHeight : null,
-              };
             }"""
         )
-        logger.info("expand scroll containers: %s", meta)
-    except Exception as exc:
-        logger.warning("expand scroll containers failed: %s", exc)
-
-    # 2) scroll document (and internal parents if any remaining) to trigger lazy load
-    try:
         _scroll_page_for_lazy_load(page, step=500, pause_ms=100)
+        page.evaluate("window.scrollTo(0,0)")
+        time.sleep(0.4)
+        page.screenshot(path=shot_path, full_page=True, type="png")
+        logger.info("evidence live full_page fallback saved %s", shot_path)
     except Exception as exc:
-        logger.warning("lazy scroll failed: %s", exc)
-
-    try:
-        page.evaluate("window.scrollTo(0, 0)")
-    except Exception:
-        pass
-    time.sleep(0.5)
-
-    try:
-        h = page.evaluate(
-            """() => Math.max(
-              document.body?.scrollHeight || 0,
-              document.documentElement?.scrollHeight || 0
-            )"""
-        )
-        logger.info("full_page capture scrollHeight=%s", h)
-    except Exception:
-        h = 0
-
-    # 3) primary: full_page=True (after expanding internal scrollers)
-    page.screenshot(path=shot_path, full_page=True, type="png")
-    logger.info("evidence full_page screenshot saved %s", shot_path)
-
-    # 4) if still short, element screenshot of longest answer (full element box)
-    try:
-        from PIL import Image
-
-        im = Image.open(shot_path)
-        w, h0 = im.size
-        need_taller = (expected_text and len(expected_text) > 300 and h0 < 1500) or h0 <= 1000
-        if need_taller:
-            loc = page.locator(".ds-markdown")
-            best_i, best_len = -1, 0
-            for i in range(loc.count()):
-                try:
-                    txt = (loc.nth(i).inner_text(timeout=800) or "").strip()
-                except Exception:
-                    continue
-                if len(txt) > best_len and not _is_noise_text(txt):
-                    best_len = len(txt)
-                    best_i = i
-            if best_i >= 0:
-                node = loc.nth(best_i)
-                handle = node.element_handle()
-                if handle:
-                    page.evaluate(
-                        """(el) => {
-                          let cur = el;
-                          for (let i = 0; i < 14 && cur; i++) {
-                            cur.style.setProperty('overflow', 'visible', 'important');
-                            cur.style.setProperty('max-height', 'none', 'important');
-                            cur.style.setProperty('height', 'auto', 'important');
-                            cur = cur.parentElement;
-                          }
-                        }""",
-                        handle,
-                    )
-                time.sleep(0.3)
-                alt = shot_path.replace(".png", "_elem.png")
-                node.screenshot(path=alt, type="png")
-                im2 = Image.open(alt)
-                if im2.height > h0:
-                    im2.save(shot_path)
-                    logger.info(
-                        "using taller element shot %s (%dx%d -> %dx%d)",
-                        shot_path,
-                        w,
-                        h0,
-                        im2.width,
-                        im2.height,
-                    )
-    except Exception as exc:
-        logger.debug("element height boost skipped: %s", exc)
+        logger.warning("live full_page failed: %s", exc)
+        page.screenshot(path=shot_path, full_page=False, type="png")
 
 
 
