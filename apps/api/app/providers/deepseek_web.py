@@ -302,283 +302,164 @@ def _looks_like_login(page) -> bool:
 
 
 
+
 def _capture_answer_evidence(page, shot_path: str, expected_text: str = "") -> None:
-    """Capture evidence like a clean chat export:
+    """Capture evidence in the shape of a clean DeepSeek answer card.
 
-    Target structure (matches good manual screenshots):
-      [user question chip]
-      [search/read status]
-      [full assistant markdown: tables, lists, citations]
+    Desired (user reference ~ full answer export):
+      - question chip (optional but preferred)
+      - full assistant content (tables/lists/citations)
+      - no left history rail, no bottom composer
+      - tall image if answer is long (not one short viewport)
 
-    NOT: left history rail, bottom composer, partial viewport.
-
-    Strategy:
-      1) CSS-hide chrome (sidebar/composer/floaters)
-      2) Locate last substantial assistant markdown node
-      3) Expand capture box upward to include preceding user question
-      4) page.screenshot(clip=union_box) so multi-node content is complete
-      5) fallback to element screenshot / full_page
+    Critical: getBoundingClientRect() height is ONLY the visible part for
+    overflow-hidden parents. Prefer Playwright element.screenshot() after
+    forcing overflow:visible on ancestors — that captures full layout size.
     """
     try:
         page.add_style_tag(
             content="""
-            /* hide non-evidence chrome */
-            aside,
-            nav,
-            [class*='sidebar' i],
-            [class*='SideBar'],
-            [class*='sider'],
-            [class*='history' i],
-            [class*='History'],
-            [class*='composer' i],
-            [class*='input-area' i],
-            textarea,
-            button[class*='send' i],
-            [class*='bottom' i][class*='bar' i] {
+            aside, nav,
+            [class*='sidebar' i], [class*='SideBar'], [class*='sider'],
+            [class*='history' i], [class*='History'] {
+              display: none !important;
+            }
+            textarea, [class*='composer' i] {
               visibility: hidden !important;
             }
-            /* prefer main column readable width */
-            body { background: #0b0f14 !important; }
             """
         )
     except Exception:
         pass
+    time.sleep(0.4)
 
-    time.sleep(0.5)
-
-    # JS: find best assistant node + optional user question, return clip rect in CSS pixels
-    box = page.evaluate(
+    # Pick best assistant markdown node index via JS scoring
+    idx = page.evaluate(
         """(expected) => {
-          const isNoise = (t) => {
-            if (!t || t.trim().length < 40) return true;
-            const s = t.trim();
-            if (s.startsWith('开启新对话') && s.length < 800) return true;
-            const noiseKeys = ['开启新对话','深度思考','智能搜索','快速模式','专家模式'];
-            let hits = 0;
-            for (const k of noiseKeys) if (s.includes(k)) hits++;
-            return hits >= 3 && (s.match(/\\n/g)||[]).length > 12;
-          };
-
-          const nodes = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"], .message-content'));
-          let best = null;
-          let bestScore = -1;
-          for (const n of nodes) {
-            const t = (n.innerText || '').trim();
-            if (isNoise(t)) continue;
+          const nodes = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
+          let best = -1, bestScore = -1;
+          for (let i = 0; i < nodes.length; i++) {
+            const t = (nodes[i].innerText || '').trim();
+            if (t.length < 80) continue;
+            if (t.startsWith('开启新对话') && t.length < 800) continue;
             let score = t.length;
+            if (nodes[i].querySelector('table')) score += 3000;
+            if (nodes[i].querySelector('li')) score += 300;
             if (expected) {
-              const sample = expected.slice(0, 60);
-              if (sample && t.includes(sample)) score += 100000;
-              else if (t.slice(0, 40) && expected.includes(t.slice(0, 40))) score += 50000;
+              const s = expected.slice(0, 50);
+              if (s && t.includes(s)) score += 100000;
             }
-            // prefer nodes with tables / rich structure
-            if (n.querySelector('table')) score += 2000;
-            if (n.querySelector('li')) score += 200;
-            if (score > bestScore) { bestScore = score; best = n; }
+            if (score > bestScore) { bestScore = score; best = i; }
           }
-          if (!best) return null;
-
-          // walk up a bit to a message/turn container if present
-          let container = best;
-          for (let i = 0; i < 6; i++) {
-            if (!container.parentElement) break;
-            const p = container.parentElement;
-            const pt = (p.innerText || '').trim();
-            // stop if parent suddenly includes huge sidebar history
-            if (pt.length > best.innerText.length * 8) break;
-            container = p;
-            // good if parent also contains a short user bubble / question chip
-            if (p.querySelector && (p.querySelector('[class*="user" i]') || p.innerText.includes('？') || p.innerText.includes('?'))) {
-              // keep expanding one more if still small
-            }
-          }
-
-          // Also try to include previous sibling blocks (user question chip above assistant)
-          let topEl = container;
-          let prev = container.previousElementSibling;
-          let guard = 0;
-          while (prev && guard < 4) {
-            const t = (prev.innerText || '').trim();
-            if (t && t.length < 300 && (t.includes('？') || t.includes('?') || t.length < 120)) {
-              topEl = prev;
-            }
-            // include "已阅读 N 个网页" strip if present just above answer
-            if (t && (t.includes('已阅读') || t.includes('网页'))) {
-              topEl = prev;
-            }
-            prev = prev.previousElementSibling;
-            guard++;
-          }
-
-          const rects = [];
-          const add = (el) => {
-            if (!el) return;
-            const r = el.getBoundingClientRect();
-            if (r.width < 40 || r.height < 40) return;
-            rects.push({x:r.x, y:r.y, w:r.width, h:r.height});
-          };
-          add(topEl);
-          add(container);
-          add(best);
-          if (!rects.length) return null;
-
-          let minX = Math.min(...rects.map(r => r.x));
-          let minY = Math.min(...rects.map(r => r.y));
-          let maxX = Math.max(...rects.map(r => r.x + r.w));
-          let maxY = Math.max(...rects.map(r => r.y + r.h));
-
-          // pad
-          const pad = 16;
-          minX = Math.max(0, minX - pad);
-          minY = Math.max(0, minY - pad);
-          maxX = Math.min(window.innerWidth, maxX + pad);
-          maxY = maxY + pad; // may extend below viewport; handled by scroll-stitch below
-
-          return {
-            x: minX,
-            y: minY,
-            width: Math.max(100, maxX - minX),
-            height: Math.max(100, maxY - minY),
-            scrollHeight: document.documentElement.scrollHeight,
-            answerTextLen: (best.innerText || '').trim().length,
-          };
+          return best;
         }""",
         expected_text or "",
     )
 
-    if box and box.get("width") and box.get("height"):
-        # If the answer is taller than viewport, scroll-stitch vertical clips
+    if idx is not None and int(idx) >= 0:
+        answer = page.locator(".ds-markdown, [class*='ds-markdown']").nth(int(idx))
+        # Expand capture root: answer node, then climb to a reasonable turn container
+        # and also try previous siblings for question chip via JS handle
         try:
-            import math
-            from pathlib import Path as P
+            handle = answer.element_handle(timeout=5000)
+            if handle:
+                # force full expand
+                page.evaluate(
+                    """(el) => {
+                      let cur = el;
+                      for (let i = 0; i < 10 && cur; i++) {
+                        const st = cur.style;
+                        st.overflow = 'visible';
+                        st.maxHeight = 'none';
+                        st.height = 'auto';
+                        cur = cur.parentElement;
+                      }
+                      // choose root: climb while parent isn't huge body/app
+                      let root = el;
+                      for (let i = 0; i < 8; i++) {
+                        const p = root.parentElement;
+                        if (!p || p === document.body || p === document.documentElement) break;
+                        const pt = (p.innerText || '').length;
+                        const rt = (root.innerText || '').length;
+                        if (pt > rt * 6) break; // parent includes too much chrome
+                        root = p;
+                      }
+                      // include previous sibling question chips
+                      let top = root;
+                      let prev = root.previousElementSibling;
+                      for (let i = 0; i < 4 && prev; i++) {
+                        const t = (prev.innerText || '').trim();
+                        if (!t) { prev = prev.previousElementSibling; continue; }
+                        if (t.length <= 400 || t.includes('？') || t.includes('?') || t.includes('已阅读')) {
+                          top = prev;
+                        }
+                        prev = prev.previousElementSibling;
+                      }
+                      // create a temporary wrapper range by scrolling each into view
+                      top.scrollIntoView({block: 'start'});
+                      return true;
+                    }""",
+                    handle,
+                )
+                time.sleep(0.3)
 
-            # scroll so top of content is near top of viewport, then capture full element via locator if possible
-            page.evaluate("(y) => window.scrollTo(0, Math.max(0, y))", max(0, box["y"] + page.evaluate("() => window.scrollY") - 20))
-            time.sleep(0.3)
-
-            # Recompute after scroll
-            box2 = page.evaluate(
-                """() => {
-                  const nodes = Array.from(document.querySelectorAll('.ds-markdown, [class*="ds-markdown"]'));
-                  let best=null, bestLen=0;
-                  for (const n of nodes) {
-                    const t=(n.innerText||'').trim();
-                    if (t.length>bestLen) {bestLen=t.length; best=n;}
-                  }
-                  if (!best) return null;
-                  // expand to parent for question chip
-                  let c = best;
-                  for (let i=0;i<5;i++){ if(c.parentElement) c=c.parentElement; }
-                  let top = c;
-                  let prev = c.previousElementSibling;
-                  for (let i=0;i<3 && prev;i++){
-                    const t=(prev.innerText||'').trim();
-                    if (t && t.length < 400) top = prev;
-                    prev = prev.previousElementSibling;
-                  }
-                  const r1 = top.getBoundingClientRect();
-                  const r2 = best.getBoundingClientRect();
-                  const x = Math.max(0, Math.min(r1.x, r2.x) - 12);
-                  const y = Math.max(0, Math.min(r1.y, r2.y) - 12);
-                  const right = Math.min(window.innerWidth, Math.max(r1.right, r2.right) + 12);
-                  const bottom = Math.max(r1.bottom, r2.bottom) + 12;
-                  return {x, y, width: right-x, height: bottom-y, absTop: y + window.scrollY, absBottom: bottom + window.scrollY};
-                }"""
-            )
-            if box2 and box2.get("height", 0) > 0:
-                # If content fits viewport height, single clip
-                vh = page.viewport_size["height"] if page.viewport_size else 1600
-                total_h = box2["absBottom"] - box2["absTop"]
-                if total_h <= vh - 40:
-                    page.screenshot(
-                        path=shot_path,
-                        type="png",
-                        clip={
-                            "x": max(0, box2["x"]),
-                            "y": max(0, box2["y"]),
-                            "width": min(box2["width"], page.viewport_size["width"]),
-                            "height": min(box2["height"], vh),
-                        },
-                    )
-                    logger.info(
-                        "evidence clip screenshot saved %s (%.0fx%.0f)",
-                        shot_path,
-                        box2["width"],
-                        box2["height"],
-                    )
-                    return
-
-                # Scroll-stitch for tall answers
+                # Prefer screenshot of a wrapper spanning question..answer
+                root_handle = page.evaluate_handle(
+                    """(el) => {
+                      let root = el;
+                      for (let i = 0; i < 8; i++) {
+                        const p = root.parentElement;
+                        if (!p || p === document.body || p === document.documentElement) break;
+                        const pt = (p.innerText || '').length;
+                        const rt = (root.innerText || '').length;
+                        if (pt > rt * 6) break;
+                        root = p;
+                      }
+                      let top = root;
+                      let prev = root.previousElementSibling;
+                      for (let i = 0; i < 4 && prev; i++) {
+                        const t = (prev.innerText || '').trim();
+                        if (t && (t.length <= 400 || t.includes('？') || t.includes('已阅读'))) {
+                          // if we can, use parent that contains both
+                          if (root.parentElement && prev.parentElement === root.parentElement) {
+                            return root.parentElement;
+                          }
+                        }
+                        prev = prev.previousElementSibling;
+                      }
+                      return root;
+                    }""",
+                    handle,
+                )
                 try:
-                    from PIL import Image
-                    import io
-
-                    slices = []
-                    y_abs = box2["absTop"]
-                    end_abs = box2["absBottom"]
-                    width = min(box2["width"], page.viewport_size["width"])
-                    x = max(0, box2["x"])
-                    max_slices = 20
-                    while y_abs < end_abs - 1 and len(slices) < max_slices:
-                        page.evaluate("(yy) => window.scrollTo(0, yy)", max(0, y_abs - 10))
+                    element = root_handle.as_element()
+                    if element:
+                        element.scroll_into_view_if_needed(timeout=5000)
                         time.sleep(0.25)
-                        scroll_y = page.evaluate("() => window.scrollY")
-                        y_view = max(0, y_abs - scroll_y)
-                        h = min(vh - 30, end_abs - y_abs)
-                        if h < 20:
-                            break
-                        buf = page.screenshot(
-                            type="png",
-                            clip={"x": x, "y": y_view, "width": width, "height": h},
-                        )
-                        slices.append(Image.open(io.BytesIO(buf)).convert("RGB"))
-                        y_abs += h - 8  # slight overlap
-                    if slices:
-                        total_height = sum(im.height for im in slices) - 8 * (len(slices) - 1)
-                        canvas = Image.new("RGB", (slices[0].width, max(total_height, 1)), (11, 15, 20))
-                        oy = 0
-                        for i, im in enumerate(slices):
-                            canvas.paste(im, (0, oy))
-                            oy += im.height - (8 if i < len(slices) - 1 else 0)
-                        canvas.save(shot_path, format="PNG")
-                        logger.info(
-                            "evidence stitched screenshot saved %s (%dx%d, %d slices)",
-                            shot_path,
-                            canvas.width,
-                            canvas.height,
-                            len(slices),
-                        )
+                        element.screenshot(path=shot_path, type="png")
+                        logger.info("evidence full-element screenshot saved %s", shot_path)
                         return
                 except Exception as exc:
-                    logger.warning("stitch screenshot failed: %s", exc)
+                    logger.warning("wrapper element screenshot failed: %s", exc)
+
+                # last try: pure answer node full element
+                answer.scroll_into_view_if_needed(timeout=5000)
+                time.sleep(0.2)
+                answer.screenshot(path=shot_path, type="png")
+                logger.info("evidence answer-node screenshot saved %s", shot_path)
+                return
         except Exception as exc:
-            logger.warning("clip screenshot failed: %s", exc)
+            logger.warning("element evidence failed: %s", exc)
 
-    # Fallback: longest markdown element screenshot
+    # fallback full page after hiding chrome
     try:
-        best = None
-        best_len = 0
-        loc = page.locator(".ds-markdown")
-        for i in range(loc.count()):
-            node = loc.nth(i)
-            try:
-                txt = (node.inner_text(timeout=1000) or "").strip()
-            except Exception:
-                continue
-            if len(txt) > best_len and not _is_noise_text(txt):
-                best_len = len(txt)
-                best = node
-        if best is not None:
-            best.scroll_into_view_if_needed(timeout=5000)
-            time.sleep(0.2)
-            best.screenshot(path=shot_path, type="png")
-            logger.info("evidence element fallback saved %s", shot_path)
-            return
+        page.evaluate("window.scrollTo(0, 0)")
+        time.sleep(0.2)
+        page.screenshot(path=shot_path, full_page=True, type="png")
+        logger.info("evidence full_page fallback saved %s", shot_path)
     except Exception as exc:
-        logger.warning("element fallback failed: %s", exc)
-
-    page.screenshot(path=shot_path, full_page=True, type="png")
-    logger.info("evidence full_page fallback saved %s", shot_path)
+        logger.warning("full_page failed: %s", exc)
+        page.screenshot(path=shot_path, full_page=False, type="png")
 
 
 
