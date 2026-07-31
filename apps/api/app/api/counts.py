@@ -20,6 +20,14 @@ def get_counts(
     date_from: Optional[str] = Query(None, alias="from", description="ISO datetime"),
     date_to: Optional[str] = Query(None, alias="to", description="ISO datetime"),
     group_by: str = Query("none", description="none|day|platform|prompt"),
+    include_fake: bool = Query(
+        False,
+        description="默认 false：排除 raw_json.source=fake* / 【假数据】样本",
+    ),
+    source: Optional[str] = Query(
+        None,
+        description="可选：只统计该 source，如 deepseek_web / chrome_bridge",
+    ),
     db: Session = Depends(get_db),
 ):
     """L2 counts only — no rates. Frontend L3 divides m/n."""
@@ -31,6 +39,8 @@ def get_counts(
         date_from=date_from,
         date_to=date_to,
         group_by=group_by,
+        include_fake=include_fake,
+        source=source,
     )
     return CountsResponse(**data)
 

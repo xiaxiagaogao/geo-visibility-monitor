@@ -29,11 +29,23 @@ ANNOTATOR_VERSION = "l1-rules-v1"
 
 
 def classify_answer_status(full_text: str) -> str:
+    """L1 quality gate for L2 denominator (answer_status=ok only)."""
     text = (full_text or "").strip()
     if not text:
         return "empty"
     if len(text) < 20:
         return "too_short"
+    # Sidebar / history chrome mistaken as answer (early DeepSeek scrapes)
+    head = text[:120]
+    if head.startswith("开启新对话"):
+        return "error"
+    if "开启新对话" in text[:80] and text.count("\n") >= 6 and len(text) < 1500:
+        # long rail of history titles, little prose
+        if "。 " not in text[:300] and text.count("。") < 3:
+            return "error"
+    # Explicit fake markers should not be "ok" if any remain
+    if text.startswith("【假数据"):
+        return "error"
     return "ok"
 
 

@@ -56,6 +56,22 @@ def _empty_den() -> Dict[str, int]:
     }
 
 
+
+FAKE_SOURCES = frozenset({"fake_worker", "fake_provider", "fake", "fake_provider_v1"})
+
+
+def is_fake_response(resp: RawResponse) -> bool:
+    """Historical B3 fake L0 rows — excluded from L2 by default."""
+    raw = resp.raw_json if isinstance(resp.raw_json, dict) else {}
+    src = str(raw.get("source") or "").strip().lower()
+    if src.startswith("fake") or src in FAKE_SOURCES:
+        return True
+    text = (resp.full_text or "").lstrip()
+    if text.startswith("【假数据"):
+        return True
+    return False
+
+
 def competitor_ids(db: Session, brand_id: int) -> List[int]:
     return list(
         db.scalars(
@@ -156,6 +172,8 @@ def compute_counts(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     group_by: str = "none",
+    include_fake: bool = False,
+    source: Optional[str] = None,
 ) -> dict:
     get_brand_or_404(db, brand_id)
     group_by = (group_by or "none").lower()
@@ -182,6 +200,14 @@ def compute_counts(
             ).order_by(RawResponse.id.asc())
         ).all()
     )
+    if not include_fake:
+        responses = [r for r in responses if not is_fake_response(r)]
+    if source:
+        src_l = source.strip().lower()
+        def _src(r: RawResponse) -> str:
+            raw = r.raw_json if isinstance(r.raw_json, dict) else {}
+            return str(raw.get("source") or "").strip().lower()
+        responses = [r for r in responses if _src(r) == src_l]
     resp_ids = [r.id for r in responses]
     job_ids = list({r.job_id for r in responses})
     prompt_id_by_job: Dict[int, int] = {}
@@ -261,13 +287,15 @@ def compute_counts(
             "prompt_id": prompt_id,
             "from": date_from,
             "to": date_to,
+            "include_fake": include_fake,
+            "source": source,
         },
         "group_by": group_by,
         "denominator": pack_den(overall_den),
         "brand": pack_brand(overall_brand[brand_id]),
         "competitors": [pack_brand(overall_brand[cid]) for cid in comp_ids],
         "series": series,
-        "note": "counts only; compute rates on client (L3)",
+        "note": "counts only; compute rates on client (L3); fake L0 excluded unless include_fake=true",
     }
 
 

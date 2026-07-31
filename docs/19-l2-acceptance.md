@@ -118,3 +118,7 @@ SQL group by 与 API **一致**。
 | C 数据治理 | 清 fake、加 source 过滤、扩 prompt/别名 |
 
 你确认 L2 验收通过后，再选 A/B/C。
+
+## 后续
+
+最小数据治理见 [20-data-governance-min.md](./20-data-governance-min.md)。
