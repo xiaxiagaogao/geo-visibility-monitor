@@ -20,12 +20,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+PROBE = "__pytest_stuck__"
+
+
 @pytest.fixture
 def db():
-    os.environ["DATABASE_URL"] = TEST_DB
-    from app.core.config import get_settings
-
-    get_settings.cache_clear()
     from app.core.db import SessionLocal
 
     session = SessionLocal()
@@ -33,25 +32,37 @@ def db():
         yield session
     finally:
         session.rollback()
+        _purge(session)
         session.close()
+
+
+def _purge(session) -> None:
+    """按外键顺序清干净，不依赖级联行为（那是 test_cascade_delete 的事）。"""
+    from sqlalchemy import text
+
+    session.execute(
+        text("DELETE FROM crawl_jobs WHERE prompt_id IN (SELECT id FROM prompts WHERE text = :p)"),
+        {"p": PROBE},
+    )
+    session.execute(text("DELETE FROM prompts WHERE text = :p"), {"p": PROBE})
+    session.execute(text("DELETE FROM brands WHERE name = :p"), {"p": PROBE})
+    session.commit()
 
 
 @pytest.fixture
 def job(db):
     from app.models import Brand, CrawlJob, Prompt
 
-    brand = Brand(name="__test_stuck__")
+    brand = Brand(name=PROBE)
     db.add(brand)
     db.flush()
-    prompt = Prompt(brand_id=brand.id, text="__test_stuck__")
+    prompt = Prompt(brand_id=brand.id, text=PROBE)
     db.add(prompt)
     db.flush()
     j = CrawlJob(prompt_id=prompt.id, platform="deepseek", status="running")
     db.add(j)
     db.commit()
-    yield j
-    db.delete(brand)  # 级联带走 prompt / job
-    db.commit()
+    return j
 
 
 def test_old_running_job_is_reclaimed(db, job):

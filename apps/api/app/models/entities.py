@@ -32,8 +32,15 @@ class Brand(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    aliases: Mapped[list["BrandAlias"]] = relationship(back_populates="brand", cascade="all, delete-orphan")
-    prompts: Mapped[list["Prompt"]] = relationship(back_populates="brand")
+    # passive_deletes=True：交给数据库的 ON DELETE CASCADE。
+    # 不加的话 SQLAlchemy 删父行前会先 UPDATE 子表把外键置 NULL，
+    # 而这些外键列都是 NOT NULL → IntegrityError（见 test_cascade_delete.py）
+    aliases: Mapped[list["BrandAlias"]] = relationship(
+        back_populates="brand", cascade="all, delete-orphan", passive_deletes=True
+    )
+    prompts: Mapped[list["Prompt"]] = relationship(
+        back_populates="brand", cascade="all, delete", passive_deletes=True
+    )
 
 
 class BrandAlias(Base):
@@ -75,7 +82,9 @@ class Prompt(Base):
     )
 
     brand: Mapped[Brand] = relationship(back_populates="prompts")
-    jobs: Mapped[list["CrawlJob"]] = relationship(back_populates="prompt")
+    jobs: Mapped[list["CrawlJob"]] = relationship(
+        back_populates="prompt", cascade="all, delete", passive_deletes=True
+    )
 
 
 class CrawlJob(Base):
@@ -94,7 +103,9 @@ class CrawlJob(Base):
     )
 
     prompt: Mapped[Prompt] = relationship(back_populates="jobs")
-    responses: Mapped[list["RawResponse"]] = relationship(back_populates="job")
+    responses: Mapped[list["RawResponse"]] = relationship(
+        back_populates="job", cascade="all, delete", passive_deletes=True
+    )
 
 
 class RawResponse(Base):
@@ -116,8 +127,12 @@ class RawResponse(Base):
     )
 
     job: Mapped[CrawlJob] = relationship(back_populates="responses")
-    mentions: Mapped[list["Mention"]] = relationship(back_populates="response")
-    citations: Mapped[list["Citation"]] = relationship(back_populates="response")
+    mentions: Mapped[list["Mention"]] = relationship(
+        back_populates="response", cascade="all, delete", passive_deletes=True
+    )
+    citations: Mapped[list["Citation"]] = relationship(
+        back_populates="response", cascade="all, delete", passive_deletes=True
+    )
 
 
 class Mention(Base):
