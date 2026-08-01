@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, status
@@ -100,10 +100,12 @@ def list_jobs(
 
 def retry_job(db: Session, job_id: int) -> CrawlJob:
     job = get_job_or_404(db, job_id)
-    if job.status not in ("failed", "success"):
+    # running 也放行：worker 容器重启后 job 会永久停在 running，
+    # 原先这里拒绝重排，导致只能连库手改（见 reclaim_stuck_jobs）
+    if job.status not in ("failed", "success", "running"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="only failed/success jobs can be retried (re-queue)",
+            detail="only failed/success/running jobs can be re-queued",
         )
     job.status = "pending"
     job.error_message = None
@@ -112,6 +114,39 @@ def retry_job(db: Session, job_id: int) -> CrawlJob:
     db.commit()
     db.refresh(job)
     return job
+
+
+def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
+    """把僵死在 running 的 job 收成 failed。
+
+    worker 容器是 restart: unless-stopped，抓取中途被 OOM / Chromium 崩溃 / 重新部署
+    打断时，job 已经 commit 成 running 却再没人碰它 —— 既不会被 claim（只捞 pending），
+    也不会自己超时。
+
+    收成 failed 而不是直接回 pending：反复把容器搞崩的任务不该自动无限重排，
+    留给人看一眼再决定（/v1/crawl-jobs/{id}/retry）。
+    """
+    cutoff = _utcnow() - timedelta(seconds=older_than_sec)
+    stuck = list(
+        db.scalars(
+            select(CrawlJob).where(
+                CrawlJob.status == "running",
+                CrawlJob.started_at.is_not(None),
+                CrawlJob.started_at < cutoff,
+            )
+        ).all()
+    )
+    if not stuck:
+        return []
+    for job in stuck:
+        job.status = "failed"
+        job.finished_at = _utcnow()
+        job.error_message = (
+            f"reclaimed: stuck in running for over {older_than_sec}s "
+            "(worker likely died mid-crawl)"
+        )
+    db.commit()
+    return [j.id for j in stuck]
 
 
 def claim_pending_jobs(db: Session, limit: int) -> List[CrawlJob]:

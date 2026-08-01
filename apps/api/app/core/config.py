@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # B5 crawl mode: fake | real
     crawl_mode: str = "fake"
     crawl_timeout_ms: int = 120_000
+    # running 超过这个时长视为「worker 死了没来得及收尾」，回收成 failed。
+    # 要大于 crawl_timeout_ms + process_job 的硬上限（+45s），留足余量。
+    crawl_stuck_job_sec: int = 600
     playwright_headless: bool = True
     deepseek_storage_state: str = ""
     deepseek_user_data_dir: str = ""

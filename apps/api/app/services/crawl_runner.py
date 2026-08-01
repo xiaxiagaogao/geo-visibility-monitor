@@ -16,7 +16,7 @@ from app.providers.base import CrawlResult
 from app.providers.deepseek_web import DeepSeekLoginRequired, DeepSeekWebProvider
 from app.providers.fake import FakeProvider
 from app.services.annotate import annotate_response
-from app.services.crawl_jobs import claim_pending_jobs
+from app.services.crawl_jobs import claim_pending_jobs, reclaim_stuck_jobs
 
 logger = logging.getLogger("geo.crawl_runner")
 
@@ -148,6 +148,10 @@ def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
 
 
 def run_once(db: Session, batch_size: int = 5) -> List[int]:
+    reclaimed = reclaim_stuck_jobs(db, get_settings().crawl_stuck_job_sec)
+    if reclaimed:
+        logger.warning("reclaimed stuck running jobs %s", reclaimed)
+
     jobs = claim_pending_jobs(db, batch_size)
     done: List[int] = []
     for claimed in jobs:
