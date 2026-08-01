@@ -22,9 +22,6 @@ from app.providers.deepseek_web import _clean_answer_text
         # 正常中文答案不该被动
         "推荐土巴兔，其次是齐家网。整体来看差异不大，可以按预算选择。",
         "researching 这个词开头也不该被剥",
-        # 歧义：分不清是胶水还是正文（旧实现正是在这里猜 2026 猜错的）。
-        # 宁可原样留在 L0 里，也不改写模型答案。
-        "FINISHEDSEARCH2026年的装修市场…",
     ],
 )
 def test_leaves_real_content_untouched(text):
@@ -38,6 +35,12 @@ def test_leaves_real_content_untouched(text):
         ("FINISHED: 答案正文在这里。", "答案正文在这里。"),
         ("SEARCH|土巴兔是装修平台。", "土巴兔是装修平台。"),
         ("SEARCH 引擎优化需要时间。", "引擎优化需要时间。"),
+        # VPS 实测（response 22）：胶水后面直接跟中文，无空白分隔
+        (
+            "FINISHEDSEARCH一家靠谱的装修公司是件耗时又重要的事。",
+            "一家靠谱的装修公司是件耗时又重要的事。",
+        ),
+        ("FINISHEDSEARCH2026年的装修市场…", "2026年的装修市场…"),
     ],
 )
 def test_strips_standalone_glue_token(raw, expected):

@@ -582,9 +582,10 @@ def _clean_answer_text(text: str) -> str:
        正常的「6年内…」被写成「2026年内…」，而且过了 2026 必错。
     """
     text = (text or "").strip()
-    # 必须后接 串尾/空白/分隔符 才认作胶水；后面紧跟中文或数字一律当正文放过
-    # （"SEARCH引擎优化…" 是正文，"SEARCH 引擎优化…" 才是胶水+正文）
-    text = re.sub(r"^(?:FINISHEDSEARCH|FINISHED|SEARCH)(?=$|[\s:|-])", "", text, flags=re.I)
+    # FINISHEDSEARCH / FINISHED 是无歧义的控制 token，正常回答不会这样开头 → 无条件剥。
+    # 裸 SEARCH 有歧义（"SEARCH引擎优化…" 是正文），必须后接 串尾/空白/分隔符 才剥。
+    text = re.sub(r"^(?:FINISHEDSEARCH|FINISHED)", "", text, flags=re.I)
+    text = re.sub(r"^SEARCH(?=$|[\s:|-])", "", text, flags=re.I)
     return text.lstrip(" :|-").strip()
 
 
@@ -627,6 +628,44 @@ def _dom_answer_text(page) -> str:
     return candidates[0]
 
 
+# 流式拼接产生的控制 token。正常中文回答不会以这些 ASCII 串开头，
+# 出现即说明首块被它顶替了。
+STREAM_GLUE_PREFIXES = ("FINISHEDSEARCH", "FINISHED")
+
+
+def _pick_answer_text(assembled: str, dom: str) -> str:
+    """在「流式拼接」与「DOM 渲染」之间选 L0 正文。
+
+    优先 DOM。VPS 实测（job 37 / response 22）：
+
+        DOM    挑选一家靠谱的装修公司是件耗时又重要的事，…
+        stream FINISHEDSEARCH一家靠谱的装修公司是件耗时又重要的事，…
+
+    SSE 拼接会丢掉**首块**，位置上被 FINISHEDSEARCH 顶替。原实现「谁长选谁」，
+    而带着胶水 token 的 stream 往往更长，于是每次都选中缺头的那份 ——
+    历史样本 id=10/12/13/14/16 开头缺字都是这么来的。
+
+    首字直接决定 position_bucket 的 head/middle/tail，不能将就。
+    """
+    assembled = (assembled or "").strip()
+    dom = (dom or "").strip()
+    if not dom:
+        return assembled
+    if not assembled:
+        return dom
+    # 侧栏误抓的 DOM 一律不参与竞争（含最后的比长度兜底）
+    if _is_noise_text(dom):
+        return assembled
+    # stream 带胶水前缀 = 首块已丢，直接用 DOM
+    if assembled.upper().startswith(STREAM_GLUE_PREFIXES):
+        return dom
+    # DOM 基本完整时同样优先它（渲染结果才是真值）
+    if len(dom) >= len(assembled) * 0.9:
+        return dom
+    # DOM 明显更短 = 还在生成中，退回 stream
+    return assembled
+
+
 def _wait_for_answer(page, stream_chunks: List[str], timeout_ms: int) -> str:
     deadline = time.time() + timeout_ms / 1000.0
     last = ""
@@ -636,8 +675,7 @@ def _wait_for_answer(page, stream_chunks: List[str], timeout_ms: int) -> str:
         if stream_chunks:
             assembled = "".join(stream_chunks).strip()
         dom = _dom_answer_text(page)
-        # choose better of stream vs dom
-        cand = assembled if len(assembled) >= len(dom) else dom
+        cand = _pick_answer_text(assembled, dom)
         if cand and not _is_noise_text(cand):
             if len(cand) > len(last) + 10:
                 last = cand
