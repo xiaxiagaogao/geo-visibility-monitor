@@ -17,7 +17,6 @@ from app.core.db import SessionLocal
 from app.services.counts import compute_counts, is_fake_response
 from app.models import RawResponse
 from sqlalchemy import select
-from app.models import CrawlJob, Prompt
 
 
 def _sql_counts(db, *, brand_id: int, platform: Optional[str], prompt_id: Optional[int], include_fake: bool) -> dict:

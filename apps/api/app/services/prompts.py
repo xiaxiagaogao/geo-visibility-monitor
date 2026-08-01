@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Brand, Prompt
+from app.models import Prompt
 from app.schemas.prompt import PromptCreate, PromptUpdate
 from app.services.brands import get_brand_or_404
 

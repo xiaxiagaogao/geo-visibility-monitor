@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import List
-
 from app.providers.base import BaseProvider, CitationData, CrawlResult
 
 

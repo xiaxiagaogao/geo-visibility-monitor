@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.models import CrawlJob, Prompt, RawResponse
 from app.schemas.crawl import ALLOWED_PLATFORMS, CrawlJobCreate
