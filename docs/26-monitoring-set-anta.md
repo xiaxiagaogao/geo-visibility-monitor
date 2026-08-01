@@ -37,7 +37,8 @@ F2 验收时没有任何办法判断提及率、SoV、位置分是否正确。
 > `/v1/counts` 加过滤参数。砍掉有提示类之后这个理由消失了 ——
 > 剩下的 `unprompted` / `scenario` 都是无提示，共用一个分母才对。
 > A/B 的对比分析用现有的 `group_by=prompt` 即可。
-> **counts 的 category 参数因此推迟**，等 L3 真需要再加。
+> **counts 的 category 参数确定不做**（2026-08-02 拍板）：前端从 `/v1/prompts`
+> 就能拿到每条 prompt 的 category，自己归类即可，不必给 API 加投机性的参数面。
 
 ---
 

@@ -57,6 +57,40 @@ class DeepSeekLoginRequired(RuntimeError):
     pass
 
 
+# 会话删除接口。2026-08-01 在 VPS 上实测抓包得到（点侧栏「…」→ 删除 →「删除该对话」）：
+#   POST /api/v0/chat_session/delete
+#   Content-Type: application/json
+#   {"chat_session_id": "<uuid>"}
+# 与发问用的 /api/v0/chat/completion 不同，这个接口**不需要工作量证明**
+# （completion 前置 POST /api/v0/chat/create_pow_challenge），所以能直接调，
+# 不必点 DOM —— 后者随时会因为改版失效。
+DELETE_SESSION_API = "https://chat.deepseek.com/api/v0/chat_session/delete"
+_SESSION_URL_RE = re.compile(r"/a/chat/s/([0-9a-fA-F-]{16,})")
+
+
+def _session_id_from_url(url: str) -> Optional[str]:
+    m = _SESSION_URL_RE.search(url or "")
+    return m.group(1) if m else None
+
+
+def _delete_session(page, session_id: str) -> bool:
+    """删掉刚抓完的会话。失败只记日志，绝不让整个任务失败。"""
+    try:
+        resp = page.request.post(
+            DELETE_SESSION_API,
+            data={"chat_session_id": session_id},
+            headers={"content-type": "application/json"},
+        )
+        ok = resp.ok
+        logger.info(
+            "delete session %s -> %s %s", session_id, resp.status, "ok" if ok else resp.text()[:120]
+        )
+        return ok
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("delete session %s failed: %s", session_id, exc)
+        return False
+
+
 class DeepSeekWebProvider(BaseProvider):
     platform = "deepseek"
 
@@ -68,12 +102,14 @@ class DeepSeekWebProvider(BaseProvider):
         storage_state: Optional[str] = None,
         user_data_dir: Optional[str] = None,
         screenshot_dir: Optional[str] = None,
+        delete_session_after: bool = True,
     ):
         self.headless = headless
         self.timeout_ms = timeout_ms
         self.storage_state = storage_state
         self.user_data_dir = user_data_dir
         self.screenshot_dir = screenshot_dir
+        self.delete_session_after = delete_session_after
 
     def search(self, prompt: str) -> CrawlResult:
         try:
@@ -215,6 +251,18 @@ class DeepSeekWebProvider(BaseProvider):
                 }
                 if cleaned != raw_text:
                     raw_json["cleaned_text"] = cleaned
+
+                # 截图已落盘 = 证据已固化，此时 DeepSeek 侧的会话就是可弃的。
+                # 不删会让侧栏无限堆积，DOM 抓取迟早又抓到侧栏（见 docs/18 与
+                # 库里那两条 answer_status=error 的样本）。
+                if self.delete_session_after:
+                    sid = _session_id_from_url(page.url)
+                    if sid:
+                        ok = _delete_session(page, sid)
+                        raw_json["session_deleted"] = ok
+                    else:
+                        logger.warning("拿不到 session_id，跳过删除 url=%s", page.url)
+                        raw_json["session_deleted"] = False
 
                 return CrawlResult(
                     platform="deepseek",

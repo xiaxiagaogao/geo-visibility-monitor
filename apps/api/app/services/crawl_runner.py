@@ -66,6 +66,7 @@ def _build_provider(db: Session, job: CrawlJob, prompt: Prompt):
             storage_state=settings.deepseek_storage_state or None,
             user_data_dir=settings.deepseek_user_data_dir or None,
             screenshot_dir=settings.screenshot_dir or None,
+            delete_session_after=settings.deepseek_delete_session,
         )
 
     # unknown real platform → fail clearly

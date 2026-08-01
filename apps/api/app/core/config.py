@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     playwright_headless: bool = True
     deepseek_storage_state: str = ""
     deepseek_user_data_dir: str = ""
+    # 抓完即删该会话。默认开：不删则侧栏无限堆积，DOM 抓取迟早又抓到侧栏
+    # （docs/18 的事故，库里已有两条 answer_status=error 的样本）
+    deepseek_delete_session: bool = True
     screenshot_dir: str = "/data/screenshots"
 
 
