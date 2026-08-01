@@ -1,23 +1,32 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Brand, CrawlJob, Mention, Prompt, RawResponse
-from app.services.brands import get_brand_or_404
+from app.models import CompetitorLink, CrawlJob, Mention, Prompt, RawResponse
 from app.services.annotate import ANNOTATOR_VERSION
-from app.models import CompetitorLink
+from app.services.brands import get_brand_or_404
+
+
+_DATE_ONLY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _parse_dt(value: Optional[str], *, end: bool = False) -> Optional[datetime]:
+    """解析 ISO 时间；``end=True`` 时纯日期补到当天最后一刻。
+
+    区间是闭区间（created_at <= to）。若 ``to=2026-08-01`` 按 00:00:00 处理，
+    整个 8/1 都会被排除 —— 前端传日期而非时间戳时必踩。
+    """
     if not value:
         return None
     v = value.strip()
+    date_only = bool(_DATE_ONLY.match(v))
     if v.endswith("Z"):
         v = v[:-1] + "+00:00"
     try:
@@ -29,6 +38,8 @@ def _parse_dt(value: Optional[str], *, end: bool = False) -> Optional[datetime]:
         ) from exc
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
+    if end and date_only:
+        dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
     return dt
 
 
