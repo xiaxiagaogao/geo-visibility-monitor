@@ -1,7 +1,7 @@
 # 代码 Review 修复记录（L3 前）
 
 > 日期：2026-08-01
-> 状态：**代码已改完，待上 VPS 验收**
+> 状态：**已在 VPS 部署并验收通过**（api 64 passed / metrics 16 passed / verify_l2 PASS）
 > 范围：全仓通读后的问题修复，**不含新功能**；做完即进 L3 前端
 
 相关：[10-数据职责](./10-data-responsibility.md) · [03-指标规格](./03-metrics-spec.md) · [19-L2 验收](./19-l2-acceptance.md)
@@ -20,6 +20,10 @@
 | P2 | counts 的 `to` 排除当天 | `fix(api): to 按当天末尾闭合` |
 | P2 | 证据截图页 HTML 消毒可绕过 | `fix(crawl): 加 CSP` |
 | P2 | 死代码与未使用 import | `chore(api): 清理` |
+| P1 | **DELETE 品牌/Prompt 对有子行的记录 500** | `fix(api): 级联删除` |
+| P1 | **L0 丢首块（流式拼接顶替）** | `fix(crawl): L0 优先取 DOM` |
+
+> 后两条是**在 VPS 上实测才发现的**，本机静态阅读看不出来。详见 §1.5 / §1.6。
 
 ### 1.1 鉴权（P0）
 
@@ -84,6 +88,53 @@ job 已 commit 成 `running` 却再没人管：`claim_pending_jobs` 只捞 `pend
 
 收成 `failed` 而非直接回 `pending`：反复搞崩容器的任务不该自动无限重排。
 
+### 1.5 级联删除（P1，VPS 实测发现）
+
+在 VPS 上跑 `test_stuck_jobs` 时，teardown 报
+`UPDATE prompts SET brand_id=NULL` → NotNullViolation。顺着查发现是生产代码的问题：
+
+```text
+DELETE /v1/brands/{id}   有 prompt 子行     -> 500 IntegrityError
+DELETE /v1/prompts/{id}  有 crawl_job 子行  -> 500 IntegrityError
+```
+
+ORM 关系没配 `passive_deletes`，SQLAlchemy 删父行前会先把子表外键置 NULL，
+而 `prompts.brand_id`、`crawl_jobs.prompt_id`、`raw_responses.job_id`、
+`mentions.response_id`、`citations.response_id` 全是 NOT NULL ——
+数据库层写好的 `ON DELETE CASCADE` 根本没机会执行。
+
+全链路加 `cascade="all, delete"` + `passive_deletes=True`。
+
+### 1.6 L0 丢首块（P1，VPS 真抓发现）
+
+同一次真抓（job 37 / response 22）的两份文本：
+
+```text
+DOM     挑选一家靠谱的装修公司是件耗时又重要的事，…
+stream  FINISHEDSEARCH一家靠谱的装修公司是件耗时又重要的事，…
+```
+
+SSE 拼接丢掉首块「挑选」，位置被控制 token `FINISHEDSEARCH` 顶替。
+`_wait_for_answer` 原本在两者间「谁长选谁」，而带胶水的 stream 往往更长，
+于是**每次都选中缺头的那份**。
+
+历史样本的开头缺字全部由此而来，此前被旧的清洗规则掩盖成「看起来只是少了个词」：
+
+| id | 入库正文开头 | 实际应为 |
+|----|--------------|----------|
+| 10 | 公司哪家好，其实没有标准答案… | 2026年装修**公司哪家好**… |
+| 16 | 2026年的行业报告和市场调研… | 根据**2026年的行业报告**… |
+
+首字直接决定 `position_bucket` 的 head/middle/tail，L0 不能将就。
+
+改法：`_pick_answer_text` 以 DOM 为真值优先，stream 只在 DOM 明显更短
+（仍在生成中）时兜底；侧栏噪声 DOM 一律不参与竞争。
+
+**验证**：修复后重抓（job 38 / response 23），入库正文与 DOM 截图逐字一致，
+无胶水前缀、无缺头。
+
+> 存量 13 条历史样本的首块已永久丢失，重跑 L1 也补不回来 —— 只能靠重抓。
+
 ---
 
 ## 2. 上线步骤（按顺序）
@@ -135,17 +186,41 @@ docker exec -e GEO_TEST_DATABASE_URL="$DATABASE_URL" geo-api \
 
 ---
 
-## 3. 本地自检
+## 3. 测试
+
+本机（无 Postgres，需真库的用例自动跳过）：
 
 ```bash
-# metrics
-cd packages/metrics && pytest -q            # 16 passed
-
-# api（apps/api 本轮新建了测试目录）
-cd apps/api && PYTHONPATH=. pytest tests/ -q  # 50 passed, 3 skipped
+cd packages/metrics && pytest -q               # 16 passed
+cd apps/api && PYTHONPATH=. pytest tests/ -q   # 57 passed, 7 skipped
 ```
 
-3 个 skipped 是 `test_stuck_jobs.py`，需要真实 Postgres，见上面第 ⑥ 步。
+VPS 容器内（真库，全部跑）：
+
+```bash
+docker exec geo-api pip install -q pytest httpx
+docker exec -w /app/apps/api -e PYTHONPATH=. \
+  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
+  geo-api python -m pytest tests/ -q          # 64 passed
+docker exec -w /app/packages/metrics geo-api python -m pytest -q   # 16 passed
+```
+
+> `pytest` 不在生产镜像里（`pip install -e .` 不装 dev extras），每次重建后要重装。
+
+### 2026-08-01 VPS 验收结果
+
+| 项 | 结果 |
+|----|------|
+| 公网无 key 访问 `/v1/*` | 401 ✓（`/health` 仍 200） |
+| 带 `X-API-Key` / `Bearer` | 200 ✓ |
+| `/qa` 浏览器直访 | 302 → `/qa/login` ✓ |
+| 登录后 Cookie（HttpOnly, Path=/qa） | ✓ |
+| **同一 Cookie 打写接口** | **401 ✓**（CSRF 防线成立） |
+| apps/api 测试 | 64 passed |
+| metrics 测试 | 16 passed |
+| `verify_l2` | PASS |
+| L1 重跑 v1→v2 | 13 条，`answer_status` 与基线一致 |
+| 真抓验证首块 | job 38 与 DOM 逐字一致 ✓ |
 
 ---
 
@@ -158,7 +233,9 @@ cd apps/api && PYTHONPATH=. pytest tests/ -q  # 50 passed, 3 skipped
 | `apps/crawler/` 死代码 | README 自称「已并入 apps/api」，整目录无人引用，待确认后删 |
 | `ensure_schema` 按 `;` 裸切 SQL | 当前迁移能跑，加函数/触发器会碎 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL |
-| 存量 L0 原文 | 已被旧清洗改写，无法回填 |
+| 存量 L0 原文 | 已被旧清洗改写 + 丢首块，无法回填；要干净数据只能重抓 |
+| **本品/竞品 0 提及** | 11 条有效回答里 土巴兔/齐家网/住小帮 **一次都没出现**（SQL 直查确认，`mention_type=none` 是对的）。DeepSeek 答的是 匠云居装饰、品筑时代装饰、龙发装饰 等。L3 看板照现状会全是 0 —— 需要先扩别名库或调整 prompt，否则「监测台」没东西可看 |
+| response 22 | 修复前抓的那条，正文带 `FINISHEDSEARCH` 前缀且缺首块，可按需删除 |
 
 ---
 
@@ -167,3 +244,4 @@ cd apps/api && PYTHONPATH=. pytest tests/ -q  # 50 passed, 3 skipped
 | 日期 | 说明 |
 |------|------|
 | 2026-08-01 | 初版：P0 鉴权 + 4 个 P1 + 3 个 P2 |
+| 2026-08-01 | VPS 部署验收；实测新增 2 个 P1（级联删除、L0 丢首块）并修复 |
