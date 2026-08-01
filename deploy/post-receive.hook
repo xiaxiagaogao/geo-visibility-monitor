@@ -61,6 +61,10 @@ for i in $(seq 1 60); do
   sleep 2
 done
 docker compose ps
+# /health 是公开探针；/health/db 与 /health/config 已需要 API_KEY，部署脚本不再探
 curl -s http://127.0.0.1:8200/health || true
-curl -s http://127.0.0.1:8200/health/db || true
+echo
+if ! grep -qE '^API_KEY=.+' .env 2>/dev/null; then
+  echo "!! 警告：deploy/.env 未设置 API_KEY —— 8200 端口在公网上完全无鉴权"
+fi
 echo "deploy finished"

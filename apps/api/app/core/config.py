@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # 鉴权：空 = 不校验（仅限本机开发）。公网部署必须设置。
+    # 生成：python -c "import secrets; print(secrets.token_urlsafe(32))"
+    api_key: str = ""
+    # QA cookie 是否只走 HTTPS（上了反代/证书后置 true）
+    api_cookie_secure: bool = False
+
     # Worker loop (API process and/or crawler process)
     fake_worker_enabled: bool = True
     fake_worker_interval_sec: float = 2.0

@@ -1,0 +1,25 @@
+{% extends "qa/base.html" %}
+{% block title %}登录 · GEO QA{% endblock %}
+{% block content %}
+<section class="card" style="max-width:440px;margin:60px auto;">
+  <h1 style="font-size:20px;">GEO QA 登录</h1>
+  <p class="muted" style="font-size:13px;">本服务暴露在公网，需要 API Key 才能查看质检数据。</p>
+  {% if bad %}
+  <p class="badge bad" style="display:block;padding:8px 12px;">密钥不正确</p>
+  {% endif %}
+  <form method="post" action="/qa/login" style="margin-top:14px;">
+    <input type="password" name="key" placeholder="API Key" autocomplete="current-password" required
+           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+                  background:#0c1118;color:var(--text);font-family:ui-monospace,monospace;" />
+    <button type="submit"
+            style="margin-top:12px;width:100%;padding:10px;border-radius:8px;border:none;
+                   background:var(--accent);color:#fff;font-size:14px;cursor:pointer;">
+      进入
+    </button>
+  </form>
+  <p class="muted" style="font-size:12px;margin-top:14px;">
+    密钥保存在 HttpOnly Cookie（仅 /qa 路径，7 天）。<code>/v1/*</code> 接口不认 Cookie，需带
+    <code>X-API-Key</code> 请求头。
+  </p>
+</section>
+{% endblock %}

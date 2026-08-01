@@ -3,13 +3,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db
+from app.core.config import get_settings
+from app.core.security import (
+    api_key_configured,
+    clear_qa_cookie,
+    set_qa_cookie,
+    verify_key,
+)
 from app.models import Brand, CrawlJob, Mention, Prompt, RawResponse
 from app.services.counts import compute_counts
 
@@ -17,6 +24,30 @@ router = APIRouter(tags=["qa"])
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+
+
+@router.get("/qa/login", response_class=HTMLResponse)
+def qa_login_form(request: Request, bad: int = 0):
+    """QA 登录页（公开）。密钥用 POST 表单提交，不走 query string —— 免得进访问日志/Referer。"""
+    if not api_key_configured():
+        return RedirectResponse(url="/qa", status_code=302)
+    return templates.TemplateResponse(request, "qa/login.html", {"bad": bool(bad)})
+
+
+@router.post("/qa/login")
+def qa_login(key: str = Form(...)):
+    if not verify_key(key):
+        return RedirectResponse(url="/qa/login?bad=1", status_code=302)
+    resp = RedirectResponse(url="/qa", status_code=302)
+    set_qa_cookie(resp, key, secure=get_settings().api_cookie_secure)
+    return resp
+
+
+@router.get("/qa/logout")
+def qa_logout():
+    resp = RedirectResponse(url="/qa/login", status_code=302)
+    clear_qa_cookie(resp)
+    return resp
 
 
 @router.get("/qa", response_class=HTMLResponse)

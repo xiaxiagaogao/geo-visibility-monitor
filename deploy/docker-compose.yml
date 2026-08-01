@@ -31,8 +31,12 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://geo:geo@postgres:5432/geo}
       API_PORT: "8200"
-      # When crawler profile is on, set FAKE_WORKER_ENABLED=false to avoid double claim
-      FAKE_WORKER_ENABLED: ${FAKE_WORKER_ENABLED:-true}
+      # 8200 对公网开放 → 必须设置 API_KEY，否则任何人可删数据/灌 L0/触发抓取
+      API_KEY: ${API_KEY:-}
+      API_COOKIE_SECURE: ${API_COOKIE_SECURE:-false}
+      # 默认 false：api 镜像里没有 Playwright，真抓模式下它抢到 job 只会失败。
+      # 只有确认不起 crawler profile、且 CRAWL_MODE=fake 时才置 true。
+      FAKE_WORKER_ENABLED: ${FAKE_WORKER_ENABLED:-false}
       CRAWL_MODE: ${CRAWL_MODE:-fake}
       DEEPSEEK_STORAGE_STATE: ${DEEPSEEK_STORAGE_STATE:-}
       PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}

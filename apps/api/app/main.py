@@ -26,11 +26,13 @@ from app.api import qa as qa_router
 from app.api import ingest as ingest_router
 from app.core.db import check_connection
 from app.core.schema import ensure_schema
+from app.core.security import ApiKeyMiddleware, warn_if_open
 from app.worker_loop import start_worker_loop, stop_worker_loop
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_if_open()
     ensure_schema()
     start_worker_loop()
     yield
@@ -39,10 +41,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GEO Demo API",
-    version="0.7.1",
+    version="0.8.0",
     description="GEO learning API — B2–B7 backend ready; QA preview at /qa",
     lifespan=lifespan,
 )
+
+app.add_middleware(ApiKeyMiddleware)
 
 app.include_router(brands_router.router)
 app.include_router(prompts_router.router)
@@ -78,16 +82,23 @@ def root():
 
 @app.get("/health")
 def health():
+    """公开存活探针 —— 部署脚本/容器健康检查用，故意不泄露运行配置。"""
+    return {"ok": True, "service": "geo-api", "version": "0.8.0"}
+
+
+@app.get("/health/config")
+def health_config():
+    """运行配置（需鉴权）。原先挂在 /health 上，对公网泄露 crawl_mode 等信息。"""
     from app.core.config import get_settings
     s = get_settings()
     return {
         "ok": True,
-        "service": "geo-api",
-        "version": "0.7.1",
-        "b7": "qa-preview", "ingest": "/v1/ingest/l0",
+        "version": "0.8.0",
         "qa": "/qa",
+        "ingest": "/v1/ingest/l0",
         "crawl_mode": s.crawl_mode,
         "worker_enabled": s.fake_worker_enabled,
+        "auth_enabled": bool(s.api_key),
     }
 
 
