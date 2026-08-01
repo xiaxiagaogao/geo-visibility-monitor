@@ -45,6 +45,22 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
+## API 自检
+
+```bash
+cd apps/api && PYTHONPATH=. pytest tests/ -q
+```
+
+## 鉴权
+
+服务在公网 8200 上，`API_KEY` 必填（见 [.env.example](.env.example)）：
+
+```bash
+curl -H "X-API-Key: $API_KEY" 'http://127.0.0.1:8200/v1/counts?brand_id=1'
+```
+
+`/qa` 页面走 `/qa/login` 登录（HttpOnly Cookie）。细节见 [docs/24](docs/24-code-review-fixes.md)。
+
 ## 状态
 
 - [x] 产品头脑风暴 / 开源评估
@@ -72,6 +88,7 @@ pytest -q
 
 | 文档 | 说明 |
 |------|------|
+| [docs/24-code-review-fixes.md](docs/24-code-review-fixes.md) | **代码 review 修复 + 上线步骤**（L3 前必读） |
 | [docs/21-l3-frontend-plan.md](docs/21-l3-frontend-plan.md) | L3 前端主线方案（待确认） |
 | [docs/23-l3-ui-pages.md](docs/23-l3-ui-pages.md) | L3 页面需求（g1geo 排版对照） |
 | [docs/22-roadmap-next.md](docs/22-roadmap-next.md) | 后续方向清单 |
