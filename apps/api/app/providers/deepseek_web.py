@@ -203,17 +203,25 @@ class DeepSeekWebProvider(BaseProvider):
                         c.cite_index = i
                     uniq_cites.append(c)
 
+                # L0 = 原始回答（docs/10）：full_text 存抓到什么就是什么，
+                # 清洗只做派生字段，且仅在确实改动了内容时才记录
+                raw_text = (full_text or "").strip()
+                cleaned = _clean_answer_text(raw_text)
+                raw_json: Dict[str, Any] = {
+                    "source": "deepseek_web",
+                    "intercept_events": len(captured_json),
+                    "stream_chunks": len(stream_chunks),
+                    "refs": "patterns: geo_marketing intercept + gitgeo selectors (reimplemented)",
+                }
+                if cleaned != raw_text:
+                    raw_json["cleaned_text"] = cleaned
+
                 return CrawlResult(
                     platform="deepseek",
                     prompt=prompt,
-                    full_text=_clean_answer_text(full_text),
+                    full_text=raw_text,
                     citations=uniq_cites,
-                    raw_json={
-                        "source": "deepseek_web",
-                        "intercept_events": len(captured_json),
-                        "stream_chunks": len(stream_chunks),
-                        "refs": "patterns: geo_marketing intercept + gitgeo selectors (reimplemented)",
-                    },
+                    raw_json=raw_json,
                     latency_ms=latency,
                     screenshot_path=shot,
                 )
@@ -528,16 +536,28 @@ body{{padding:28px 36px 56px;font-family:-apple-system,BlinkMacSystemFont,"Segoe
 
 
 def _clean_answer_text(text: str) -> str:
+    """剥掉流式拼接残留的胶水 token —— 仅用于派生字段。
+
+    结果写进 raw_json.cleaned_text，绝不覆盖 full_text：docs/10 定义 L0 = 原始回答，
+    证据必须可审计、可复核。
+
+    只剥开头独立成词的 FINISHED/SEARCH（后面不能紧跟字母数字）。
+    原实现有三条会破坏正文的规则，已删除：
+
+    1. 开头 ``(FINISHEDSEARCH|FINISHED|SEARCH)+`` 无边界条件 —— 把
+       「SEARCH引擎优化…」开头的正文砍成「引擎优化…」。本项目做的就是 GEO/SEO，
+       这种开头完全可能出现。
+    2. 结尾 ``(...)[\\w\\u4e00-\\u9fff]*$`` —— ``\\w`` 在 Python 下匹配中文，
+       结尾只要出现 search 字样就把后面整串吞掉。
+       实测「…目前主营业务为家装SEARCH」被截断成「…目前主营业务为家装」。
+    3. ``^6年`` → ``2026年`` —— 硬编码年份猜测，直接改写模型答案：
+       正常的「6年内…」被写成「2026年内…」，而且过了 2026 必错。
+    """
     text = (text or "").strip()
-    import re
-    # stream glue tokens at ends
-    text = re.sub(r"^(FINISHEDSEARCH|FINISHED|SEARCH)+", "", text, flags=re.I).lstrip(" :|-")
-    text = re.sub(r"(FINISHEDSEARCH|FINISHED|SEARCH)[\w\u4e00-\u9fff]*$", "", text, flags=re.I).strip()
-    # common broken year prefix after stripping FINISHEDSEARCH2026 -> if starts with lone 6年 fix
-    if re.match(r"^6年", text):
-        text = "2026年" + text[len("6年"):]
-    text = re.sub(r"^2026年6年", "2026年", text)
-    return text.strip()
+    # 必须后接 串尾/空白/分隔符 才认作胶水；后面紧跟中文或数字一律当正文放过
+    # （"SEARCH引擎优化…" 是正文，"SEARCH 引擎优化…" 才是胶水+正文）
+    text = re.sub(r"^(?:FINISHEDSEARCH|FINISHED|SEARCH)(?=$|[\s:|-])", "", text, flags=re.I)
+    return text.lstrip(" :|-").strip()
 
 
 def _is_noise_text(text: str) -> bool:
@@ -602,9 +622,6 @@ def _wait_for_answer(page, stream_chunks: List[str], timeout_ms: int) -> str:
         if last and len(last) > 120 and stable_hits >= 5:
             break
         time.sleep(0.5)
-    # strip common stream glue artifacts
-    last = (last or "").strip()
-    for junk in ("FINISHEDSEARCH", "FINISHED", "SEARCH"):
-        if last.startswith(junk) and len(last) > len(junk) + 10:
-            last = last[len(junk):].lstrip(" :|-")
-    return last
+    # 原样返回：胶水 token 的剥离交给 _clean_answer_text 写进派生字段，
+    # 这里若动手就等于污染了 L0（docs/10）
+    return (last or "").strip()
