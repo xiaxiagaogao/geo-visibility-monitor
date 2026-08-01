@@ -21,7 +21,9 @@ from app.models import (
 
 logger = logging.getLogger("geo.annotate")
 
-ANNOTATOR_VERSION = "l1-rules-v1"
+# v2: match_brand 改为「最早命中」+ 长度守恒折叠，position_bucket / evidence_snippet
+# 的取值随之变化 → 存量行必须重跑（POST /v1/responses/annotate/run）
+ANNOTATOR_VERSION = "l1-rules-v2"
 
 # answer_status values (denominator definition)
 # - ok: counts as valid sample for rates
