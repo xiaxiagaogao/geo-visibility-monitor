@@ -60,12 +60,48 @@ class DeepSeekLoginRequired(RuntimeError):
 # 会话删除接口。2026-08-01 在 VPS 上实测抓包得到（点侧栏「…」→ 删除 →「删除该对话」）：
 #   POST /api/v0/chat_session/delete
 #   Content-Type: application/json
+#   Authorization: Bearer <token>          ← 必需，token 在 localStorage 不在 cookie
 #   {"chat_session_id": "<uuid>"}
-# 与发问用的 /api/v0/chat/completion 不同，这个接口**不需要工作量证明**
-# （completion 前置 POST /api/v0/chat/create_pow_challenge），所以能直接调，
-# 不必点 DOM —— 后者随时会因为改版失效。
+#
+# 两个坑：
+# 1. **HTTP 200 不代表成功。** 缺 token 时照样返回 200，错误在 body 里：
+#    {"code":40002,"msg":"Missing Token","data":null}
+#    所以必须解析 body 的 code，只看 resp.ok 会被骗（本仓踩过：第一版实现日志报
+#    "200 ok" 但侧栏对话纹丝不动）。
+# 2. token 在 localStorage，Playwright 的 page.request 只带 cookie 拿不到。
+#    因此改为在**页面内**用 fetch 发送：JS 自己从 localStorage 取 token，
+#    Python 侧只拿回 {status, code, msg} —— token 全程不出浏览器、不进日志。
 DELETE_SESSION_API = "https://chat.deepseek.com/api/v0/chat_session/delete"
+DELETE_SESSION_PATH = "/api/v0/chat_session/delete"
 _SESSION_URL_RE = re.compile(r"/a/chat/s/([0-9a-fA-F-]{16,})")
+
+# 在页面上下文里执行：取 token → 发删除 → 只回状态，不回 token
+_DELETE_JS = """
+async ({ path, sessionId }) => {
+  const pick = (o) => o && typeof o === 'object'
+      ? (o.token || o.value?.token || o.data?.token || o.data?.user?.token || null)
+      : null;
+  let token = null;
+  for (const k of Object.keys(localStorage)) {
+    const raw = localStorage.getItem(k);
+    if (!raw) continue;
+    try { token = pick(JSON.parse(raw)); } catch (e) { /* 非 JSON，跳过 */ }
+    if (token) break;
+  }
+  const headers = { 'content-type': 'application/json' };
+  if (token) headers['authorization'] = 'Bearer ' + token;
+  const res = await fetch(path, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ chat_session_id: sessionId }),
+  });
+  let body = null;
+  try { body = await res.json(); } catch (e) { /* 非 JSON */ }
+  // 只回状态，绝不回 token
+  return { status: res.status, code: body?.code ?? null, msg: body?.msg ?? null,
+           had_token: Boolean(token) };
+}
+"""
 
 
 def _session_id_from_url(url: str) -> Optional[str]:
@@ -74,21 +110,24 @@ def _session_id_from_url(url: str) -> Optional[str]:
 
 
 def _delete_session(page, session_id: str) -> bool:
-    """删掉刚抓完的会话。失败只记日志，绝不让整个任务失败。"""
+    """删掉刚抓完的会话。失败只记日志，绝不让整个任务失败 —— 证据已经落盘了。"""
     try:
-        resp = page.request.post(
-            DELETE_SESSION_API,
-            data={"chat_session_id": session_id},
-            headers={"content-type": "application/json"},
-        )
-        ok = resp.ok
-        logger.info(
-            "delete session %s -> %s %s", session_id, resp.status, "ok" if ok else resp.text()[:120]
-        )
-        return ok
+        r = page.evaluate(_DELETE_JS, {"path": DELETE_SESSION_PATH, "sessionId": session_id})
     except Exception as exc:  # noqa: BLE001
         logger.warning("delete session %s failed: %s", session_id, exc)
         return False
+
+    # code 为 0 或缺省才算成功；HTTP 200 本身说明不了任何事
+    code = r.get("code")
+    ok = r.get("status") == 200 and code in (0, None)
+    if ok:
+        logger.info("delete session %s -> ok", session_id)
+    else:
+        logger.warning(
+            "delete session %s -> status=%s code=%s msg=%s had_token=%s",
+            session_id, r.get("status"), code, r.get("msg"), r.get("had_token"),
+        )
+    return ok
 
 
 class DeepSeekWebProvider(BaseProvider):
