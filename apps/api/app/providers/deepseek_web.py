@@ -337,6 +337,33 @@ def _scroll_page_for_lazy_load(page, step: int = 400, pause_ms: int = 150) -> No
 
 
 
+def _sanitize_answer_html(html: str) -> str:
+    """粗筛第三方页面片段 —— 只是纵深防御的第二层，真正兜底的是文档里的 CSP。
+
+    这段 HTML 来自 chat.deepseek.com 的回答气泡，会被 set_content 到同一个
+    browser context（带着登录态）的新页面里渲染截图。原实现只用
+    ``\\son\\w+=(["']).*?\\1`` 剥事件处理器，匹配不到**无引号**写法，
+    ``<img src=x onerror=alert(1)>`` 能整条活下来。
+    """
+    out = html
+    # 会执行脚本或发起外部请求的元素，整块删掉
+    for tag in ("script", "iframe", "object", "embed", "link", "meta", "base", "svg"):
+        out = re.sub(rf"<{tag}[\s\S]*?</{tag}\s*>", "", out, flags=re.I)
+        out = re.sub(rf"<{tag}\b[^>]*/?>", "", out, flags=re.I)
+    # 事件处理器：带引号、无引号、JSX 花括号三种写法
+    out = re.sub(r"""\son\w+\s*=\s*(["']).*?\1""", " ", out, flags=re.I | re.S)
+    out = re.sub(r"\son\w+\s*=\s*\{[^}]*\}", " ", out, flags=re.I)
+    out = re.sub(r"\son\w+\s*=\s*[^\s>]+", " ", out, flags=re.I)
+    # javascript: / data: 伪协议
+    out = re.sub(
+        r"""\s(?:href|src|xlink:href)\s*=\s*(["'])\s*(?:javascript|data|vbscript):[^"']*\1""",
+        " ",
+        out,
+        flags=re.I,
+    )
+    return out
+
+
 def _capture_answer_evidence(
     page,
     shot_path: str,
@@ -420,9 +447,7 @@ def _capture_answer_evidence(
         pass
 
     if answer_html:
-        answer_html = _re.sub(r"<script[\s\S]*?</script>", "", answer_html, flags=_re.I)
-        answer_html = _re.sub(r"\son\w+=([\"']).*?\1", "", answer_html, flags=_re.I)
-        answer_html = _re.sub(r"\son\w+=\{[^}]*\}", "", answer_html, flags=_re.I)
+        answer_html = _sanitize_answer_html(answer_html)
 
         q_html = (
             f'<div class="q">{html_lib.escape(q)}</div>' if q else ""
@@ -430,8 +455,11 @@ def _capture_answer_evidence(
         status_html = (
             f'<div class="meta">{html_lib.escape(status)}</div>' if status else ""
         )
+        # CSP 才是真正的防线：正则消毒永远有绕过，而这份文档只需要文字+样式，
+        # 直接禁掉脚本与一切外部请求（图片只允许内联 data:）。
         doc = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; script-src 'none'; frame-src 'none'; connect-src 'none'" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 *{{box-sizing:border-box}}
