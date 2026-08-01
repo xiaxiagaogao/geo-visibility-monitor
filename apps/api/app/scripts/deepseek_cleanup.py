@@ -27,9 +27,9 @@ import argparse
 import sys
 
 from app.core.config import get_settings
-from app.providers.deepseek_web import DELETE_SESSION_API
+from app.providers.deepseek_web import SIDEBAR_ITEM_SEL, _delete_session
 
-ITEM_SEL = "a[href^='/a/chat/s/']"
+ITEM_SEL = SIDEBAR_ITEM_SEL
 DEEPSEEK_URL = "https://chat.deepseek.com"
 
 
@@ -121,22 +121,17 @@ def main() -> int:
             browser.close()
             return 0
 
+        # 复用 provider 里那套（走侧栏 UI 并复核条目真的消失）。
+        # 不能直调 /api/v0/chat_session/delete —— 缺 Bearer token 时它返回
+        # HTTP 200 + {"code":40002,"msg":"Missing Token"}，看着像成功其实没删。
         ok = fail = 0
         for title, sid in targets:
-            try:
-                resp = page.request.post(
-                    DELETE_SESSION_API,
-                    data={"chat_session_id": sid},
-                    headers={"content-type": "application/json"},
-                )
-                if resp.ok:
-                    ok += 1
-                else:
-                    fail += 1
-                    print(f"  失败 {title}: HTTP {resp.status}")
-            except Exception as exc:  # noqa: BLE001
+            if _delete_session(page, sid):
+                ok += 1
+                print(f"  已删除 {title}")
+            else:
                 fail += 1
-                print(f"  失败 {title}: {exc}")
+                print(f"  失败   {title} ({sid})")
         print(f"\n完成：成功 {ok}，失败 {fail}")
         ctx.close()
         browser.close()

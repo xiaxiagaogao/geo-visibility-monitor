@@ -75,33 +75,10 @@ DELETE_SESSION_API = "https://chat.deepseek.com/api/v0/chat_session/delete"
 DELETE_SESSION_PATH = "/api/v0/chat_session/delete"
 _SESSION_URL_RE = re.compile(r"/a/chat/s/([0-9a-fA-F-]{16,})")
 
-# 在页面上下文里执行：取 token → 发删除 → 只回状态，不回 token
-_DELETE_JS = """
-async ({ path, sessionId }) => {
-  const pick = (o) => o && typeof o === 'object'
-      ? (o.token || o.value?.token || o.data?.token || o.data?.user?.token || null)
-      : null;
-  let token = null;
-  for (const k of Object.keys(localStorage)) {
-    const raw = localStorage.getItem(k);
-    if (!raw) continue;
-    try { token = pick(JSON.parse(raw)); } catch (e) { /* 非 JSON，跳过 */ }
-    if (token) break;
-  }
-  const headers = { 'content-type': 'application/json' };
-  if (token) headers['authorization'] = 'Bearer ' + token;
-  const res = await fetch(path, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ chat_session_id: sessionId }),
-  });
-  let body = null;
-  try { body = await res.json(); } catch (e) { /* 非 JSON */ }
-  // 只回状态，绝不回 token
-  return { status: res.status, code: body?.code ?? null, msg: body?.msg ?? null,
-           had_token: Boolean(token) };
-}
-"""
+# 侧栏条目与删除菜单的选择器（2026-08-01 实测）
+SIDEBAR_ITEM_SEL = "a[href^='/a/chat/s/']"
+DELETE_MENU_TEXT = "删除"
+DELETE_CONFIRM_TEXT = "删除该对话"     # 注意不是「确定」
 
 
 def _session_id_from_url(url: str) -> Optional[str]:
@@ -110,24 +87,51 @@ def _session_id_from_url(url: str) -> Optional[str]:
 
 
 def _delete_session(page, session_id: str) -> bool:
-    """删掉刚抓完的会话。失败只记日志，绝不让整个任务失败 —— 证据已经落盘了。"""
+    """删掉刚抓完的会话（走侧栏 UI）。
+
+    为什么不直调 DELETE_SESSION_API：它要 ``Authorization: Bearer <token>``，
+    而 token 既不在 cookie 也不在 localStorage（实测 localStorage 只有
+    settingsJwt 与若干配置项），只能是 IndexedDB 或 SPA 内存。
+    继续挖属于凭据考古，收益不值当 —— 何况本 provider 抓答案本来就依赖
+    ``.ds-markdown`` 等 DOM 选择器，多一处 DOM 依赖并不真正增加脆弱性。
+
+    按 **session_id 精确定位**那一条，绝不按标题模糊匹配 ——
+    这个账号里绝大多数是用户私人对话，误删不可接受。
+
+    失败只记日志，绝不让整个任务失败：证据（截图 + 正文）已经拿到了。
+    """
     try:
-        r = page.evaluate(_DELETE_JS, {"path": DELETE_SESSION_PATH, "sessionId": session_id})
+        item = page.locator(f"{SIDEBAR_ITEM_SEL}[href$='{session_id}']")
+        if item.count() == 0:
+            logger.warning("delete session %s: 侧栏里找不到该会话", session_id)
+            return False
+
+        item.first.scroll_into_view_if_needed(timeout=5000)
+        item.first.hover(timeout=5000)
+        page.wait_for_timeout(400)
+
+        more = item.first.locator(".ds-button")
+        if more.count() == 0:
+            logger.warning("delete session %s: 条目内没有「更多」按钮", session_id)
+            return False
+        more.last.click(timeout=5000)
+        page.wait_for_timeout(600)
+
+        page.get_by_text(DELETE_MENU_TEXT, exact=True).first.click(timeout=5000)
+        page.wait_for_timeout(600)
+        page.get_by_text(DELETE_CONFIRM_TEXT, exact=True).first.click(timeout=5000)
+        page.wait_for_timeout(1500)
+
+        # 复核：真的没了才算成功
+        gone = page.locator(f"{SIDEBAR_ITEM_SEL}[href$='{session_id}']").count() == 0
+        if gone:
+            logger.info("delete session %s -> ok", session_id)
+        else:
+            logger.warning("delete session %s: 点完删除但条目仍在", session_id)
+        return gone
     except Exception as exc:  # noqa: BLE001
         logger.warning("delete session %s failed: %s", session_id, exc)
         return False
-
-    # code 为 0 或缺省才算成功；HTTP 200 本身说明不了任何事
-    code = r.get("code")
-    ok = r.get("status") == 200 and code in (0, None)
-    if ok:
-        logger.info("delete session %s -> ok", session_id)
-    else:
-        logger.warning(
-            "delete session %s -> status=%s code=%s msg=%s had_token=%s",
-            session_id, r.get("status"), code, r.get("msg"), r.get("had_token"),
-        )
-    return ok
 
 
 class DeepSeekWebProvider(BaseProvider):
