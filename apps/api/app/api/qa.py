@@ -191,7 +191,7 @@ def qa_response_detail(
                     display_raw[k] = "[redacted-conversation-url]"
         if row.screenshot_path:
             name = Path(row.screenshot_path).name
-            screenshot_url = f"/qa/media/screenshots/{name}"
+            screenshot_url = f"/v1/media/screenshots/{name}"
     return templates.TemplateResponse(
         request,
         "qa/response_detail.html",
@@ -207,8 +207,15 @@ def qa_response_detail(
 
 
 @router.get("/qa/media/screenshots/{filename}")
+@router.get("/v1/media/screenshots/{filename}")
 def qa_screenshot(filename: str):
-    """Serve crawl evidence screenshots (basename only)."""
+    """证据截图（只接受 basename）。
+
+    两个路径指向同一处理函数：``/qa/...`` 给运维预览页，``/v1/...`` 给正式前端 ——
+    前端不该依赖 ``/qa`` 这个运维工具的地盘。
+
+    两条都是 GET，浏览器 ``<img src>`` 用 Cookie 认证即可（``<img>`` 发不了请求头）。
+    """
     import os
 
     safe = Path(filename).name

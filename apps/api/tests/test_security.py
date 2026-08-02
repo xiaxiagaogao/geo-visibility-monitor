@@ -1,10 +1,15 @@
 """ApiKeyMiddleware 行为测试（不依赖数据库）。
 
-关键约定：
-- /v1/* 只认请求头，**不认 Cookie** —— 否则第三方站点能借浏览器 Cookie 发起 CSRF 写操作
-- /qa/* 额外认 Cookie（浏览器加不了请求头），但 QA 页面全是 GET，只读
-- /health 永远公开（部署脚本探针）
-- API_KEY 为空 = 整体不校验（本机开发）
+分界线是 **HTTP 方法**，不是路径（F0a）：
+
+- 请求头认证：任何方法都接受
+- Cookie 认证：**只对 GET/HEAD/OPTIONS 有效**
+
+理由：浏览器 SPA 没法安全持有 API Key，``<img src>`` 也发不了请求头，
+所以读接口和截图必须能用 Cookie；但 Cookie 一旦能用于写接口就等于开了 CSRF。
+所有会改状态的路由都是 POST/PUT/PATCH/DELETE（已逐条核对）。
+
+其余：/health 永远公开（部署探针）；API_KEY 为空 = 整体不校验（本机开发）。
 """
 from __future__ import annotations
 
@@ -35,6 +40,26 @@ def build_app() -> FastAPI:
     @app.post("/v1/brands")
     def create_brand():
         return {"created": True}
+
+    @app.put("/v1/brands/1/aliases")
+    def put_aliases():
+        return {"ok": True}
+
+    @app.patch("/v1/brands/1")
+    def patch_brand():
+        return {"ok": True}
+
+    @app.delete("/v1/brands/1")
+    def delete_brand():
+        return {"ok": True}
+
+    @app.get("/v1/counts")
+    def counts():
+        return {"n_valid": 35}
+
+    @app.get("/v1/media/screenshots/{name}")
+    def media(name: str):
+        return {"file": name}
 
     @app.get("/qa")
     def qa_home():
@@ -93,14 +118,45 @@ def test_config_endpoint_is_not_public(client):
 
 
 def test_qa_accepts_cookie(client):
-    client.cookies.set(QA_COOKIE_NAME, KEY, path="/qa")
+    client.cookies.set(QA_COOKIE_NAME, KEY, path="/")
     assert client.get("/qa").status_code == 200
 
 
-def test_v1_ignores_cookie(client):
-    """CSRF 防线：Cookie 对写接口无效。"""
+@pytest.mark.parametrize("path", ["/v1/counts", "/v1/media/screenshots/a.png"])
+def test_cookie_works_for_get_on_v1(client, path):
+    """F0a：读接口与截图必须能用 Cookie —— <img src> 发不了请求头。"""
     client.cookies.set(QA_COOKIE_NAME, KEY, path="/")
-    assert client.post("/v1/brands").status_code == 401
+    assert client.get(path).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("post", "/v1/brands"),
+        ("put", "/v1/brands/1/aliases"),
+        ("patch", "/v1/brands/1"),
+        ("delete", "/v1/brands/1"),
+    ],
+)
+def test_cookie_never_works_for_write_methods(client, method, path):
+    """CSRF 红线：Cookie 对任何写方法都无效，逐个方法验。"""
+    client.cookies.set(QA_COOKIE_NAME, KEY, path="/")
+    assert getattr(client, method)(path).status_code == 401
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("post", "/v1/brands"),
+        ("put", "/v1/brands/1/aliases"),
+        ("patch", "/v1/brands/1"),
+        ("delete", "/v1/brands/1"),
+    ],
+)
+def test_header_still_works_for_write_methods(client, method, path):
+    client.cookies.set(QA_COOKIE_NAME, "wrong-cookie", path="/")
+    r = getattr(client, method)(path, headers={"X-API-Key": KEY})
+    assert r.status_code == 200
 
 
 def test_qa_html_request_redirects_to_login(client):
@@ -115,8 +171,11 @@ def test_login_sets_cookie_and_grants_qa(client):
     assert r.headers["location"] == "/qa"
     cookie = r.headers["set-cookie"]
     assert "HttpOnly" in cookie
-    assert "Path=/qa" in cookie
+    # path=/ 而非 /qa：F0b 起前端挂在 /，GET /v1/* 与截图也要带上它。
+    # 放宽作用域不引入 CSRF —— Cookie 只在安全方法上生效。
+    assert "Path=/" in cookie and "Path=/qa" not in cookie
     assert client.get("/qa").status_code == 200
+    assert client.get("/v1/counts").status_code == 200
 
 
 def test_login_rejects_wrong_key(client):
