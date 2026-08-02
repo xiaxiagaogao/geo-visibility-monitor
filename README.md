@@ -88,7 +88,9 @@ curl -H "X-API-Key: $API_KEY" 'http://127.0.0.1:8200/v1/counts?brand_id=1'
 
 | 文档 | 说明 |
 |------|------|
-| [docs/24-code-review-fixes.md](docs/24-code-review-fixes.md) | **代码 review 修复 + 上线步骤**（L3 前必读） |
+| [docs/27-l3-handoff.md](docs/27-l3-handoff.md) | **L3 前端交接（新会话冷启动从这里开始）** |
+| [docs/26-monitoring-set-anta.md](docs/26-monitoring-set-anta.md) | 安踏监测集设计与 D2 结果 |
+| [docs/24-code-review-fixes.md](docs/24-code-review-fixes.md) | 代码 review 修复 + 上线步骤 |
 | [docs/21-l3-frontend-plan.md](docs/21-l3-frontend-plan.md) | L3 前端主线方案（待确认） |
 | [docs/23-l3-ui-pages.md](docs/23-l3-ui-pages.md) | L3 页面需求（g1geo 排版对照） |
 | [docs/22-roadmap-next.md](docs/22-roadmap-next.md) | 后续方向清单 |
