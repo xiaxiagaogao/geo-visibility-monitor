@@ -1,0 +1,184 @@
+/* ── emphasis 横条：本品主色，竞品统一灰 ── */
+.bars {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr minmax(104px, max-content);
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.barLabel {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.barLabelOwn {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.barTrack {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--dim);
+}
+
+.barFillOwn {
+  background: var(--accent);
+}
+
+/* 零命中：给一个红色的起始笔画，让「0」不是一段空白而是一个信号 */
+.barZero {
+  width: 4px;
+  background: var(--bad);
+}
+
+.barValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: #c8d2e0;
+  white-space: nowrap;
+}
+
+.barValueOwn {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.barValueZero {
+  color: var(--bad);
+}
+
+/* ── 命中矩阵 ── */
+.matrixScroll {
+  overflow-x: auto;
+}
+
+.matrix {
+  border-collapse: separate;
+  border-spacing: 4px;
+  font-size: 9.5px;
+  width: 100%;
+  min-width: 720px;
+}
+
+.matrix thead th {
+  font-weight: 400;
+  color: var(--muted);
+  text-align: center;
+  padding: 0 0 2px;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.matrix thead th.colOwn {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.rowHead {
+  text-align: left;
+  width: 210px;
+  padding-right: 8px;
+  vertical-align: middle;
+}
+
+.rowTitle {
+  font-size: var(--fs-sm);
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* 行首带这一行自己的指标 —— 学自竞品，读矩阵时不用来回换算 */
+.rowMeta {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.rowMetaZero {
+  color: var(--bad);
+}
+
+.cell {
+  text-align: center;
+  border-radius: 3px;
+  padding: 6px 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  border: 1px solid transparent;
+  width: 62px;
+}
+
+.cellButton {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  border-radius: 3px;
+}
+
+.l1 {
+  background: var(--seq-1);
+}
+
+.l2 {
+  background: var(--seq-2);
+}
+
+.l3 {
+  background: var(--seq-3);
+  color: #0d1116;
+}
+
+.zero {
+  background: none;
+  border-color: var(--border);
+  color: #5b6b85;
+}
+
+/* 本品挂零：红框。这是整张矩阵里最该被看见的东西 */
+.zeroOwn {
+  border-color: var(--bad);
+  border-width: 1.4px;
+}
+
+.cellHit:hover {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+  cursor: pointer;
+}
+
+.legend {
+  display: flex;
+  gap: 13px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.legendSwatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}

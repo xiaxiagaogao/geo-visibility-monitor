@@ -1,0 +1,144 @@
+.root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Topbar ───────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: var(--topbar-h);
+  padding: 0 var(--sp-4);
+  background: var(--card-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-weight: 700;
+  font-size: var(--fs-md);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.brandSwitch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 10px 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-size: var(--fs-sm);
+}
+
+.brandSwitchLabel {
+  color: var(--muted);
+}
+
+.brandSwitchValue {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.caret {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.pills {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.pill {
+  font-size: var(--fs-sm);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--surface-inset);
+  white-space: nowrap;
+}
+
+.pillOn {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface-quote);
+}
+
+/* 未接入的平台：灰到一眼看出点不了，而不是看起来能点但没反应 */
+.pillOff {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.provenance {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Body ─────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: none;
+  padding: var(--sp-3) 0;
+  background: var(--card-2);
+  border-right: 1px solid var(--border);
+}
+
+.navLink {
+  display: block;
+  padding: 8px 16px;
+  font-size: var(--fs-base);
+  color: var(--muted);
+  border-left: 2px solid transparent;
+}
+
+.navLink:hover {
+  color: var(--text);
+}
+
+.navLinkOn {
+  color: var(--text);
+  border-left-color: var(--accent);
+  background: var(--surface-quote);
+}
+
+.navSep {
+  height: 1px;
+  background: var(--border);
+  margin: var(--sp-3) var(--sp-3);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-4) var(--sp-5) var(--sp-6);
+}
+
+.content {
+  max-width: var(--content-max);
+}

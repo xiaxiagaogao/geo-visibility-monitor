@@ -1,0 +1,391 @@
+/* ── 页头（面包屑 + 标题 + 主 CTA），骨架学自竞品 ── */
+.pageHead {
+  margin-bottom: var(--sp-4);
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-bottom: var(--sp-3);
+}
+
+.crumbSep {
+  opacity: 0.5;
+}
+
+.crumbCurrent {
+  color: var(--text);
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.title {
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.btn:hover {
+  border-color: var(--muted);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btnPrimary:hover {
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: var(--sp-3);
+}
+
+.tab {
+  font-size: var(--fs-sm);
+  padding: 5px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  border: 1px solid transparent;
+  background: none;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tabOn {
+  color: var(--text);
+  background: var(--surface-quote);
+  border-color: var(--accent);
+}
+
+.tabCount {
+  margin-left: 5px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ── 筛选行 ── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.input,
+.select {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input {
+  min-width: 220px;
+}
+
+.select {
+  min-width: 132px;
+}
+
+/* ── Panel ── */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 13px 14px;
+  margin-bottom: 13px;
+}
+
+.panelInset {
+  background: var(--surface-inset);
+  border-color: var(--track);
+}
+
+.panelFlush {
+  margin-bottom: 0;
+}
+
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.panelTitle {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  margin: 0;
+}
+
+.panelSub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 2px 0 11px;
+  line-height: 1.6;
+}
+
+/* ── Badge ── */
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 状态色只做徽章且始终配文字 —— 绝不当图表系列色（docs/27 §5.1） */
+.badgeOk {
+  color: var(--ok);
+  border-color: #14532d;
+}
+
+.badgeBad {
+  color: var(--bad);
+  border-color: #7f1d1d;
+}
+
+.badgeWarn {
+  color: var(--warn);
+  border-color: #78350f;
+}
+
+.badgeAccent {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── ⓘ 口径提示 ── */
+.infoDot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  font-size: 8px;
+  line-height: 10px;
+  text-align: center;
+  color: var(--muted);
+  margin-left: 4px;
+  vertical-align: 1px;
+  cursor: help;
+}
+
+/* ── Meter（线性，不用环形 —— dataviz 硬规则）── */
+.meters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 11px;
+  margin-bottom: 13px;
+}
+
+.meter {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 13px;
+}
+
+.meterLabel {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.meterValue {
+  font-size: var(--fs-num);
+  font-weight: 650;
+  margin: 5px 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.meterValueAccent {
+  color: var(--accent);
+}
+
+.meterValueBad {
+  color: var(--bad);
+}
+
+.meterTrack {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+/* 计数卡不画轨道，只占等高，保证与同排 meter 的基线对齐 */
+.meterTrackless {
+  height: 5px;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.meterFillDim {
+  background: var(--dim);
+}
+
+/* 分母永远在，且是等宽的 —— docs/27 §5.3 */
+.meterDen {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* ── 表 ── */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+}
+
+.table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--row-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rowLink {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ── 空 / 错误态 ── */
+.empty {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+}
+
+/* ── Modal ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(6, 10, 16, 0.72);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+
+.modal {
+  width: min(760px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+.modalHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.modalTitle {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.modalClose:hover {
+  color: var(--text);
+  background: var(--surface-quote);
+}
+
+.modalBody {
+  padding: 16px 18px 20px;
+}

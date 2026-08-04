@@ -1,0 +1,106 @@
+.sectionLabel {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: var(--sp-5) 0 6px;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+/* ── 聊天记录形态：提问在右，回答在左 ── */
+.turn {
+  display: flex;
+  margin-bottom: var(--sp-3);
+}
+
+.turnAsk {
+  justify-content: flex-end;
+}
+
+.ask {
+  max-width: 78%;
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--fs-base);
+  padding: 9px 13px;
+  border-radius: var(--radius-lg) var(--radius-lg) 2px var(--radius-lg);
+}
+
+.answer {
+  flex: 1;
+  background: #0f1722;
+  border: 1px solid var(--border);
+  border-radius: 2px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  padding: 13px 15px;
+  font-size: var(--fs-base);
+  line-height: 1.9;
+  color: #c8d2e0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 命中处内联高亮 —— 目前拿不到 offset，见 §2.4 */
+.hl {
+  background: #1d3a5f;
+  border-bottom: 1.5px solid var(--accent);
+  border-radius: 2px;
+  padding: 0 2px;
+  color: #dbeafe;
+}
+
+.notice {
+  font-size: var(--fs-sm);
+  color: var(--warn);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius);
+  padding: 8px 11px;
+  margin: 0 0 var(--sp-4);
+  line-height: 1.65;
+}
+
+.pending {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 9px;
+  line-height: 1.65;
+  border-left: 2px solid var(--warn);
+  padding-left: 10px;
+}
+
+.ownCell {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.shot {
+  height: 96px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: #0c1118;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-size: var(--fs-sm);
+}
+
+.footnote {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.meta {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-bottom: var(--sp-4);
+}
+
+.metaValue {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

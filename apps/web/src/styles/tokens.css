@@ -1,0 +1,75 @@
+/**
+ * 设计 token —— 色彩部分原样来自 docs/27 §5.1，全部对 #1a2332 跑过 dataviz 验证器。
+ *
+ * 两条硬约束（跑验证器得出的，不是审美）：
+ *   1. --ok / --warn / --bad 只能做徽章且必须配文字，**绝不可当图表系列色**
+ *      （#f59e0b ↔ #22c55e 在红色盲下 ΔE 5.7，低于 6 的硬下限）
+ *   2. 顺序色阶不能抄 dataviz 参考值 —— 参考值绑定它自己的底色。
+ *      重取为 #256abf → #6da7ec 后对本底色全 PASS
+ */
+:root {
+  /* 页面底 —— 沿用 /qa base.html */
+  --bg: #0f1419;
+  --card: #1a2332;
+  --card-2: #152031;
+  --text: #e7ecf3;
+  --muted: #8b9bb4;
+  --border: #2a3548;
+
+  /* 状态色：只做徽章，必须配文字 */
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+
+  /* 图表系列色（本轮只有 emphasis 形态用得上，留着备用） */
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --s5: #d55181;
+  --s6: #008300;
+  --s7: #9085e9;
+  --s8: #e66767;
+
+  /* emphasis 形态：主角 + 背景灰 */
+  --accent: #3987e5;
+  --dim: #3d4a61;
+
+  /* 矩阵格子顺序色阶 */
+  --seq-1: #256abf;
+  --seq-2: #3987e5;
+  --seq-3: #6da7ec;
+
+  /* 以下是排版 token，不在 docs/27 里，属本轮新增 —— 数值取自 v2 稿实测 */
+  --surface-inset: #111a26;
+  --surface-quote: #12233a;
+  --track: #22304a;
+  --row-border: #1e2939;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 28px;
+
+  --fs-xs: 10.5px;
+  --fs-sm: 11.5px;
+  --fs-base: 12.5px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 21px;
+  --fs-num: 27px;
+
+  --font-sans: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+
+  --topbar-h: 48px;
+  --sidebar-w: 168px;
+  --content-max: 1180px;
+}
