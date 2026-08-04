@@ -1,43 +1,57 @@
-import { BRANDS, PLATFORMS } from '@/lib/fixtures'
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+import { Badge } from '@/components/ui'
+import { LAST_COLLECTED_AT } from '@/lib/fixtures'
 
 import styles from './shell.module.css'
+import { ThemeToggle } from './ThemeToggle'
 
 /**
- * 顶栏 = 「当前在看谁、在哪些平台、什么时间窗」。
- *
- * 平台放顶栏而不是筛选行 —— 它表达的是**能力边界**（只有 DeepSeek 接了），
- * 不是一个普通筛选项。竞品把平台塞进筛选行是因为它四个平台都真跑得动。
+ * 页面标题从路由推，不用 context —— 只有 5 条固定路由，
+ * 为这点信息拉一层 provider 不划算。
  */
+const TITLES: Record<string, { title: string; sub: string }> = {
+  '/': { title: '总览', sub: '全局表现速览 · 安踏（运动鞋服）' },
+  '/batches/': { title: '采集批次', sub: '按采集日期分组 · 逐批下钻到证据' },
+  '/gaps/': { title: '覆盖缺口', sub: '本品缺席或明显落后、竞品在场的提问 · 按失分量排序' },
+  '/citations/': { title: '引用分析', sub: 'citations 聚合 · 来源与覆盖分布' },
+  '/responses/': { title: '原始回答', sub: '单条 AI 回答溯源 · 正文 / 截图 / 引用' },
+}
+
 export function Topbar() {
-  const brand = BRANDS[0]
+  const pathname = usePathname()
+  const meta = TITLES[pathname] ?? TITLES[`${pathname}/`] ?? { title: 'GEO 监测台', sub: '' }
 
   return (
     <header className={styles.topbar}>
-      <span className={styles.logo}>GEO 监测台</span>
-      <span className={styles.divider} />
-
-      <div className={styles.brandSwitch}>
-        <span className={styles.brandSwitchLabel}>监测品牌</span>
-        <span className={styles.brandSwitchValue}>{brand.name}</span>
-        <span className={styles.caret}>▾</span>
-      </div>
-
-      <div className={styles.pills}>
-        {PLATFORMS.map((p) => (
-          <span
-            key={p.id}
-            className={`${styles.pill} ${p.connected ? styles.pillOn : styles.pillOff}`}
-            title={p.connected ? undefined : '该平台尚未接入，无数据'}
-          >
-            {p.connected ? p.label : `${p.label} · 未接入`}
-          </span>
-        ))}
+      <div>
+        <div className={styles.filterGroup}>
+          <strong style={{ fontSize: 'var(--fs-h1)' }}>{meta.title}</strong>
+          {/* 只读定位：配置与发起继续走 /qa，这个前端不做写操作 */}
+          <Badge tone="accent">只读</Badge>
+        </div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
+          {meta.sub}
+        </div>
       </div>
 
       <span className={styles.spacer} />
 
-      <span className={styles.provenance}>数据口径：L2 counts · 已排除假数据</span>
-      <span className={styles.pill}>全部时间</span>
+      <span className={styles.topbarStatus}>
+        <span className={styles.statusDot} />
+        采集正常 · 更新于 {LAST_COLLECTED_AT}
+      </span>
+
+      <button className={styles.iconBtn} aria-label="刷新" title="刷新">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12a9 9 0 1 1-2.6-6.4" />
+          <path d="M21 4v5h-5" />
+        </svg>
+      </button>
+
+      <ThemeToggle />
     </header>
   )
 }

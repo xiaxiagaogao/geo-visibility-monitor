@@ -4,39 +4,9 @@ import { formatFraction, formatRate } from '@/lib/l3/rates'
 
 import styles from './ui.module.css'
 
-/* ── 页头 ──────────────────────────────────────────── */
+export const ui = styles
 
-export function PageHeader({
-  crumbs,
-  title,
-  subtitle,
-  actions,
-}: {
-  crumbs: string[]
-  title: string
-  subtitle?: ReactNode
-  actions?: ReactNode
-}) {
-  return (
-    <div className={styles.pageHead}>
-      <div className={styles.crumbs}>
-        {crumbs.map((c, i) => (
-          <span key={c} className={i === crumbs.length - 1 ? styles.crumbCurrent : undefined}>
-            {i > 0 && <span className={styles.crumbSep}>&nbsp;/&nbsp;</span>}
-            {c}
-          </span>
-        ))}
-      </div>
-      <div className={styles.titleRow}>
-        <div>
-          <h1 className={styles.title}>{title}</h1>
-          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
-        </div>
-        {actions ? <div className={styles.actions}>{actions}</div> : null}
-      </div>
-    </div>
-  )
-}
+/* 页标题在 Topbar 里（照搬 GeoMonitor 的做法），页面本身不再重复一遍标题 */
 
 export function Button({
   children,
@@ -60,7 +30,173 @@ export function Button({
   )
 }
 
-/* ── Tabs ─────────────────────────────────────────── */
+/* ══════ Panel ══════ */
+
+export function Panel({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title?: ReactNode
+  subtitle?: ReactNode
+  right?: ReactNode
+  children?: ReactNode
+}) {
+  return (
+    <section className={styles.panel}>
+      {title || right ? (
+        <div className={styles.panelHead}>
+          <div>
+            {title ? <h2 className={styles.panelTitle}>{title}</h2> : null}
+            {subtitle ? <p className={styles.panelSub}>{subtitle}</p> : null}
+          </div>
+          {right}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  )
+}
+
+export function PanelNote({ children }: { children: ReactNode }) {
+  return <p className={styles.panelNote}>{children}</p>
+}
+
+/* ══════ KPI ══════ */
+
+export function KpiGrid({ children }: { children: ReactNode }) {
+  return <div className={styles.kpiGrid}>{children}</div>
+}
+
+/**
+ * 比率型 KPI。
+ *
+ * props **强制要 `m` 和 `n`**，没有只收 rate 的重载 ——
+ * 这样「孤零零的百分比」在类型层面就写不出来（docs/29 §7.2）。
+ */
+export function KpiRate({
+  label,
+  info,
+  m,
+  n,
+  denomLabel,
+  alert,
+}: {
+  label: string
+  info?: string
+  m: number
+  n: number
+  denomLabel?: string
+  alert?: boolean
+}) {
+  return (
+    <div className={`${styles.kpi} ${alert ? styles.kpiAlert : ''}`}>
+      <div className={styles.kpiLabel}>
+        {label}
+        {info ? <InfoDot title={info} /> : null}
+      </div>
+      <div className={`${styles.kpiValue} mono ${alert ? styles.kpiValueAlert : ''}`}>
+        {formatRate(n > 0 ? m / n : null)}
+      </div>
+      <div className={`${styles.kpiDenom} mono`}>{denomLabel ?? formatFraction(m, n)}</div>
+    </div>
+  )
+}
+
+/** 计数型 KPI。值不是比率，所以不带百分比。 */
+export function KpiCount({
+  label,
+  info,
+  value,
+  note,
+  alert,
+}: {
+  label: string
+  info?: string
+  value: number | string
+  note: string
+  alert?: boolean
+}) {
+  return (
+    <div className={`${styles.kpi} ${alert ? styles.kpiAlert : ''}`}>
+      <div className={styles.kpiLabel}>
+        {label}
+        {info ? <InfoDot title={info} /> : null}
+      </div>
+      <div className={`${styles.kpiValue} mono ${alert ? styles.kpiValueAlert : ''}`}>{value}</div>
+      <div className={styles.kpiDenom}>{note}</div>
+    </div>
+  )
+}
+
+/**
+ * 降级态 KPI —— 采到了，但这个维度后端还没算。
+ *
+ * 和「空」必须分开：空是没采到，降级是采到了算不出来。
+ * 文案说清楚缺什么，否则用户会以为是采集出了问题。
+ */
+export function KpiDegraded({
+  label,
+  info,
+  reason,
+  note,
+}: {
+  label: string
+  info?: string
+  reason: string
+  note: string
+}) {
+  return (
+    <div className={styles.kpi}>
+      <div className={styles.kpiLabel}>
+        {label}
+        {info ? <InfoDot title={info} /> : null}
+      </div>
+      <div className={`${styles.kpiValue} ${styles.kpiValueMuted}`}>{reason}</div>
+      <div className={styles.kpiDenom}>{note}</div>
+    </div>
+  )
+}
+
+/* ══════ Badge / InfoDot ══════ */
+
+export type BadgeTone = 'neutral' | 'ok' | 'danger' | 'warning' | 'accent'
+
+const BADGE_TONE: Record<BadgeTone, string> = {
+  neutral: '',
+  ok: styles.badgeOk,
+  danger: styles.badgeDanger,
+  warning: styles.badgeWarning,
+  accent: styles.badgeAccent,
+}
+
+export function Badge({
+  children,
+  tone = 'neutral',
+  dot,
+}: {
+  children: ReactNode
+  tone?: BadgeTone
+  dot?: boolean
+}) {
+  return (
+    <span className={`${styles.badge} ${BADGE_TONE[tone]}`}>
+      {dot ? <span className={styles.dot} /> : null}
+      {children}
+    </span>
+  )
+}
+
+export function InfoDot({ title }: { title: string }) {
+  return (
+    <span className={styles.infoDot} title={title} role="img" aria-label={`口径：${title}`}>
+      i
+    </span>
+  )
+}
+
+/* ══════ Tabs ══════ */
 
 export interface TabItem {
   id: string
@@ -95,183 +231,48 @@ export function Tabs({
   )
 }
 
-/* ── 筛选行 ───────────────────────────────────────── */
-
-export function FilterBar({ children }: { children: ReactNode }) {
-  return <div className={styles.filterBar}>{children}</div>
-}
-
-export function SearchInput({ placeholder }: { placeholder: string }) {
-  return <input className={styles.input} placeholder={placeholder} aria-label={placeholder} />
-}
-
-export function Select({ label, options }: { label: string; options: string[] }) {
-  return (
-    <select className={styles.select} aria-label={label} defaultValue={options[0]}>
-      {options.map((o) => (
-        <option key={o}>{o}</option>
-      ))}
-    </select>
-  )
-}
-
-/* ── Panel ────────────────────────────────────────── */
-
-export function Panel({
-  title,
-  subtitle,
-  right,
-  inset,
-  flush,
-  children,
-}: {
-  title?: ReactNode
-  subtitle?: ReactNode
-  right?: ReactNode
-  inset?: boolean
-  flush?: boolean
-  children?: ReactNode
-}) {
-  const cls = [styles.panel, inset ? styles.panelInset : '', flush ? styles.panelFlush : '']
-    .filter(Boolean)
-    .join(' ')
-
-  return (
-    <section className={cls}>
-      {title || right ? (
-        <div className={styles.panelHead}>
-          <div>
-            {title ? <h2 className={styles.panelTitle}>{title}</h2> : null}
-            {subtitle ? <p className={styles.panelSub}>{subtitle}</p> : null}
-          </div>
-          {right}
-        </div>
-      ) : (
-        subtitle && <p className={styles.panelSub}>{subtitle}</p>
-      )}
-      {children}
-    </section>
-  )
-}
-
-/* ── Badge ────────────────────────────────────────── */
-
-export type BadgeTone = 'neutral' | 'ok' | 'bad' | 'warn' | 'accent'
-
-const BADGE_CLASS: Record<BadgeTone, string> = {
-  neutral: '',
-  ok: styles.badgeOk,
-  bad: styles.badgeBad,
-  warn: styles.badgeWarn,
-  accent: styles.badgeAccent,
-}
-
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: BadgeTone }) {
-  return <span className={`${styles.badge} ${BADGE_CLASS[tone]}`}>{children}</span>
-}
-
-export function InfoDot({ title }: { title: string }) {
-  return (
-    <span className={styles.infoDot} title={title} aria-label={title} role="img">
-      i
-    </span>
-  )
-}
-
-/* ── Meter ────────────────────────────────────────── */
-
-export function MeterGrid({ children }: { children: ReactNode }) {
-  return <div className={styles.meters}>{children}</div>
-}
-
-/**
- * 线性 meter —— 不用环形 gauge（dataviz 硬规则，docs/27 §5.2）。
- *
- * props 强制要 `m` 和 `n`：**没有只收 rate 的重载**。
- * 这样「孤零零的百分比」在类型层面就写不出来（docs/27 §5.3）。
- */
-export function Meter({
-  label,
-  info,
-  m,
-  n,
-  tone = 'accent',
-  denNote,
-}: {
-  label: string
-  info?: string
-  m: number
-  n: number
-  tone?: 'accent' | 'dim' | 'bad'
-  denNote?: string
-}) {
-  const r = n > 0 ? m / n : null
-  const pct = r === null ? 0 : Math.min(1, Math.max(0, r)) * 100
-
-  const valueCls =
-    tone === 'accent' ? styles.meterValueAccent : tone === 'bad' ? styles.meterValueBad : ''
-
-  return (
-    <div className={styles.meter}>
-      <div className={styles.meterLabel}>
-        {label}
-        {info ? <InfoDot title={info} /> : null}
-      </div>
-      <div className={`${styles.meterValue} mono ${valueCls}`}>{formatRate(r)}</div>
-      <div className={styles.meterTrack}>
-        <div
-          className={`${styles.meterFill} ${tone === 'dim' ? styles.meterFillDim : ''}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className={`${styles.meterDen} mono`}>{denNote ?? formatFraction(m, n)}</div>
-    </div>
-  )
-}
-
-/**
- * 计数卡：值本身不是比率。
- *
- * **不画轨道** —— 一条满格的轨道摆在「2」下面会被读成「100%」，
- * 而这里的 2 是「10 条提问里有 2 条挂零」。用等高占位保持与 meter 行对齐即可。
- */
-export function CountCard({
-  label,
-  info,
-  value,
-  note,
-  tone = 'dim',
-}: {
-  label: string
-  info?: string
-  value: number | string
-  note: string
-  tone?: 'accent' | 'dim' | 'bad'
-}) {
-  const valueCls =
-    tone === 'accent' ? styles.meterValueAccent : tone === 'bad' ? styles.meterValueBad : ''
-
-  return (
-    <div className={styles.meter}>
-      <div className={styles.meterLabel}>
-        {label}
-        {info ? <InfoDot title={info} /> : null}
-      </div>
-      <div className={`${styles.meterValue} mono ${valueCls}`}>{value}</div>
-      <div className={styles.meterTrackless} />
-      <div className={styles.meterDen}>{note}</div>
-    </div>
-  )
-}
-
-/* ── 表 / 空态 ────────────────────────────────────── */
+/* ══════ 表 ══════ */
 
 export function Table({ children }: { children: ReactNode }) {
   return <table className={styles.table}>{children}</table>
 }
 
-export const tableStyles = styles
+/* ══════ 三态：每个数据组件必备（docs/29 §7.1）══════ */
+
+export function Skeleton({ height = 16, width = '100%' }: { height?: number; width?: string }) {
+  return <div className={styles.skeleton} style={{ height, width }} />
+}
+
+export function ErrorState({
+  status,
+  code,
+  message,
+  onRetry,
+}: {
+  status: number
+  code?: string
+  message: string
+  onRetry?: () => void
+}) {
+  return (
+    <div className={styles.errorBox}>
+      <div style={{ flex: 1 }}>
+        <div className={styles.errorTitle}>加载失败</div>
+        <div className={styles.errorDetail}>
+          接口 {status}
+          {code ? ` · ${code}` : ''} · {message}
+        </div>
+      </div>
+      {onRetry ? <Button onClick={onRetry}>重试</Button> : null}
+    </div>
+  )
+}
 
 export function EmptyState({ children }: { children: ReactNode }) {
-  return <div className={styles.empty}>{children}</div>
+  return <div className={styles.stateBox}>{children}</div>
+}
+
+/** 行内降级标记，用在矩阵格、表格单元里 */
+export function Degraded({ children }: { children: ReactNode }) {
+  return <span className={styles.degraded}>{children}</span>
 }

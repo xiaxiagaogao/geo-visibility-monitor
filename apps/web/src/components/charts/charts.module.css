@@ -1,184 +1,259 @@
-/* ── emphasis 横条：本品主色，竞品统一灰 ── */
+/* ═══ emphasis 横条：本品主色，竞品统一灰 ═══ */
 .bars {
   display: grid;
-  grid-template-columns: minmax(96px, max-content) 1fr minmax(104px, max-content);
+  grid-template-columns: minmax(90px, max-content) 1fr minmax(96px, max-content);
   align-items: center;
-  gap: 6px 10px;
+  gap: 7px var(--sp-3);
 }
 
 .barLabel {
   font-size: var(--fs-xs);
-  color: var(--muted);
+  color: var(--text-secondary);
   text-align: right;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
 }
 
 .barLabelOwn {
-  color: var(--text);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .barTrack {
-  height: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-inset);
+  height: 14px;
+  border-radius: var(--r-xs);
+  background: var(--bar-track);
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  border-radius: var(--radius-sm);
-  background: var(--dim);
+  border-radius: var(--r-xs);
+  background: var(--bar-other);
 }
 
 .barFillOwn {
-  background: var(--accent);
+  background: var(--bar-own);
 }
 
-/* 零命中：给一个红色的起始笔画，让「0」不是一段空白而是一个信号 */
+/* 零命中：给一个 danger 起始笔画，让「0」不是一段空白而是一个信号 */
 .barZero {
   width: 4px;
-  background: var(--bad);
+  background: var(--danger);
 }
 
+/* 竞品填充对底色 < 3:1，验证器要求补偿 —— 补偿就是这里：
+   每根条右侧都直接标了百分比和 m/n，不依赖颜色读数 */
 .barValue {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-xs);
-  color: #c8d2e0;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .barValueOwn {
-  color: var(--text);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .barValueZero {
-  color: var(--bad);
+  color: var(--danger);
 }
 
-/* ── 命中矩阵 ── */
+/* ═══ 命中矩阵 ═══ */
 .matrixScroll {
   overflow-x: auto;
+  margin: 0 calc(var(--sp-1) * -1);
+  padding: 0 var(--sp-1);
 }
 
 .matrix {
   border-collapse: separate;
-  border-spacing: 4px;
-  font-size: 9.5px;
+  border-spacing: 3px;
   width: 100%;
-  min-width: 720px;
+  min-width: 760px;
 }
 
 .matrix thead th {
-  font-weight: 400;
-  color: var(--muted);
+  font-weight: 500;
+  color: var(--text-tertiary);
   text-align: center;
-  padding: 0 0 2px;
+  padding: 0 0 var(--sp-1);
   font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
 .matrix thead th.colOwn {
-  color: var(--text);
+  color: var(--text-primary);
   font-weight: 700;
 }
 
+/* 行首带这一行自己的指标 —— 读矩阵时不用在脑子里除一遍 */
 .rowHead {
   text-align: left;
-  width: 210px;
-  padding-right: 8px;
+  width: 236px;
+  padding: 0 var(--sp-3) 0 0;
   vertical-align: middle;
+  font-weight: 400;
 }
 
 .rowTitle {
   font-size: var(--fs-sm);
-  color: var(--text);
-  font-weight: 500;
-  line-height: 1.4;
+  color: var(--text-primary);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 232px;
 }
 
-/* 行首带这一行自己的指标 —— 学自竞品，读矩阵时不用来回换算 */
 .rowMeta {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  margin-top: 2px;
+  font-size: var(--fs-2xs);
+  color: var(--text-tertiary);
+  margin-top: 1px;
 }
 
 .rowMetaZero {
-  color: var(--bad);
+  color: var(--danger);
 }
 
+/* 行高压到 46px —— GeoMonitor 原稿 68px，我们 10 行 × 8 列一屏放不下 */
 .cell {
+  height: 46px;
   text-align: center;
-  border-radius: 3px;
-  padding: 6px 0;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
+  border-radius: var(--r-xs);
+  padding: 0;
   border: 1px solid transparent;
-  width: 62px;
+  width: 74px;
 }
 
-.cellButton {
-  display: block;
+.cellBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
   width: 100%;
+  height: 100%;
   background: none;
   border: none;
   padding: 0;
   color: inherit;
-  font: inherit;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
 }
 
+.cellMain {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* 出场顺位。后端还没落库 position_rank，所以现在恒不显示 */
+.cellRank {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  opacity: 0.75;
+  line-height: 1.1;
+}
+
+/* 顺序色阶 —— 亮度单调，格内文字色按档定（docs/29 §6.2 有实测对比度） */
 .l1 {
   background: var(--seq-1);
+  color: var(--seq-1-ink);
 }
 
 .l2 {
   background: var(--seq-2);
+  color: var(--seq-2-ink);
 }
 
 .l3 {
   background: var(--seq-3);
-  color: #0d1116;
+  color: var(--seq-3-ink);
 }
 
+/* 未提及：虚线空格，必须和「已提及但没顺位」看得出区别 */
 .zero {
   background: none;
-  border-color: var(--border);
-  color: #5b6b85;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-tertiary);
 }
 
-/* 本品挂零：红框。这是整张矩阵里最该被看见的东西 */
+/* 本品挂零 —— 我们比 GeoMonitor 多的第四态。
+   本品缺席是这个产品的核心结论，不能和「某个竞品没出现」同一个样式 */
 .zeroOwn {
-  border-color: var(--bad);
-  border-width: 1.4px;
+  border: 1.5px dashed var(--danger);
+  color: var(--danger);
 }
 
-.cellHit:hover {
-  outline: 2px solid var(--text);
+.hit:hover {
+  outline: 2px solid var(--text-primary);
   outline-offset: 1px;
   cursor: pointer;
 }
 
 .legend {
   display: flex;
-  gap: 13px;
+  gap: var(--sp-4);
   font-size: var(--fs-xs);
-  color: var(--muted);
-  margin-top: 10px;
+  color: var(--text-tertiary);
+  margin-top: var(--sp-4);
   flex-wrap: wrap;
+  align-items: center;
 }
 
-.legendSwatch {
+.swatch {
   display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  margin-right: 5px;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  margin-right: 6px;
   vertical-align: -1px;
+}
+
+/* ═══ 排名条（引用来源 Top 用）═══ */
+.rankRow {
+  display: grid;
+  grid-template-columns: 22px 1fr 56px 48px;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.rankRow:last-child {
+  border-bottom: none;
+}
+
+.rankNum {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+.rankName {
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.rankTrack {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bar-track);
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.rankFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
 }

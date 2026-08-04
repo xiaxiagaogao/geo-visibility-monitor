@@ -12,6 +12,9 @@ import type { Brand, PlatformOption, Prompt, RawResponse } from './types'
 
 export const OWN_BRAND_ID = 34
 
+/** 顶栏「更新于」用。接 API 后取最新一条 response 的 created_at */
+export const LAST_COLLECTED_AT = '08-02 10:41'
+
 export const BRANDS: Brand[] = [
   {
     id: 34,
@@ -123,20 +126,26 @@ export const TOTALS = {
   ],
 }
 
-/** 抓取任务：真实批次就是「一天」 */
-export interface JobBatch {
+/**
+ * 采集批次 —— 批次就是**一天**（docs/29 拍板 ⑦）。
+ * 我们的 CrawlJob 是一条样本（35 条样本 = 35 个 job），没有「批次」这个实体，
+ * 按 `group_by=day` 分组是零后端改动的做法。
+ */
+export interface Batch {
   date: string
   label: string
   note: string
-  dimmed?: boolean
+  /** 该批是否还有明细可展开；false 表示 fixture 里只留了摘要 */
+  expanded: boolean
   rows: { promptId: number; samples: number; status: 'success' | 'failed'; m: number }[]
 }
 
-export const JOB_BATCHES: JobBatch[] = [
+export const BATCHES: Batch[] = [
   {
     date: '2026-08-02',
     label: '安踏监测集',
-    note: '10 条提问 × 3–5 样本 · 全部成功',
+    note: '10 条提问 × 3–5 样本 = 35 条 · 全部成功',
+    expanded: true,
     rows: MATRIX.map((r) => ({
       promptId: r.promptId,
       samples: r.n,
@@ -148,7 +157,7 @@ export const JOB_BATCHES: JobBatch[] = [
     date: '2026-07-31',
     label: '装修行业监测集',
     note: '15 条样本 · 13 成功 2 无效 · 本品提及率 0.0% · 0/13 —— 零状态的真实用例',
-    dimmed: true,
+    expanded: false,
     rows: [],
   },
 ]
@@ -177,12 +186,20 @@ export const SAMPLE_RESPONSE: RawResponse = {
   annotator_version: 'l1-v1',
   created_at: '2026-08-02T10:12:00Z',
   citations: [],
+  /**
+   * ⚠️ `position_rank` 全部为 null，不是偷懒 —— 这是**库里的真实状态**：
+   * annotate.py 每写一条 mention 都硬编码 `position_rank=None`（列存在但从没算过）。
+   * 填上 #1 #2 #3 就是在编数据，也会让「首位提及率」的降级态显得自相矛盾。
+   * 后端按 offset 升序回填之后，这里换成真实序号，UI 自动从降级态恢复。
+   *
+   * `sentiment` 同理，annotate.py 也是写死 None，等后端接 LLM。
+   */
   mentions: [
-    { id: 1, brand_id: 34, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: 1, evidence_snippet: null },
-    { id: 2, brand_id: 35, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: 2, evidence_snippet: null },
-    { id: 3, brand_id: 38, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: 3, evidence_snippet: null },
-    { id: 4, brand_id: 39, mentioned: true, mention_type: 'body', position_bucket: 'middle', position_rank: 4, evidence_snippet: null },
-    { id: 5, brand_id: 40, mentioned: true, mention_type: 'body', position_bucket: 'tail', position_rank: 5, evidence_snippet: null },
+    { id: 1, brand_id: 34, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: null, evidence_snippet: null },
+    { id: 2, brand_id: 35, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: null, evidence_snippet: null },
+    { id: 3, brand_id: 38, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: null, evidence_snippet: null },
+    { id: 4, brand_id: 39, mentioned: true, mention_type: 'body', position_bucket: 'middle', position_rank: null, evidence_snippet: null },
+    { id: 5, brand_id: 40, mentioned: true, mention_type: 'body', position_bucket: 'tail', position_rank: null, evidence_snippet: null },
   ],
 }
 

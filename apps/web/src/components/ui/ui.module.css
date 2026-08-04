@@ -1,298 +1,252 @@
-/* ── 页头（面包屑 + 标题 + 主 CTA），骨架学自竞品 ── */
-.pageHead {
-  margin-bottom: var(--sp-4);
-}
-
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  margin-bottom: var(--sp-3);
-}
-
-.crumbSep {
-  opacity: 0.5;
-}
-
-.crumbCurrent {
-  color: var(--text);
-}
-
-.titleRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
-}
-
-.title {
-  font-size: var(--fs-xl);
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
-
-.subtitle {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  margin: 4px 0 0;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex: none;
-}
-
+/* ═══ 按钮 ═══ */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 13px;
-  border-radius: var(--radius);
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-  font-size: var(--fs-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
 }
 
 .btn:hover {
-  border-color: var(--muted);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .btnPrimary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
+  color: var(--accent-contrast);
+  font-weight: 500;
 }
 
 .btnPrimary:hover {
-  border-color: var(--accent);
-  filter: brightness(1.08);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-contrast);
 }
 
-/* ── Tabs ── */
+/* ═══ Panel ═══ */
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.panelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.panelTitle {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  margin: 0;
+}
+
+.panelSub {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin: 3px 0 0;
+  line-height: 1.6;
+}
+
+.panelNote {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.75;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-subtle);
+  border-radius: var(--r-sm);
+}
+
+/* ═══ KPI 卡 ═══ */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--sp-4);
+}
+
+.kpi {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* 左侧竖条只在异常时着色 —— 正常态是中性的，红条一出现就有信息量。
+   GeoMonitor 给四张卡配了绿/绿/橙/红纯装饰，破了它自己「全站同色=同义」的规矩。 */
+.kpi::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--border);
+}
+
+.kpiAlert::before {
+  background: var(--danger);
+}
+
+.kpiLabel {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.kpiValue {
+  font-size: var(--fs-data);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: var(--sp-2) 0 var(--sp-1);
+  letter-spacing: -0.5px;
+}
+
+.kpiValueAlert {
+  color: var(--danger);
+}
+
+.kpiValueMuted {
+  color: var(--text-tertiary);
+  font-size: var(--fs-h2);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* 分母副文案是强制的 —— 凡出现比率必须同时显示 m/n */
+.kpiDenom {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* ═══ Badge ═══ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  white-space: nowrap;
+}
+
+.badgeOk {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--bg-surface));
+}
+
+.badgeDanger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--bg-surface));
+}
+
+.badgeWarning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--bg-surface));
+}
+
+.badgeAccent {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--bg-surface));
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* ═══ ⓘ 口径提示 ═══ */
+.infoDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--text-tertiary);
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  margin-left: 5px;
+  cursor: help;
+  flex: none;
+}
+
+/* ═══ Tabs ═══ */
 .tabs {
   display: flex;
-  gap: 2px;
-  margin-bottom: var(--sp-3);
+  gap: var(--sp-5);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-5);
 }
 
 .tab {
-  font-size: var(--fs-sm);
-  padding: 5px 12px;
-  border-radius: 6px;
-  color: var(--muted);
-  border: 1px solid transparent;
+  position: relative;
+  padding: 0 0 10px;
   background: none;
+  border: none;
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
 }
 
 .tab:hover {
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .tabOn {
-  color: var(--text);
-  background: var(--surface-quote);
-  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.tabOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
 }
 
 .tabCount {
   margin-left: 5px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  opacity: 0.75;
-}
-
-/* ── 筛选行 ── */
-.filterBar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-3);
-  flex-wrap: wrap;
-}
-
-.input,
-.select {
-  height: 30px;
-  padding: 0 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-
-.input::placeholder {
-  color: var(--muted);
-}
-
-.input {
-  min-width: 220px;
-}
-
-.select {
-  min-width: 132px;
-}
-
-/* ── Panel ── */
-.panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 13px 14px;
-  margin-bottom: 13px;
-}
-
-.panelInset {
-  background: var(--surface-inset);
-  border-color: var(--track);
-}
-
-.panelFlush {
-  margin-bottom: 0;
-}
-
-.panelHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-4);
-}
-
-.panelTitle {
-  font-size: var(--fs-base);
-  font-weight: 600;
-  margin: 0;
-}
-
-.panelSub {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  margin: 2px 0 11px;
-  line-height: 1.6;
-}
-
-/* ── Badge ── */
-.badge {
-  display: inline-block;
-  padding: 1px 7px;
-  border-radius: var(--radius-pill);
   font-size: var(--fs-xs);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  white-space: nowrap;
+  opacity: 0.8;
 }
 
-/* 状态色只做徽章且始终配文字 —— 绝不当图表系列色（docs/27 §5.1） */
-.badgeOk {
-  color: var(--ok);
-  border-color: #14532d;
-}
-
-.badgeBad {
-  color: var(--bad);
-  border-color: #7f1d1d;
-}
-
-.badgeWarn {
-  color: var(--warn);
-  border-color: #78350f;
-}
-
-.badgeAccent {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-/* ── ⓘ 口径提示 ── */
-.infoDot {
-  display: inline-block;
-  width: 11px;
-  height: 11px;
-  border: 1px solid var(--muted);
-  border-radius: 50%;
-  font-size: 8px;
-  line-height: 10px;
-  text-align: center;
-  color: var(--muted);
-  margin-left: 4px;
-  vertical-align: 1px;
-  cursor: help;
-}
-
-/* ── Meter（线性，不用环形 —— dataviz 硬规则）── */
-.meters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 11px;
-  margin-bottom: 13px;
-}
-
-.meter {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 12px 13px;
-}
-
-.meterLabel {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.meterValue {
-  font-size: var(--fs-num);
-  font-weight: 650;
-  margin: 5px 0 8px;
-  letter-spacing: -0.02em;
-}
-
-.meterValueAccent {
-  color: var(--accent);
-}
-
-.meterValueBad {
-  color: var(--bad);
-}
-
-.meterTrack {
-  height: 5px;
-  border-radius: 3px;
-  background: var(--track);
-  overflow: hidden;
-}
-
-/* 计数卡不画轨道，只占等高，保证与同排 meter 的基线对齐 */
-.meterTrackless {
-  height: 5px;
-}
-
-.meterFill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--accent);
-}
-
-.meterFillDim {
-  background: var(--dim);
-}
-
-/* 分母永远在，且是等宽的 —— docs/27 §5.3 */
-.meterDen {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  margin-top: 6px;
-}
-
-/* ── 表 ── */
+/* ═══ 表 ═══ */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -301,91 +255,109 @@
 
 .table th {
   text-align: left;
-  color: var(--muted);
-  font-weight: 600;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-weight: 500;
   font-size: var(--fs-xs);
-  letter-spacing: 0.04em;
+  padding: 0 var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 
 .table td {
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--row-border);
+  padding: 11px var(--sp-3);
+  border-bottom: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
+  vertical-align: middle;
 }
 
 .table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.rowLink {
-  color: var(--accent);
-  white-space: nowrap;
+.table tbody tr:hover {
+  background: var(--bg-hover);
 }
 
-/* ── 空 / 错误态 ── */
-.empty {
-  padding: 28px 14px;
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowLink {
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.rowLink:hover {
+  text-decoration: underline;
+}
+
+/* ═══ 三态 + 降级态 ═══ */
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-7) var(--sp-4);
   text-align: center;
-  color: var(--muted);
-  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
   line-height: 1.8;
 }
 
-/* ── Modal ── */
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(6, 10, 16, 0.72);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 40px 20px;
-  overflow-y: auto;
+.stateIcon {
+  color: var(--text-tertiary);
 }
 
-.modal {
-  width: min(760px, 100%);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
-}
-
-.modalHead {
+.errorBox {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--card);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--bg-surface));
+  background: color-mix(in srgb, var(--danger) 6%, var(--bg-surface));
+  border-radius: var(--r-sm);
 }
 
-.modalTitle {
-  font-size: var(--fs-md);
-  font-weight: 600;
+.errorTitle {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.modalClose {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
+.errorDetail {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
-.modalClose:hover {
-  color: var(--text);
-  background: var(--surface-quote);
+/* 降级态：采到了，但这个维度后端还没算 —— 和「空」必须区分开，
+   否则用户会以为是采集出了问题 */
+.degraded {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
 }
 
-.modalBody {
-  padding: 16px 18px 20px;
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-subtle) 25%,
+    var(--bg-hover) 37%,
+    var(--bg-subtle) 63%
+  );
+  background-size: 800px 100%;
+  animation: geo-shimmer 1.4s infinite linear;
+  border-radius: var(--r-xs);
 }

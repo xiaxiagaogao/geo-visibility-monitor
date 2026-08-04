@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatFraction, formatRate, headShare, matrixLevel, rate, sov } from './rates'
+import {
+  firstMentionRate,
+  formatFraction,
+  formatRate,
+  headShare,
+  matrixLevel,
+  rate,
+} from './rates'
 
 describe('rate', () => {
   it('0 命中是真结论，不是不可算', () => {
@@ -32,18 +39,14 @@ describe('headShare', () => {
   })
 })
 
-describe('sov', () => {
-  it('对上 21/137 = 15.3%', () => {
-    // 安踏 21，竞品 亚瑟士22 耐克21 李宁20 阿迪20 361度17 特步11 鸿星尔克5 = 116
-    expect(sov(21, [22, 21, 20, 20, 17, 11, 5])).toBeCloseTo(21 / 137, 10)
+describe('firstMentionRate', () => {
+  it('分母是被提及数，不是有效样本数', () => {
+    // 21 次被提及里有 9 次排在第一个 —— 分母是 21 不是 35
+    expect(firstMentionRate(9, 21)).toBeCloseTo(9 / 21, 10)
   })
 
-  it('全场零提及 → 分母 0 → null', () => {
-    expect(sov(0, [0, 0])).toBeNull()
-  })
-
-  it('没有竞品时就是 100%', () => {
-    expect(sov(7, [])).toBe(1)
+  it('还没被提及过就不可算，不能显示 0%', () => {
+    expect(firstMentionRate(0, 0)).toBeNull()
   })
 })
 

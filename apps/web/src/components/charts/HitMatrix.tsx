@@ -1,7 +1,8 @@
 'use client'
 
-import { BRAND_NAMES, type MatrixRow, OWN_BRAND_ID, PROMPT_BY_ID } from '@/lib/fixtures'
+import { type MatrixRow, OWN_BRAND_ID } from '@/lib/fixtures'
 import { formatRate, matrixLevel, rate } from '@/lib/l3/rates'
+import { brandName, promptText } from '@/lib/selectors'
 
 import styles from './charts.module.css'
 
@@ -13,13 +14,18 @@ const LEVEL_CLASS = {
 } as const
 
 /**
- * 提问 × 品牌命中矩阵 —— 采纳竞品的下钻交互（docs/27 §4 决定 ⑤）。
+ * 提问 × 品牌 命中矩阵。
  *
- * 与竞品的差别：它的列是**平台**（一个品牌跑四个平台），
- * 我们的列是**品牌**（八个品牌跑一个平台）—— 因为我们只接了 DeepSeek。
- * 结构同构，等第二个 Provider 上线时再决定要不要加一层。
+ * 与 GeoMonitor 的差别：它的列是**平台**（一个品牌跑六个平台），
+ * 我们的列是**品牌**（八个品牌跑一个平台）—— 因为只接了 DeepSeek。
+ * 结构同构，等第二个 Provider 上线再决定要不要加一层。
  *
- * 行首挂该行自己的指标（学自竞品）：读矩阵时不用在脑子里除一遍。
+ * 格子四态（docs/29 §3.2）：
+ *   命中·有顺位 → `3/3` + `#2`   命中·无顺位 → `3/3`
+ *   未提及 → 虚线空格            本品挂零 → 虚线 + danger 描边
+ *
+ * 「绝不伪造名次」是 GeoMonitor 的原则，照搬：`position_rank` 后端还没落库，
+ * 那就一个 `#` 都不显示，而不是拿别的数糊上去。
  */
 export function HitMatrix({
   rows,
@@ -39,12 +45,13 @@ export function HitMatrix({
               <th />
               {columns.map((id) => (
                 <th key={id} className={id === OWN_BRAND_ID ? styles.colOwn : undefined}>
-                  {BRAND_NAMES[id]}
+                  {brandName(id)}
                   {id === OWN_BRAND_ID ? '（本品）' : ''}
                 </th>
               ))}
             </tr>
           </thead>
+
           <tbody>
             {rows.map((row) => {
               const ownM = row.cells.find((c) => c.brandId === OWN_BRAND_ID)?.m ?? 0
@@ -54,52 +61,24 @@ export function HitMatrix({
               return (
                 <tr key={row.promptId}>
                   <th scope="row" className={styles.rowHead}>
-                    <div className={styles.rowTitle}>
-                      {PROMPT_BY_ID.get(row.promptId)?.text ?? `#${row.promptId}`}
+                    <div className={styles.rowTitle} title={promptText(row.promptId)}>
+                      {promptText(row.promptId)}
                     </div>
                     <div className={`${styles.rowMeta} ${ownZero ? styles.rowMetaZero : ''}`}>
                       本品 {formatRate(ownRate)} · {ownM}/{row.n}
                     </div>
                   </th>
 
-                  {columns.map((brandId) => {
-                    const cell = row.cells.find((c) => c.brandId === brandId)
-                    const m = cell?.m
-                    const hit = m !== null && m !== undefined
-                    const r = hit ? rate(m, row.n) : null
-                    const level = matrixLevel(r)
-                    const isOwn = brandId === OWN_BRAND_ID
-
-                    const cls = [
-                      styles.cell,
-                      LEVEL_CLASS[level],
-                      level === 'zero' && isOwn ? styles.zeroOwn : '',
-                      hit ? styles.cellHit : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
-
-                    const label = `${PROMPT_BY_ID.get(row.promptId)?.text ?? row.promptId} · ${
-                      BRAND_NAMES[brandId]
-                    } · ${hit ? `${m}/${row.n}` : '未提及'}`
-
-                    return (
-                      <td key={brandId} className={cls}>
-                        {hit && onPick ? (
-                          <button
-                            type="button"
-                            className={styles.cellButton}
-                            aria-label={label}
-                            onClick={() => onPick(row.promptId, brandId)}
-                          >
-                            {m}/{row.n}
-                          </button>
-                        ) : (
-                          <span aria-label={label}>{hit ? `${m}/${row.n}` : '—'}</span>
-                        )}
-                      </td>
-                    )
-                  })}
+                  {columns.map((brandId) => (
+                    <Cell
+                      key={brandId}
+                      m={row.cells.find((c) => c.brandId === brandId)?.m ?? null}
+                      n={row.n}
+                      isOwn={brandId === OWN_BRAND_ID}
+                      label={`${promptText(row.promptId)} · ${brandName(brandId)}`}
+                      onPick={onPick ? () => onPick(row.promptId, brandId) : undefined}
+                    />
+                  ))}
                 </tr>
               )
             })}
@@ -109,24 +88,78 @@ export function HitMatrix({
 
       <div className={styles.legend}>
         <span>
-          <i className={styles.legendSwatch} style={{ border: '1px solid var(--border)' }} />
+          <i className={styles.swatch} style={{ border: '1px dashed var(--border-strong)' }} />
           未提及
         </span>
         <span>
-          <i className={styles.legendSwatch} style={{ background: 'var(--seq-1)' }} />≤33%
+          <i className={styles.swatch} style={{ background: 'var(--seq-1)' }} />≤33%
         </span>
         <span>
-          <i className={styles.legendSwatch} style={{ background: 'var(--seq-2)' }} />
+          <i className={styles.swatch} style={{ background: 'var(--seq-2)' }} />
           34–66%
         </span>
         <span>
-          <i className={styles.legendSwatch} style={{ background: 'var(--seq-3)' }} />≥67%
+          <i className={styles.swatch} style={{ background: 'var(--seq-3)' }} />≥67%
         </span>
         <span>
-          <i className={styles.legendSwatch} style={{ border: '1.4px solid var(--bad)' }} />
+          <i className={styles.swatch} style={{ border: '1.5px dashed var(--danger)' }} />
           本品挂零
         </span>
       </div>
     </>
+  )
+}
+
+function Cell({
+  m,
+  n,
+  isOwn,
+  label,
+  rank,
+  onPick,
+}: {
+  m: number | null
+  n: number
+  isOwn: boolean
+  label: string
+  /** 出场顺位。后端还没落库 position_rank，所以恒为 undefined */
+  rank?: number
+  onPick?: () => void
+}) {
+  const hit = m !== null && m > 0
+  const r = m === null ? null : rate(m, n)
+  const level = matrixLevel(r)
+  const zeroOwn = level === 'zero' && isOwn
+
+  const cls = [
+    styles.cell,
+    LEVEL_CLASS[level],
+    zeroOwn ? styles.zeroOwn : '',
+    hit && onPick ? styles.hit : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const a11y = `${label} · ${m === null || m === 0 ? '未提及' : `${m}/${n}`}`
+
+  const inner = (
+    <>
+      <span className={styles.cellMain}>{m === null || m === 0 ? '—' : `${m}/${n}`}</span>
+      {rank !== undefined ? <span className={styles.cellRank}>#{rank}</span> : null}
+    </>
+  )
+
+  return (
+    <td className={cls}>
+      {hit && onPick ? (
+        <button type="button" className={styles.cellBtn} aria-label={a11y} onClick={onPick}>
+          {inner}
+        </button>
+      ) : (
+        <span className={styles.cellBtn} aria-label={a11y}>
+          {inner}
+        </span>
+      )}
+    </td>
   )
 }

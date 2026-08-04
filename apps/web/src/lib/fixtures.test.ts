@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { MATRIX, MATRIX_COLUMNS, OWN_BRAND_ID, PROMPTS, TOTALS } from './fixtures'
-import { rate, sov } from './l3/rates'
+import { MATRIX, MATRIX_COLUMNS, OWN_BRAND_ID, PROMPTS, SAMPLE_RESPONSE, TOTALS } from './fixtures'
+import { rate } from './l3/rates'
 
 /**
  * 这些不是「测试数据结构」，是**核对真实数字**。
@@ -37,12 +37,9 @@ describe('安踏监测集固定数据自洽性', () => {
     }
   })
 
-  it('SoV = 21/137 = 15.3%', () => {
-    const s = sov(
-      TOTALS.brand.mMentioned,
-      TOTALS.competitors.map((c) => c.mMentioned),
-    )
-    expect(s).toBeCloseTo(21 / 137, 10)
+  it('八个品牌命中总数 137 —— 这是 docs/27 §6 记的基准', () => {
+    const total = TOTALS.competitors.reduce((acc, c) => acc + c.mMentioned, TOTALS.brand.mMentioned)
+    expect(total).toBe(137)
   })
 
   it('没有哪一格的命中数超过该行样本数', () => {
@@ -58,6 +55,15 @@ describe('安踏监测集固定数据自洽性', () => {
     for (const r of MATRIX) {
       expect(r.cells).toHaveLength(MATRIX_COLUMNS.length)
       expect(ids.has(r.promptId), `prompt ${r.promptId}`).toBe(true)
+    }
+  })
+
+  it('样例样本的 position_rank 必须全是 null —— 库里就是这样，填上就是编数据', () => {
+    // annotate.py:154 每条 mention 都硬编码 position_rank=None / sentiment=None。
+    // 一旦这里填了 #1 #2 #3，「首位提及率」的降级态就自相矛盾了。
+    // 后端按 offset 升序回填之后，连同这条断言一起改。
+    for (const m of SAMPLE_RESPONSE.mentions) {
+      expect(m.position_rank, `brand ${m.brand_id}`).toBeNull()
     }
   })
 

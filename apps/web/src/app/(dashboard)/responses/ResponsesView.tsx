@@ -1,151 +1,161 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
-import { HitMatrix } from '@/components/charts/HitMatrix'
-import { EvidenceModal } from '@/components/evidence/EvidenceModal'
-import {
-  Badge,
-  Button,
-  EmptyState,
-  FilterBar,
-  PageHeader,
-  Panel,
-  SearchInput,
-  Select,
-  Table,
-  tableStyles,
-  Tabs,
-} from '@/components/ui'
-import { MATRIX, MATRIX_COLUMNS, PROMPT_BY_ID, SAMPLE_RESPONSE, TOTALS } from '@/lib/fixtures'
-import { OWN_BRAND_ID } from '@/lib/fixtures'
+import { HighlightedText } from '@/components/evidence/HighlightedText'
+import { Badge, Degraded, EmptyState, Panel, Table, ui } from '@/components/ui'
+import { OWN_BRAND_ID, SAMPLE_RESPONSE } from '@/lib/fixtures'
+import { brandName, promptText } from '@/lib/selectors'
+
+import styles from './responses.module.css'
 
 /** 样例样本属于这条提问 —— 点别的格子时要如实说明看到的不是那一格 */
 const SAMPLE_PROMPT_ID = 101
 
 export function ResponsesView() {
-  const router = useRouter()
   const params = useSearchParams()
-  const [tab, setTab] = useState('matrix')
 
   // 详情走查询参数而不是 /responses/123 —— 静态导出没有动态路由段（docs/28 §2.1）。
-  // 好处顺带来了：模态开着时 URL 就是可分享的永久链接，刷新不丢、后退即关。
-  const rid = params.get('rid')
+  // 顺带好处：URL 就是可分享的永久链接，刷新不丢。
   const pickedPrompt = Number(params.get('p') ?? SAMPLE_PROMPT_ID)
+  const mismatched = pickedPrompt !== SAMPLE_PROMPT_ID
 
-  const open = (promptId: number) => {
-    router.push(`/responses/?p=${promptId}&rid=${SAMPLE_RESPONSE.id}`, { scroll: false })
-  }
-  const close = () => router.push('/responses/', { scroll: false })
+  const r = SAMPLE_RESPONSE
+  const hits = r.mentions.filter((m) => m.mentioned)
 
   return (
-    <>
-      <PageHeader
-        crumbs={['监测台', '回答明细']}
-        title="回答明细"
-        subtitle={`${TOTALS.nValid} 条有效样本 · 点任意格子查看该提问下的原始回答与证据`}
-        actions={<Button>刷新</Button>}
-      />
+    <div className={styles.split}>
+      <Panel>
+        {mismatched ? (
+          <p className={styles.notice}>
+            你点的是「{promptText(pickedPrompt)}」，这里展示的是示例样本 #{r.id}。
+            接上 <code>GET /v1/responses?prompt_id=</code> 后会换成该格子的真实样本。
+          </p>
+        ) : null}
 
-      <Tabs
-        items={[
-          { id: 'matrix', label: '矩阵' },
-          { id: 'list', label: '列表', count: TOTALS.nValid },
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
+        <div className={styles.answerHead}>
+          <span className={styles.platformTag}>
+            <span className={styles.platformDot} />
+            DeepSeek
+          </span>
+          <span className={styles.runMeta}>#{r.id}</span>
+          <span className={styles.runMeta}>{r.created_at.slice(0, 16).replace('T', ' ')}</span>
+          <span style={{ flex: 1 }} />
+          <Badge tone="ok" dot>
+            已提及
+          </Badge>
+          <Degraded>暂无排名</Degraded>
+          <Degraded>暂无情感</Degraded>
+        </div>
 
-      <FilterBar>
-        <SearchInput placeholder="搜索提问 / 关键词" />
-        <Select label="状态" options={['全部状态', 'ok', 'error', 'empty', 'too_short']} />
-        <Select label="平台" options={['全部平台', 'DeepSeek']} />
-        <Button>重置</Button>
-      </FilterBar>
+        <h2 className={styles.question}>{r.prompt_text}</h2>
 
-      {tab === 'matrix' ? (
-        <>
-          <Panel
-            title="提问 × 品牌 命中矩阵"
-            subtitle="格子内为 命中 / 样本；空心 = 未提及；红框 = 本品挂零"
-          >
-            <HitMatrix
-              rows={MATRIX}
-              columns={MATRIX_COLUMNS}
-              onPick={(promptId) => open(promptId)}
-            />
-          </Panel>
+        <HighlightedText
+          text={r.full_text}
+          highlights={[]}
+          className={styles.answerBody}
+          markClassName={styles.hl}
+        />
 
-          <Panel inset flush>
-            <p style={{ margin: 0, fontSize: 'var(--fs-sm)', color: 'var(--muted)', lineHeight: 1.7 }}>
-              读法：上半区（国产 / 性价比类提问）本品与国产品牌成片命中、国际品牌成片空白；
-              下半区（专业跑鞋 / 训练类）正好反过来。
-              <strong style={{ color: 'var(--text)' }}>
-                这个互补结构就是这套监测集给出的第一个结论 —— 也是「60%」这个数字背后的真相。
-              </strong>
-            </p>
-          </Panel>
-        </>
-      ) : (
-        <Panel title="回答列表" subtitle="每行一条抓取样本，可下钻到全文与截图" flush>
+        <p className={styles.pending}>
+          命中位置内联高亮尚未开启：后端 <code>mentions</code> 表还没有{' '}
+          <code>first_offset</code> / <code>matched_term</code> 两列。
+          前端不会自己去正文里重找品牌名 —— 那会和 L1 标注口径分叉。
+        </p>
+
+        <p className={styles.sectionLabel}>L1 标注 · 命中品牌（{hits.length}）</p>
+        <Table>
+          <thead>
+            <tr>
+              <th>品牌</th>
+              <th>类型</th>
+              <th>首次位置</th>
+              <th>出场顺位</th>
+            </tr>
+          </thead>
+          <tbody>
+            {hits.map((m) => (
+              <tr key={m.id}>
+                <td style={m.brand_id === OWN_BRAND_ID ? { color: 'var(--accent)', fontWeight: 600 } : undefined}>
+                  {brandName(m.brand_id)}
+                  {m.brand_id === OWN_BRAND_ID ? '（本品）' : ''}
+                </td>
+                <td>
+                  <Badge>{m.mention_type}</Badge>
+                </td>
+                <td>
+                  <Badge>{m.position_bucket ?? '—'}</Badge>
+                </td>
+                <td>
+                  {m.position_rank !== null ? (
+                    <span className={ui.numeric}>#{m.position_rank}</span>
+                  ) : (
+                    <Degraded>未排名</Degraded>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+
+        <p className={styles.sectionLabel}>引用来源（{r.citations.length}）</p>
+        {r.citations.length === 0 ? (
+          <EmptyState>本样本无解析到引用。</EmptyState>
+        ) : (
           <Table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>时间</th>
-                <th>平台</th>
-                <th>提问</th>
-                <th>状态</th>
-                <th>本品</th>
-                <th>耗时</th>
-                <th />
-              </tr>
-            </thead>
             <tbody>
-              <tr>
-                <td className="mono">#{SAMPLE_RESPONSE.id}</td>
-                <td className="mono">{SAMPLE_RESPONSE.created_at.slice(0, 10)}</td>
-                <td>{SAMPLE_RESPONSE.platform}</td>
-                <td>{SAMPLE_RESPONSE.prompt_text}</td>
-                <td>
-                  <Badge tone="ok">{SAMPLE_RESPONSE.answer_status}</Badge>
-                </td>
-                <td>
-                  <Badge tone="accent">
-                    {SAMPLE_RESPONSE.mentions.some((m) => m.brand_id === OWN_BRAND_ID && m.mentioned)
-                      ? '已提及'
-                      : '未提及'}
-                  </Badge>
-                </td>
-                <td className="mono">{SAMPLE_RESPONSE.latency_ms} ms</td>
-                <td>
-                  <button className={tableStyles.rowLink} onClick={() => open(SAMPLE_PROMPT_ID)}>
-                    查看 ›
-                  </button>
-                </td>
-              </tr>
+              {r.citations.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.title ?? c.url}</td>
+                  <td style={{ color: 'var(--text-tertiary)' }}>{c.domain}</td>
+                </tr>
+              ))}
             </tbody>
           </Table>
-          <EmptyState>
-            这一轮只搭框架，固定数据里只放了 1 条完整样本。
-            <br />
-            其余 {TOTALS.nValid - 1} 条接上 <code>GET /v1/responses</code> 后自动出现。
-          </EmptyState>
-        </Panel>
-      )}
+        )}
+      </Panel>
 
-      {rid ? (
-        <EvidenceModal
-          response={SAMPLE_RESPONSE}
-          notice={
-            pickedPrompt === SAMPLE_PROMPT_ID
-              ? undefined
-              : `你点的是「${PROMPT_BY_ID.get(pickedPrompt)?.text ?? pickedPrompt}」，这里展示的是示例样本 #${SAMPLE_RESPONSE.id}。接上 GET /v1/responses?prompt_id= 后会换成该格子的真实样本。`
-          }
-          onClose={close}
-        />
-      ) : null}
-    </>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+        <Panel title="执行元数据">
+          <MetaRow k="执行模式" v="browser" />
+          <MetaRow k="耗时" v={`${r.latency_ms} ms`} />
+          <MetaRow k="answer_status" v={r.answer_status ?? '—'} />
+          <MetaRow k="标注版本" v={r.annotator_version ?? '—'} />
+          <MetaRow k="任务" v={`#${r.job_id}`} />
+          <div className={styles.metaRow}>
+            <span className={styles.metaKey}>出场顺位</span>
+            <Degraded>暂无排名数据</Degraded>
+          </div>
+          <div className={styles.metaRow}>
+            <span className={styles.metaKey}>情感</span>
+            <Degraded>暂无情感数据</Degraded>
+          </div>
+          <div className={styles.metaRow}>
+            <span className={styles.metaKey}>别名命中</span>
+            <Degraded>待后端补 matched_term</Degraded>
+          </div>
+        </Panel>
+
+        <Panel title="回答截图">
+          <div className={styles.shot}>
+            <span>完整回答区域截图（隐藏侧栏）</span>
+            <span className={styles.shotPath}>{r.screenshot_path}</span>
+          </div>
+          <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', margin: '10px 0 0' }}>
+            经 <code>/v1/media/screenshots/</code> 取，靠 Cookie 鉴权。
+            不保留 DeepSeek 对话 URL · 会话抓完即删。
+          </p>
+        </Panel>
+      </div>
+    </div>
+  )
+}
+
+function MetaRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className={styles.metaRow}>
+      <span className={styles.metaKey}>{k}</span>
+      <span className={styles.metaVal}>{v}</span>
+    </div>
   )
 }
