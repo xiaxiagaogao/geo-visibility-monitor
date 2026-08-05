@@ -103,33 +103,49 @@ RawResponse ──< Citation
 
 **position_bucket：** 按**首次**提及的 offset 把全文三等分  
 `head = offset < L/3` · `middle = < 2L/3` · `tail = 其余` · 未提及 = `null`  
-（当前 annotator：`l1-rules-v2`）
+（当前 annotator：`l1-rules-v3`）
 
-### 3.1 mentions 有四个列是恒空的
+### 3.1 出场顺位 position_rank（口径必须说清）
 
-`mentions` 表里这四列**存在但从未被计算**，`annotate.py` 每次写入都硬编码空值：
+**含义是位置事实，不是推荐名次。** 命名与展示都不要说成「首推」。
 
-| 列 | 当前值 | 本该是什么 |
-|----|--------|-----------|
-| `position_rank` | 恒 `NULL` | 出场顺位或榜单名次 |
-| `sentiment` / `sentiment_score` | 恒 `NULL` | 情感（计划由后端接 LLM，L1 后置） |
-| `is_recommended` | 恒 `False` | 「推荐/首选/建议选择」启发式 |
+- 正文命中的品牌按 `first_offset` 升序 1-based 排名
+- 只有 `mention_type=body` 有名次。`citation_only` 是 `NULL` —— 正文根本没出现，
+  没有「出场位置」可言，**不是排在最后**
+- **只在被监测品牌集合内排序**。若回答先提到未监测的品牌，我方 `rank=1` 仍是 1，
+  含义是「我们关心的品牌里它最先出现」，不是「全文第一个品牌」
+- 同 offset（别名重叠）按 `brand_id` 兜底，保证同输入同输出
+
+实现见 `services/annotate.assign_position_ranks`。
+
+### 3.2 first_offset / matched_term 与一条不变量
+
+```text
+full_text[first_offset : first_offset + len(matched_term)] == matched_term
+```
+
+**前端靠这条自检高亮有没有错位**（`first_offset` 非空时成立）。
+
+`matched_term` 落库的是**原文片段**，不是 `match_brand()` 返回的折叠形式 ——
+正文写 `Nike` 而 `match_brand` 给的是 `nike`，直接落库会让展示大小写不符、
+且上面那条不变量不成立。见 `services/annotate.surface_term`。
+
+`citation_only` 命中时 `first_offset` 为 `NULL`（正文没出现），此时不变量不适用。
+
+> 前端**禁止**自己拿 `matched_term` 去正文里重找 —— 会和 L1 口径分叉。
+
+### 3.3 仍然恒空的两类字段
+
+| 列 | 当前值 | 缺什么 |
+|----|--------|--------|
+| `sentiment` / `sentiment_score` | 恒 `NULL` | 计划由后端接 LLM（L1 后置） |
+| `is_recommended` | 恒 `False` | 「推荐/首选/建议选择」启发式未接入流水线 |
 
 `packages/metrics` 里 `score_sentiment()` / `is_recommended()` 的实现是有的，
 但只挂在 `/v1/analyze/*` 那两个无状态玩具接口上，**L1 标注流水线没调**。
 
 连带后果：`/v1/counts` 没有 `m_recommended`，**前端算不出推荐率**；
-排名、情感相关的一切展示都没有数据源。要用就得先扩 L1 白名单并重跑标注。
-
-### 3.2 offset 与 matched_term 算了但没存
-
-`match_brand()` 返回 `offset` 和 `matched_term`，`annotate.py` 拿它们切出
-`evidence_snippet` 之后**直接丢弃**，`mentions` 表没有这两列。
-
-所以「在原文命中处内联高亮品牌名」这个能力，**不是 API 没返回，是库里没存**。
-要做需要：加两列 → 改 `annotate` 落库 → `MentionOut` 暴露 → 重跑 annotate。
-
-> 前端**禁止**自己拿 `matched_term` 去正文里重找 —— 会和 L1 口径分叉。
+情感相关的一切展示都没有数据源。要用就得先扩 L1 白名单并重跑标注。
 
 ---
 
@@ -150,6 +166,7 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 | 重标 | POST | `/v1/responses/{id}/annotate` · `/annotate/run` |
 | 计数 | GET | `/v1/counts` |
 | 口径 | GET | `/v1/config/metrics` |
+| 平台可用性 | GET | `/v1/config/platforms` —— 前端据此渲染 chip，**勿硬编码平台清单**（见 §7.1） |
 | 灌入 | POST | `/v1/ingest/l0`（非主路径） |
 | 截图 | GET | `/v1/media/screenshots/{file}`（`/qa/media/...` 是同一处理函数的别名） |
 | 质检 | GET/POST | `/qa` · `/qa/login` · `/qa/logout` · `/qa/responses`… |
@@ -226,7 +243,13 @@ n_valid = 35（answer_status 全部 ok，零 error）
 安踏 m=21 → 60.0%   head 15 / middle 5 / tail 1
 竞品区间 14.3%(鸿星尔克 5) ~ 62.9%(亚瑟士 22)
 SoV(安踏) = 21 / 137 = 15.3%
+出场顺位分布（安踏 21 次命中）：#1×6 · #2×5 · #3×5 · #4×4 · #5×1
 ```
+
+> 2026-08-05 升 `l1-rules-v3` 重跑全部 50 条样本后，上面每个数字**逐个不变** ——
+> v3 是纯增量（只补 `first_offset` / `matched_term` / `position_rank`）。
+> 全库 179 条正文命中，`substr(full_text, first_offset+1, len(matched_term))`
+> 与 `matched_term` **179/179 完全吻合，零错位**。
 
 **这套数据的双峰结构是刻意配比出来的，不是巧合：**
 
@@ -265,7 +288,25 @@ SoV(安踏) = 21 / 137 = 15.3%
 | 僵死 `running` | 超时（`CRAWL_STUCK_JOB_SEC`，默认 600s）回收为 failed；`retry` 放行 running；勿只捞 pending |
 | DELETE 品牌/Prompt | ORM 关系须配 `cascade` + `passive_deletes=True`，否则 SQLAlchemy 会先把子表外键置 NULL 而撞 NOT NULL → 500 |
 
-平台：`deepseek`；source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计数排除 fake）。
+source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计数排除 fake）。
+
+### 7.1 平台：「已知」与「能跑」是两件事
+
+`app/providers/registry.py` 是**唯一真相源**，加平台只改这一个文件。
+
+| 概念 | 含义 | 现状 |
+|------|------|------|
+| **已知平台** | `platform` 列的合法取值，历史数据按它解释 | `deepseek` `doubao` `kimi` `tongyi` |
+| **已实现** | real 模式下真有 Provider 能跑完 | **只有 `deepseek`** |
+
+- 未接入的平台**建任务时就返回 400**，不会放到 worker 才 failed
+  —— 后者会让人误判成「抓取出错」，而真相是「这个平台没接」
+- **fake 模式下所有已知平台都可跑**（走 `FakeProvider`），本机/CI 造数据靠这个
+- 前端读 `GET /v1/config/platforms` 渲染 chip：`available` = 现在建任务能否跑完；
+  `implemented` = 有没有 real Provider。fake 模式下 `available=true` 但 `note`
+  会明写「产出的是假数据」，**不骗前端**
+
+> **`ALLOWED_PLATFORMS` 不等于「能跑」。** 它现在从注册表派生，仅表示「已知」。
 
 > **存量污染不可回填。** 早期样本的 L0 被旧清洗规则改写过、且丢了首块，
 > 重跑 L1 也补不回来 —— 要干净数据只能重抓。安踏那 35 条是修复后抓的，是干净的。
@@ -363,8 +404,7 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 |----|------|-----------|
 | **无用户体系** | 单一共享密钥，无 users 表，无归属校验 —— `/v1/counts?brand_id=任意值` 谁都能查 | 做三角色权限时。隔离键 `workspace_id` 已存在但未启用（§3） |
 | **counts 全量加载** | 把所有 `RawResponse`（含 `full_text` 全文）拉进 Python 再累加，不是 SQL 聚合 | 样本量上千后 |
-| **L1 白名单只有一半** | `position_rank` / `sentiment` / `is_recommended` 恒空（§3.1） | 前端要排名、情感、推荐率时 |
-| **offset 未落库** | 算了就丢（§3.2） | 要做原文命中高亮时 |
+| **L1 白名单仍缺情感** | `sentiment` / `is_recommended` 恒空（§3.3）；`/v1/counts` 无 `m_recommended` | 前端要情感、推荐率时 |
 | **无批次 / 提问集实体** | 一条 job = 一个样本，「一次检测」不存在（§3）。最初设计里有 `PromptSet`，与 `Organization` / `Workspace` 一样从未建表 | 要「新建一次命名检测并回看」时 |
 | `ensure_schema` 按 `;` 裸切 SQL | 当前迁移能跑；加函数/触发器会碎 | 写复杂迁移时 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL | 调整竞品集合后 |
