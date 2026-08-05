@@ -57,3 +57,4 @@ deploy/deepseek_live_answer.json
 **/deepseek_storage.json
 
 data/deepseek_profile/
+data/*.png

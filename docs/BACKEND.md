@@ -85,7 +85,7 @@ RawResponse ──< Citation
 
 | 表 | 层 | 要点 |
 |----|----|------|
-| brands | 配置 | 有 **`workspace_id`（默认 1）**，`GET /v1/brands` 可按它过滤 —— 目前**唯一的隔离键**，做「客户」角色时是地基 |
+| brands | 配置 | 有 **`workspace_id`（默认 1）**，`GET /v1/brands` 可按它过滤 —— 目前**唯一的隔离键**，做「客户」角色时是地基。它是最初 `Org → Workspace → Brand` 三层归属模型的残留，上面两层从未建表 |
 | brand_aliases / competitor_links | 配置 | 别名勿过宽（见 §6）；竞品**也是 brand 行**，不是字符串 |
 | prompts | 配置 | 监测提问；**正文不应含监测品牌名**（见 §6） |
 | crawl_jobs | 采集 | pending → running → success/failed；**`sample_index` = 同一 prompt 的第几次采样**。一条 job = **一个样本**，不是一个批次 |
@@ -365,7 +365,7 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 | **counts 全量加载** | 把所有 `RawResponse`（含 `full_text` 全文）拉进 Python 再累加，不是 SQL 聚合 | 样本量上千后 |
 | **L1 白名单只有一半** | `position_rank` / `sentiment` / `is_recommended` 恒空（§3.1） | 前端要排名、情感、推荐率时 |
 | **offset 未落库** | 算了就丢（§3.2） | 要做原文命中高亮时 |
-| **无批次实体** | 一条 job = 一个样本，「一次检测」不存在（§3） | 要「新建一次命名检测并回看」时 |
+| **无批次 / 提问集实体** | 一条 job = 一个样本，「一次检测」不存在（§3）。最初设计里有 `PromptSet`，与 `Organization` / `Workspace` 一样从未建表 | 要「新建一次命名检测并回看」时 |
 | `ensure_schema` 按 `;` 裸切 SQL | 当前迁移能跑；加函数/触发器会碎 | 写复杂迁移时 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL | 调整竞品集合后 |
 | `apps/crawler/` 死代码 | 整目录无人引用（§9） | 读代码的人会被误导 |
