@@ -7,8 +7,9 @@ GEO 可见性监测（学习项目）。前后端分离：
 
 ```text
 apps/api · apps/web · packages/metrics · deploy/
-docs/BACKEND.md           # 现行唯一后端说明（从历史 01–27 提炼）
-history/docs-archive/     # 旧文冻结，日常不必读
+docs/BACKEND.md           # 现行唯一后端说明（历史 01–27 已全部提炼进来）
 ```
+
+要翻旧文档：`git log --diff-filter=D -- history/`
 
 开发：本机改代码 → `git push vps main` → VPS 运行（细节见 BACKEND.md §10）。
