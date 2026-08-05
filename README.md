@@ -1,98 +1,58 @@
-# geo-demo — GEO 投流分析系统（个人学习）
+# geo-demo — GEO 可见性监测（学习项目）
 
-从零全栈学习项目：后端抓取 + 指标派生 + 前端仪表盘。
+前后端分离：
 
-## 文档
+| 侧 | 职责 | 文档 |
+|----|------|------|
+| **后端** | 抓取 AI 回答、L1 标注、L2 计数 API、运维质检 | **[docs/BACKEND.md](docs/BACKEND.md)** · **[docs/BACKEND-RUNBOOK.md](docs/BACKEND-RUNBOOK.md)** |
+| **前端** | 展示、比率/图表、产品交互 | 前端工程自行维护（本仓 `apps/web` 可对接 API） |
 
-- [头脑风暴 v1](./%23%20GEO投流分析系统%20全栈构建头脑风暴（第一版）.md)
-- [开源项目评估](./%23%20开源项目评估（可用于GEO系统）.md)
-- [MVP 范围](./docs/01-mvp-scope.md)
-- [数据模型](./docs/02-data-model.md)
-- [指标规格](./docs/03-metrics-spec.md)
-- [前后端架构（详细）](./docs/04-architecture.md)
-- [Git 工作流](./docs/05-git-workflow.md)
-- [B1 数据库](./docs/06-b1-database.md)
-- [Docker 安装验收](./docs/07-docker-setup.md)（本机可选）
-- [VPS 部署](./docs/08-vps-deploy.md)（**当前运行环境**）
-- [B2 配置域 API](./docs/09-b2-config-api.md)
-- [数据职责 L0–L3 拍板](./docs/10-data-responsibility.md)
-- [指标分工 v0.1](./docs/11-metrics-fe-be-split.md)
-- [B3 抓取任务](./docs/12-b3-crawl-jobs.md)
-- [B4 L1 标注](./docs/13-b4-l1-annotate.md)
-- [B5 DeepSeek](./docs/14-b5-deepseek.md)
-- [B6 Counts API](./docs/15-b6-counts-api.md)
-- [B7 QA 预览](./docs/16-b7-qa-preview.md)
+定位：个人学习全栈；后端按可对接的数据产品设计，前端按展示产品设计。非商用 SaaS。
+
+---
 
 ## 仓库结构
 
 ```text
 apps/
-  api/        FastAPI 业务 API
-  web/        Next.js 前端（后续）
-  crawler/    Playwright 抓取 Worker
+  api/         FastAPI + crawl worker 入口
+  web/         前端（另线构筑；后端不维护其产品文档）
+  crawler/     抓取相关
 packages/
-  metrics/    可解释指标库（纯逻辑 + 单测）
-deploy/       docker-compose 等
-docs/         设计文档
+  metrics/     可解释匹配/位置等纯逻辑
+deploy/        docker-compose、Dockerfile、hook
+docs/
+  BACKEND.md           # 后端规格（活）
+  BACKEND-RUNBOOK.md   # 后端运维（活）
+  archive/             # 历史文档（只读）
 ```
 
-## 快速开始（指标库）
+---
+
+## 后端快速入口
+
+1. 读规格：[`docs/BACKEND.md`](docs/BACKEND.md)（定位、L0–L2、API、鉴权）  
+2. 读运维：[`docs/BACKEND-RUNBOOK.md`](docs/BACKEND-RUNBOOK.md)（VPS、发布、抓取、排障）  
+3. 本机改代码 → `git commit` → `git push vps main` → VPS 自动部署  
+4. 公网 API：`http://<VPS>:8200`（需 `X-API-Key`；运维页 `/qa`）
+
+指标库单测：
 
 ```bash
-cd packages/metrics
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest -q
-```
-
-## API 自检
-
-```bash
+cd packages/metrics && pytest -q
 cd apps/api && PYTHONPATH=. pytest tests/ -q
 ```
 
-## 鉴权
+---
 
-服务在公网 8200 上，`API_KEY` 必填（见 [.env.example](.env.example)）：
+## 文档策略
 
-```bash
-curl -H "X-API-Key: $API_KEY" 'http://127.0.0.1:8200/v1/counts?brand_id=1'
-```
+- **日常只维护 2 篇后端活文档**（上表）。  
+- 旧版 01–27 编号文、L3 草案、踩坑长文 → [`docs/archive/`](docs/archive/)，冲突时以活文档 + 代码为准。  
+- 前端页面/IA 需求请写在前端仓库或 `apps/web` 侧，避免再次把 `docs/` 堆成杂物间。
 
-`/qa` 页面走 `/qa/login` 登录（HttpOnly Cookie）。细节见 [docs/24](docs/24-code-review-fixes.md)。
+---
 
-## 状态
+## 根目录其它材料
 
-- [x] 产品头脑风暴 / 开源评估
-- [x] MVP 文档 + monorepo 骨架
-- [x] metrics 包 + 单测
-- [x] Git 规范
-- [x] B1 数据库落地（schema + 连接 + 校验脚本）
-- [x] B2 配置域 API（品牌/Prompt CRUD）
-- [x] B3 任务 + 假 Worker（L0）
-- [x] B4 L1 规则标注
-- [x] B5 DeepSeek Web Provider（fake/real）
-- [x] B6 counts API
-- [x] B7 后端质量预览 /qa
-- [ ] 正式前端（B6/B7 之后）
-
-## 路线（已确认）
-
-- **运行环境：VPS**（本机只写代码 + git push，不做本地 Docker 验收）
-- **数据职责（已拍板）**：L0/L1/L2 后端（L2=counts）；**L3 比率前端**（见 docs/10、docs/11）
-
-后端 B1→…→B6 → **B7 后端数据预览** → 前端。  
-实现中按需对照开源，减少重复劳动。
-
-## 文档速览
-
-| 文档 | 说明 |
-|------|------|
-| [docs/27-l3-handoff.md](docs/27-l3-handoff.md) | **L3 前端交接（新会话冷启动从这里开始）** |
-| [docs/26-monitoring-set-anta.md](docs/26-monitoring-set-anta.md) | 安踏监测集设计与 D2 结果 |
-| [docs/24-code-review-fixes.md](docs/24-code-review-fixes.md) | 代码 review 修复 + 上线步骤 |
-| [docs/21-l3-frontend-plan.md](docs/21-l3-frontend-plan.md) | L3 前端主线方案（待确认） |
-| [docs/23-l3-ui-pages.md](docs/23-l3-ui-pages.md) | L3 页面需求（g1geo 排版对照） |
-| [docs/22-roadmap-next.md](docs/22-roadmap-next.md) | 后续方向清单 |
-| [docs/10-data-responsibility.md](docs/10-data-responsibility.md) | L0–L3 职责 |
-| [docs/20-data-governance-min.md](docs/20-data-governance-min.md) | 最小数据治理 |
+- 早期头脑风暴 / 开源评估：仓库根目录 `# …md`（背景阅读，非现行规格）
