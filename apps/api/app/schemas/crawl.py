@@ -62,8 +62,15 @@ class MentionOut(BaseModel):
     mentioned: bool
     mention_type: str
     position_bucket: Optional[str] = None
+    #: 出场顺位（1-based，仅 body 命中有值）。**是位置事实，不是推荐名次** ——
+    #: 且只在被监测品牌集合内排序，见 services/annotate.assign_position_ranks
     position_rank: Optional[int] = None
     evidence_snippet: Optional[str] = None
+    #: 首次命中在 full_text 里的下标，可直接切原文 → 前端做命中处内联高亮。
+    #: citation_only 命中时为 null（正文里没出现）。
+    first_offset: Optional[int] = None
+    #: 实际命中的别名，用于展示「靠哪个别名命中的」
+    matched_term: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

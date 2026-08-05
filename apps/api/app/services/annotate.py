@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from geo_metrics import match_brand, position_bucket
+from geo_metrics.mention import MentionMatch
 
 from app.models import (
     Brand,
@@ -22,8 +23,11 @@ from app.models import (
 logger = logging.getLogger("geo.annotate")
 
 # v2: match_brand 改为「最早命中」+ 长度守恒折叠，position_bucket / evidence_snippet
-# 的取值随之变化 → 存量行必须重跑（POST /v1/responses/annotate/run）
-ANNOTATOR_VERSION = "l1-rules-v2"
+#     的取值随之变化 → 存量行必须重跑（POST /v1/responses/annotate/run）
+# v3: 落库 first_offset / matched_term，并按 offset 升序派生 position_rank。
+#     v2 已有的字段取值**不变**，v3 只是把此前算完就丢掉的信息补上 ——
+#     所以重跑是纯增量，不会动 answer_status / position_bucket / evidence_snippet。
+ANNOTATOR_VERSION = "l1-rules-v3"
 
 # answer_status values (denominator definition)
 # - ok: counts as valid sample for rates
@@ -97,6 +101,47 @@ def _evidence(body: str, offset: Optional[int], term: Optional[str], width: int 
     return body[max(0, offset - width) : offset + width + (len(term or "") or 8)]
 
 
+def surface_term(body: str, m: MentionMatch) -> Optional[str]:
+    """落库用的 ``matched_term``：**原文里真正出现的那一段**。
+
+    ``match_brand`` 返回的 ``matched_term`` 是**折叠后**的形式（小写），
+    正文里写的是 ``Nike`` 而它给的是 ``nike``。直接落库会有两个后果：
+
+    1. 展示「别名命中」时大小写与原文不符
+    2. ``full_text[first_offset : +len(matched_term)] == matched_term``
+       这条本该成立的不变量不成立，前端没法用它自检高亮有没有错位
+
+    折叠是长度守恒的，所以按 offset 切原文一定切得准，直接取回原貌即可。
+    ``citation_only`` 没有正文 offset，只能保留折叠形式（此时上面那条不变量不适用）。
+    """
+    term = m.matched_term
+    if not term or m.offset is None:
+        return term
+    return body[m.offset : m.offset + len(term)] or term
+
+
+def assign_position_ranks(matches: List[Tuple[int, MentionMatch]]) -> Dict[int, int]:
+    """出场顺位：正文命中的品牌按首次出现位置排名（1-based）。
+
+    **口径必须说清楚，否则会被误读成「AI 推荐的第一名」：**
+
+    - 只有 ``mention_type=body`` 参与排名。``citation_only`` 是在引用里命中的，
+      正文根本没出现，没有「出场位置」可言 → rank 为 None，不是排在最后
+    - 名次**只在被监测品牌集合内**排。若回答里先提了一个我们没监测的品牌，
+      我们的 rank=1 仍然是 1 —— 它的含义是「我们关心的品牌里它最先出现」，
+      不是「全文第一个出现的品牌」
+    - 同 offset（别名重叠等）按 brand_id 兜底排序，保证同样输入永远同样输出
+
+    这是**位置事实**，不是推荐度。命名与展示都不要说成「首推」。
+    """
+    body_hits = sorted(
+        (m.offset, bid)
+        for bid, m in matches
+        if m.mention_type == "body" and m.offset is not None
+    )
+    return {bid: rank for rank, (_, bid) in enumerate(body_hits, start=1)}
+
+
 def target_brand_ids(db: Session, owner_brand_id: int) -> List[int]:
     """Owner brand + its competitors."""
     ids = [owner_brand_id]
@@ -135,9 +180,14 @@ def annotate_response(db: Session, response_id: int, *, replace: bool = True) ->
     cite_text = _citation_blob(db, response_id)
     body = resp.full_text or ""
 
-    for bid in target_brand_ids(db, prompt.brand_id):
-        aliases = _aliases_for_brand(db, bid)
-        m = match_brand(body, aliases, citation_text=cite_text)
+    # 两趟：先把所有品牌的命中收齐，才能算出场顺位（单趟写不出跨品牌的名次）
+    matches = [
+        (bid, match_brand(body, _aliases_for_brand(db, bid), citation_text=cite_text))
+        for bid in target_brand_ids(db, prompt.brand_id)
+    ]
+    ranks = assign_position_ranks(matches)
+
+    for bid, m in matches:
         bucket = position_bucket(body, m.offset) if m.mention_type == "body" else None
         # invalid answers: still record mention rows but status marks denominator
         db.add(
@@ -147,11 +197,13 @@ def annotate_response(db: Session, response_id: int, *, replace: bool = True) ->
                 mentioned=bool(m.mentioned),
                 mention_type=m.mention_type,
                 position_bucket=bucket,
-                position_rank=None,  # rank heuristic later
+                position_rank=ranks.get(bid),
                 is_recommended=False,
                 sentiment=None,
                 sentiment_score=None,
                 evidence_snippet=_evidence(body, m.offset, m.matched_term),
+                first_offset=m.offset,
+                matched_term=surface_term(body, m),
             )
         )
 

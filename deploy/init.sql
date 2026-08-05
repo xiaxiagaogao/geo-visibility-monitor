@@ -69,11 +69,15 @@ CREATE TABLE IF NOT EXISTS mentions (
     mentioned BOOLEAN NOT NULL,
     mention_type TEXT NOT NULL,
     position_bucket TEXT,
+    -- 出场顺位：正文里被监测品牌按 first_offset 升序的名次（1-based）
     position_rank INT,
     is_recommended BOOLEAN NOT NULL DEFAULT FALSE,
     sentiment TEXT,
     sentiment_score DOUBLE PRECISION,
-    evidence_snippet TEXT
+    evidence_snippet TEXT,
+    -- 首次命中在 full_text 里的下标（可直接切原文）与实际命中的别名
+    first_offset INT,
+    matched_term TEXT
 );
 
 CREATE TABLE IF NOT EXISTS citations (

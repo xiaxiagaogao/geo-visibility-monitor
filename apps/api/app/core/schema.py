@@ -28,6 +28,16 @@ _MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_mentions_response ON mentions(response_id);
         """,
     ),
+    (
+        "004_l1_offset_rank",
+        """
+        -- match_brand 一直在算 offset 与 matched_term，annotate 却切完
+        -- evidence_snippet 就丢掉。落库后解锁：原文命中处内联高亮、别名命中展示，
+        -- 以及按 offset 升序派生 position_rank（此前恒 NULL）。
+        ALTER TABLE mentions ADD COLUMN IF NOT EXISTS first_offset INT;
+        ALTER TABLE mentions ADD COLUMN IF NOT EXISTS matched_term TEXT;
+        """,
+    ),
 ]
 
 

@@ -146,11 +146,19 @@ class Mention(Base):
     mentioned: Mapped[bool] = mapped_column(Boolean, nullable=False)
     mention_type: Mapped[str] = mapped_column(Text, nullable=False)
     position_bucket: Mapped[Optional[str]] = mapped_column(Text)
+    #: 出场顺位（1-based）：本条回答**正文**里，被监测品牌按首次出现位置排序的名次。
+    #: 只有 mention_type=body 才有；citation_only 与未命中都是 NULL。
+    #: 注意口径：**只在被监测品牌集合内排**，不是「全文第几个出现的品牌」。
     position_rank: Mapped[Optional[int]] = mapped_column(Integer)
     is_recommended: Mapped[bool] = mapped_column(Boolean, server_default="false")
     sentiment: Mapped[Optional[str]] = mapped_column(Text)
     sentiment_score: Mapped[Optional[float]] = mapped_column(Float)
     evidence_snippet: Mapped[Optional[str]] = mapped_column(Text)
+    #: 首次命中在 full_text 里的字符下标。**能直接切原文**（match_brand 用长度守恒折叠），
+    #: 前端据此做命中处内联高亮。citation_only 无 offset → NULL。
+    first_offset: Mapped[Optional[int]] = mapped_column(Integer)
+    #: 实际命中的那个别名（如「瑞特」「ANTA」），用于展示「靠哪个别名命中的」。
+    matched_term: Mapped[Optional[str]] = mapped_column(Text)
 
     response: Mapped[RawResponse] = relationship(back_populates="mentions")
 
