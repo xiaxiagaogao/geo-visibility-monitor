@@ -22,6 +22,7 @@ from app.api import crawl_jobs as crawl_jobs_router
 from app.api import prompts as prompts_router
 from app.api import responses as responses_router
 from app.api import counts as counts_router
+from app.api import config as config_router
 from app.api import qa as qa_router
 from app.api import ingest as ingest_router
 from app.core.db import check_connection
@@ -53,6 +54,7 @@ app.include_router(prompts_router.router)
 app.include_router(crawl_jobs_router.router)
 app.include_router(responses_router.router)
 app.include_router(counts_router.router)
+app.include_router(config_router.router)
 app.include_router(qa_router.router)
 app.include_router(ingest_router.router)
 

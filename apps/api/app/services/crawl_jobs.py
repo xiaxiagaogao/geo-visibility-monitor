@@ -7,8 +7,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import CrawlJob, Prompt, RawResponse
-from app.schemas.crawl import ALLOWED_PLATFORMS, CrawlJobCreate
+from app.providers import registry
+from app.schemas.crawl import CrawlJobCreate
 
 
 def _utcnow() -> datetime:
@@ -48,10 +50,21 @@ def job_to_out(db: Session, job: CrawlJob) -> dict:
 
 def create_jobs(db: Session, data: CrawlJobCreate) -> List[CrawlJob]:
     platform = (data.platform or "deepseek").strip().lower()
-    if platform not in ALLOWED_PLATFORMS:
+    if not registry.is_known(platform):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"platform must be one of {list(ALLOWED_PLATFORMS)}",
+            detail=f"platform must be one of {list(registry.known_codes())}",
+        )
+    # 未接入的平台在这里就挡掉。以前放行到 worker 才 RuntimeError，
+    # 用户看到的是「抓取失败」而不是「这个平台没接」—— 两者排查方向完全不同。
+    crawl_mode = get_settings().crawl_mode
+    if not registry.is_runnable(platform, crawl_mode=crawl_mode):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"platform '{platform}' 尚未接入（Provider 未实现），无法发起真实抓取。"
+                f" 当前可用：{[c for c in registry.known_codes() if registry.is_runnable(c, crawl_mode=crawl_mode)]}"
+            ),
         )
     prompt = db.get(Prompt, data.prompt_id)
     if not prompt:

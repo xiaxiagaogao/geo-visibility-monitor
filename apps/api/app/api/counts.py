@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.schemas.counts import CountsResponse, MetricsConfigOut
+from app.schemas.counts import CountsResponse
 from app.services import counts as counts_svc
 
 router = APIRouter(tags=["counts"])
@@ -45,7 +45,4 @@ def get_counts(
     return CountsResponse(**data)
 
 
-@router.get("/v1/config/metrics", response_model=MetricsConfigOut)
-def get_metrics_config():
-    """口径配置下发."""
-    return MetricsConfigOut(**counts_svc.metrics_config())
+# /v1/config/metrics 已移至 app/api/config.py（与 /v1/config/platforms 同处），URL 未变。

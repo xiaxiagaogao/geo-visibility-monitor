@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import Brand, BrandAlias, Citation, CrawlJob, Prompt, RawResponse
 from app.providers.base import CrawlResult
-from app.providers.deepseek_web import DeepSeekLoginRequired, DeepSeekWebProvider
+from app.providers.deepseek_web import DeepSeekLoginRequired
 from app.providers.fake import FakeProvider
+from app.providers.registry import ProviderContext, build_real_provider
 from app.services.annotate import annotate_response
 from app.services.crawl_jobs import claim_pending_jobs, reclaim_stuck_jobs
 
@@ -58,19 +59,17 @@ def _build_provider(db: Session, job: CrawlJob, prompt: Prompt):
             brand_names=brands,
         )
 
-    # real modes
-    if platform == "deepseek":
-        return DeepSeekWebProvider(
-            headless=settings.playwright_headless,
-            timeout_ms=settings.crawl_timeout_ms,
-            storage_state=settings.deepseek_storage_state or None,
-            user_data_dir=settings.deepseek_user_data_dir or None,
-            screenshot_dir=settings.screenshot_dir or None,
-            delete_session_after=settings.deepseek_delete_session,
-        )
-
-    # unknown real platform → fail clearly
-    raise RuntimeError(f"real crawl not implemented for platform={platform}; use deepseek or crawl_mode=fake")
+    # real 模式：平台与 Provider 的对应关系全在 providers/registry.py。
+    # 未实现的平台在那里明确报错 —— 正常情况下 create_jobs 就该先把它挡成 400，
+    # 走到这里说明是历史遗留任务或直接改库造出来的。
+    return build_real_provider(
+        platform,
+        ProviderContext(
+            settings=settings,
+            sample_index=job.sample_index or 1,
+            brand_names=brands,
+        ),
+    )
 
 
 def _persist_result(db: Session, job: CrawlJob, prompt: Prompt, result: CrawlResult) -> RawResponse:

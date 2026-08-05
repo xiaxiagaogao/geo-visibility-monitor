@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
-ALLOWED_PLATFORMS = ("deepseek", "doubao", "kimi", "tongyi")
+#: 已知平台 = ``platform`` 列的合法取值。**注意它不等于「能跑」** ——
+#: 能不能跑要问 ``registry.is_runnable``（见 registry 模块文档）。
+#: 保留这个名字是为了不动既有引用；取值从注册表派生，避免两处漂移。
+from app.providers.registry import known_codes as _known_codes  # noqa: E402
+
+ALLOWED_PLATFORMS = _known_codes()
 
 
 class CrawlJobCreate(BaseModel):

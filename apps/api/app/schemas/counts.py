@@ -50,13 +50,4 @@ class CountsResponse(BaseModel):
     note: str = "counts only; compute rates on client (L3)"
 
 
-class MetricsConfigOut(BaseModel):
-    """口径配置下发（防前端硬编码）."""
-
-    answer_status_values: List[str]
-    valid_denominator: str
-    mention_types: List[str]
-    position_buckets: List[str]
-    default_composite_weights: Dict[str, float]
-    annotator_version: str
-    crawl_mode_default_hint: str
+# MetricsConfigOut 已移至 app/schemas/config.py（与 PlatformOut 同处），URL 未变。
