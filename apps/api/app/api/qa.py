@@ -39,7 +39,8 @@ def qa_login(key: str = Form(...)):
     if not verify_key(key):
         return RedirectResponse(url="/qa/login?bad=1", status_code=302)
     resp = RedirectResponse(url="/qa", status_code=302)
-    set_qa_cookie(resp, key, secure=get_settings().api_cookie_secure)
+    s = get_settings()
+    set_qa_cookie(resp, key, secure=s.api_cookie_secure, samesite=s.api_cookie_samesite)
     return resp
 
 

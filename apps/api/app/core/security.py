@@ -102,14 +102,41 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         )
 
 
-def set_qa_cookie(response: Response, key: str, *, secure: bool) -> None:
-    # path="/"：前端（F0b 起挂在 /）与 GET /v1/*、媒体路由都要带上它。
+def set_qa_cookie(
+    response: Response,
+    key: str,
+    *,
+    secure: bool,
+    samesite: str = "lax",
+) -> None:
+    """下发读取用 Cookie。
+
+    ``samesite``：同源部署用 ``lax``；**前后端分离部署必须用 ``none``**，
+    否则跨站请求（含证据截图的 ``<img src>``）根本不会带上它。
+
+    ``none`` 会放宽到「任何站点发起的请求都带 Cookie」，但**不会引入 CSRF** ——
+    中间件只在 GET/HEAD/OPTIONS 上认 Cookie，跨站构造不出被认证的写操作
+    （``test_cookie_never_works_for_write_methods`` 逐方法守着）。
+
+    浏览器硬性要求 ``SameSite=None`` 必须同时 ``Secure``，所以这里强制成对，
+    否则 Cookie 会被静默丢弃 —— 那种故障现象是「登录了但一直 401」，极难排查。
+    """
+    samesite = (samesite or "lax").lower()
+    if samesite not in ("lax", "strict", "none"):
+        samesite = "lax"
+    if samesite == "none" and not secure:
+        logger.warning(
+            "api_cookie_samesite=none 需要 api_cookie_secure=true（浏览器强制），"
+            "已自动置 secure=true；若当前不是 HTTPS，登录会表现为「一直 401」。"
+        )
+        secure = True
+    # path="/"：GET /v1/* 与媒体路由都要带上它。
     # 作用域放宽不引入 CSRF —— 中间件只在安全方法上认 Cookie。
     response.set_cookie(
         QA_COOKIE_NAME,
         key,
         httponly=True,
-        samesite="lax",
+        samesite=samesite,
         secure=secure,
         max_age=7 * 24 * 3600,
         path="/",
@@ -125,4 +152,34 @@ def warn_if_open() -> None:
         logger.warning(
             "API_KEY 未设置 —— 所有接口无鉴权。若本服务对公网开放（compose 默认 8200:8200），"
             "任何人都可以删除品牌、灌入 L0、触发抓取。请在 deploy/.env 设置 API_KEY。"
+        )
+    _warn_split_deploy_misconfig()
+
+
+def _warn_split_deploy_misconfig() -> None:
+    """分离部署的三个配置必须成套，缺一个就是「登录了但一直 401」。
+
+    这类故障没有任何报错，浏览器只是静默不带 Cookie，排查成本极高，
+    所以在启动时就把话说清楚。
+    """
+    s = get_settings()
+    origins = s.cors_origins
+    samesite = (s.api_cookie_samesite or "lax").lower()
+
+    if origins and samesite != "none":
+        logger.warning(
+            "已配置 CORS_ALLOW_ORIGINS=%s（分离部署），但 API_COOKIE_SAMESITE=%s。"
+            "跨站请求不会带上 Cookie —— 读接口与证据截图都会 401。应设为 none。",
+            origins,
+            samesite,
+        )
+    if samesite == "none" and not s.api_cookie_secure:
+        logger.warning(
+            "API_COOKIE_SAMESITE=none 但 API_COOKIE_SECURE=false —— "
+            "浏览器会直接丢弃该 Cookie。必须走 HTTPS 并置 API_COOKIE_SECURE=true。"
+        )
+    if not origins and samesite == "none":
+        logger.warning(
+            "API_COOKIE_SAMESITE=none 却没有配置 CORS_ALLOW_ORIGINS —— "
+            "同源部署无需放宽 SameSite，这样只是白白扩大 Cookie 的发送面。"
         )

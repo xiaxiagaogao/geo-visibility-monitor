@@ -19,8 +19,21 @@ class Settings(BaseSettings):
     # 鉴权：空 = 不校验（仅限本机开发）。公网部署必须设置。
     # 生成：python -c "import secrets; print(secrets.token_urlsafe(32))"
     api_key: str = ""
-    # QA cookie 是否只走 HTTPS（上了反代/证书后置 true）
+    # Cookie 是否只走 HTTPS（上了证书后置 true）。samesite=none 时**必须**为 true，
+    # 否则浏览器直接丢弃该 Cookie。
     api_cookie_secure: bool = False
+    # 前后端**分离部署**时置 "none"：跨站请求才会带上 Cookie
+    # （截图 <img src> 靠它，见 core/security.py）。同源部署保持 "lax"。
+    api_cookie_samesite: str = "lax"
+
+    # CORS：逗号分隔的前端 Origin 白名单，空 = 不启用 CORS（同源部署）。
+    # 例：https://geo.xg22.top,http://localhost:3000
+    # 注意：带 Cookie 的跨站请求**不允许**用 "*"，必须逐个列出。
+    cors_allow_origins: str = ""
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in (self.cors_allow_origins or "").split(",") if o.strip()]
 
     # Worker loop (API process and/or crawler process)
     fake_worker_enabled: bool = True

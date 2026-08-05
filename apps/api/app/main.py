@@ -25,6 +25,7 @@ from app.api import counts as counts_router
 from app.api import config as config_router
 from app.api import qa as qa_router
 from app.api import ingest as ingest_router
+from app.core.config import get_settings
 from app.core.db import check_connection
 from app.core.schema import ensure_schema
 from app.core.security import ApiKeyMiddleware, warn_if_open
@@ -48,6 +49,22 @@ app = FastAPI(
 )
 
 app.add_middleware(ApiKeyMiddleware)
+
+# CORS 必须**后加**：Starlette 里后加的中间件在外层，先执行。
+# 顺序反了的话，预检 OPTIONS 会先撞上 ApiKeyMiddleware 拿到不带 CORS 头的 401，
+# 浏览器直接判定跨域失败 —— 现象是「所有请求都失败但 curl 一切正常」。
+_cors_origins = get_settings().cors_origins
+if _cors_origins:
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        # 带 Cookie 的跨站请求不允许用 "*"，必须是具体 Origin 列表
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(brands_router.router)
 app.include_router(prompts_router.router)

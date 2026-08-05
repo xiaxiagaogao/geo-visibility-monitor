@@ -34,6 +34,10 @@ services:
       # 8200 对公网开放 → 必须设置 API_KEY，否则任何人可删数据/灌 L0/触发抓取
       API_KEY: ${API_KEY:-}
       API_COOKIE_SECURE: ${API_COOKIE_SECURE:-false}
+      # 前后端分离部署（D1）：这三项与 API_COOKIE_SECURE 必须成套，
+      # 缺一项的现象是「登录了但一直 401」，无报错、极难排查。见 .env.example
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+      API_COOKIE_SAMESITE: ${API_COOKIE_SAMESITE:-lax}
       # 默认 false：api 镜像里没有 Playwright，真抓模式下它抢到 job 只会失败。
       # 只有确认不起 crawler profile、且 CRAWL_MODE=fake 时才置 true。
       FAKE_WORKER_ENABLED: ${FAKE_WORKER_ENABLED:-false}
