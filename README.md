@@ -1,23 +1,14 @@
 # geo-demo
 
-GEO 可见性监测 · 学习项目。**前后端分离**：后端抓数/标注/计数，前端展示（前端文档不在本仓堆叠）。
+GEO 可见性监测（学习项目）。前后端分离：
 
-## 后端文档（只有这一份）
-
-→ **[docs/BACKEND.md](docs/BACKEND.md)**（产品规格 + API + 鉴权 + VPS 运维）
-
-历史材料（不必日常读）：`history/docs-archive/`
-
-## 结构
+- **后端：** 抓取 · 标注 · 计数 API → 说明见 **[docs/BACKEND.md](docs/BACKEND.md)**（唯一核心文档）
+- **前端：** 展示 · 比率 · 交互 → 前端侧自建文档
 
 ```text
-apps/api          API + worker
-apps/web          前端占位（另线）
-packages/metrics  指标纯逻辑
-deploy/           compose / 发布
-docs/BACKEND.md   后端唯一说明
+apps/api · apps/web · packages/metrics · deploy/
+docs/BACKEND.md           # 现行唯一后端说明（从历史 01–27 提炼）
+history/docs-archive/     # 旧文冻结，日常不必读
 ```
 
-## 后端开发流
-
-本机改代码 → commit → `git push vps main` → VPS 跑服务（详见 BACKEND.md 运维部分）。
+开发：本机改代码 → `git push vps main` → VPS 运行（细节见 BACKEND.md §10）。
