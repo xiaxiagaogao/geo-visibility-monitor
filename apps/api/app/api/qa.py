@@ -216,6 +216,11 @@ def qa_screenshot(filename: str):
     前端不该依赖 ``/qa`` 这个运维工具的地盘。
 
     两条都是 GET，浏览器 ``<img src>`` 用 Cookie 认证即可（``<img>`` 发不了请求头）。
+
+    **响应必须带 ``Cache-Control: private, no-store``。** 这是需要鉴权的证据文件，
+    而 URL 以 ``.png`` 结尾 —— 放到 CDN（本项目走 Cloudflare）后面时，
+    CDN 会按扩展名把它当静态资源缓存到边缘节点，之后任何拿到 URL 的人
+    都能绕过鉴权取到图。加了这个头，共享缓存就不会存它。
     """
     import os
 
@@ -240,5 +245,9 @@ def qa_screenshot(filename: str):
         except Exception:
             continue
         if path.is_file():
-            return FileResponse(str(path), media_type="image/png")
+            return FileResponse(
+                str(path),
+                media_type="image/png",
+                headers={"Cache-Control": "private, no-store"},
+            )
     raise HTTPException(status_code=404, detail=f"screenshot not found: {safe}")

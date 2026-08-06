@@ -152,3 +152,32 @@ def test_cookie_is_httponly_and_root_path():
 
 def test_bogus_samesite_falls_back_to_lax():
     assert "samesite=lax" in _cookie_header(secure=False, samesite="whatever")
+
+
+# ---------- CDN 缓存 ----------
+
+
+def test_screenshot_is_not_cacheable_by_shared_caches(tmp_path, monkeypatch):
+    """证据截图必须带 private,no-store。
+
+    URL 以 .png 结尾，CDN（本项目走 Cloudflare）会按扩展名把它当静态资源
+    缓存到边缘 —— 之后任何拿到 URL 的人都能绕过鉴权取到图。
+    """
+    from app.api import qa as qa_router
+
+    shot = tmp_path / "evidence.png"
+    shot.write_bytes(b"\x89PNG\r\n\x1a\n")
+    monkeypatch.setenv("SCREENSHOT_DIR", str(tmp_path))
+    monkeypatch.delenv("API_KEY", raising=False)  # 本用例只关心缓存头
+    get_settings.cache_clear()
+
+    app = FastAPI()
+    app.include_router(qa_router.router)
+    r = TestClient(app).get("/v1/media/screenshots/evidence.png")
+
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    cc = r.headers.get("cache-control", "").lower()
+    assert "no-store" in cc and "private" in cc, (
+        f"截图响应缺少缓存控制（实际 Cache-Control={cc!r}），会被 CDN 缓存到边缘"
+    )
