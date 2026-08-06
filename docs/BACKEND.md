@@ -211,6 +211,45 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 > 将来做真会话登录与三角色权限时，这条应当被**重新设计**（CSRF token 或
 > SameSite=strict + 双提交），而不是原样继承。
 
+### 5.1 分离部署（D1）：三项配置必须成套
+
+前端独立部署后是**跨站**访问，三项缺一不可，缺了的现象是「登录了但一直 401」，
+无任何报错：
+
+```bash
+CORS_ALLOW_ORIGINS=https://geo.xg22.top   # 带 Cookie 时不允许 "*"，逐个列出
+API_COOKIE_SAMESITE=none                  # 跨站请求才会带 Cookie
+API_COOKIE_SECURE=true                    # 浏览器强制：SameSite=None 必须 Secure
+```
+
+启动时会校验这三项是否成套，不成套直接 WARNING。
+
+- **CORS 中间件必须后加**（`main.py`）：Starlette 里后加的在外层先执行。
+  顺序反了，预检 `OPTIONS` 会先撞 `ApiKeyMiddleware` 拿到不带 CORS 头的 401 ——
+  现象是「浏览器全挂但 curl 正常」。
+- 放宽 SameSite **不引入 CSRF**：Cookie 仍只对 GET/HEAD/OPTIONS 有效。
+
+### 5.2 CDN 会绕过鉴权 —— 需要鉴权的响应必须禁缓存
+
+线上拓扑：`浏览器 → Cloudflare（真证书）→ Caddy（tls internal）→ geo-api:8200`。
+
+**Cloudflare 按文件扩展名缓存静态资源。** `/v1/media/screenshots/*.png` 是需要
+鉴权的证据文件，但 URL 以 `.png` 结尾 —— 若源站不表态，CF 会把它存到边缘节点，
+之后**任何拿到 URL 的人都能取到，请求根本到不了我们的中间件**。
+
+这个洞只在套 CDN 后出现，本机与直连 `:8200` 都复现不了。2026-08-05 实测：
+未登录请求返回 `200 · cf-cache-status: HIT`。
+
+**防线：**
+
+1. 响应带 `Cache-Control: private, no-store`（已落地，有行为测试守着）。
+   加了之后 CF 对该路径变为 `cf-cache-status: BYPASS`，未登录请求正确 401。
+2. **建议**在 Cloudflare 再加一条 Cache Rule：`/v1/media/*` → Bypass cache，
+   作为「有人改掉响应头」时的兜底。
+
+> **新增任何返回文件的接口时，先问一句「它会不会被 CDN 缓存」。**
+> 判断依据是 URL 后缀与 `Cache-Control`，不是路径前缀。
+
 ---
 
 ## 6. 监测数据口径（从实践收束）
@@ -347,6 +386,9 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 | 项 | 值 |
 |----|-----|
 | VPS | `96.9.213.230`（Ubuntu 24.04） |
+| API 公网入口 | `https://geo-api.xg22.top`（Cloudflare 橙云 → Caddy → `127.0.0.1:8200`） |
+| 前端公网入口 | `https://geo.xg22.top`（DNS 已就绪，**Caddy 站点待建**） |
+| Caddy | `/etc/caddy/Caddyfile`，**同机还有 fund. / option. 两个别的项目** —— 改完只 `systemctl reload caddy`，勿 restart；改前先备份 |
 | 工作树 / 裸仓 | `/opt/geo-demo` · `/opt/geo-demo.git` |
 | API | `:8200`（需 Key） |
 | 库 | `127.0.0.1:5433`（**勿改 0.0.0.0**；默认口令 `geo/geo` 是弱口令，对外前必须改） |
