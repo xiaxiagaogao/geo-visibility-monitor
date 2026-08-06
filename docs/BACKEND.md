@@ -19,8 +19,8 @@
 **后端不做：** 返回提及率/SoV 当权威、浏览器调 LLM、账号池规模化、内容生成与发布、
 告警中心 / 周报 PDF / Webhook。
 
-**后端尚未做、但已列入方向：** 用户体系与三角色权限（超级管理员 / 运营 / 客户）。
-当前是**单一共享密钥**（§5），没有 users 表 —— 见 §11「已知债务」。
+**用户体系与三角色权限（超级管理员 / 运营 / 客户）已实现** —— 见 §5。
+共享密钥 `API_KEY` 保留为**机器凭证**（脚本 / 运维 / CI），不下放给前端。
 
 **`/qa`：** 运维质检页，不是正式产品前端。
 
@@ -165,6 +165,8 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 | 明细 | GET | `/v1/responses` · `/{id}` |
 | 重标 | POST | `/v1/responses/{id}/annotate` · `/annotate/run` |
 | 计数 | GET | `/v1/counts` |
+| 登录 | POST | `/v1/auth/login`（公开）· `/v1/auth/logout` · GET `/v1/auth/me` |
+| 用户 | CRUD | `/v1/users` · `/v1/users/{id}` —— **仅超管** |
 | 口径 | GET | `/v1/config/metrics` |
 | 平台可用性 | GET | `/v1/config/platforms` —— 前端据此渲染 chip，**勿硬编码平台清单**（见 §7.1） |
 | 灌入 | POST | `/v1/ingest/l0`（非主路径） |
@@ -194,24 +196,69 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 
 ---
 
-## 5. 鉴权
+## 5. 鉴权与权限（D2）
 
-| 通道 | 范围 |
-|------|------|
-| `X-API-Key` / `Authorization: Bearer` | **所有方法** |
-| Cookie `geo_qa_key`（`POST /qa/login` 下发，`path=/`） | **仅 GET/HEAD/OPTIONS** |
-| **完全免鉴权** | `/health` · `/qa/login` · `/favicon.ico` |
+### 5.0 三条身份通道（并存，互不替代）
 
-- 截图 `<img>` 不能带自定义头 → 读接口允许 Cookie。  
-- Cookie **禁止**用于写 → 防 CSRF（`test_cookie_never_works_for_write_methods` 逐方法守着，勿放开）。  
-- 未认证且 `Accept: text/html` 的 GET → 302 到 `/qa/login`；否则 401 JSON。  
-- 公网必须配置 `API_KEY`（`deploy/.env`，chmod 600）；空 key = **完全无鉴权**，启动打 WARNING。
+| 通道 | 载体 | 身份 | 用途 |
+|------|------|------|------|
+| **用户会话** | Cookie `geo_session`（HttpOnly） | `users` 行，带角色与 workspace | **前端唯一通道** |
+| **共享密钥** | `X-API-Key` / `Bearer` | **等同超管**，无用户身份 | 脚本、运维、CI、`verify_l2` |
+| **QA 后门** | Cookie `geo_qa_key` | **等同超管**，仅 GET/HEAD/OPTIONS | `/qa` 运维质检页 |
+| **完全免鉴权** | — | — | `/health` · `/qa/login` · `/v1/auth/login` · `/favicon.ico` |
 
-> **这是「没有用户体系」时的权宜设计。** 按 HTTP 方法切分是用来替代 CSRF token 的。
-> 将来做真会话登录与三角色权限时，这条应当被**重新设计**（CSRF token 或
-> SameSite=strict + 双提交），而不是原样继承。
+认证在**中间件**（`ApiKeyMiddleware`），解析结果放 `request.state.principal`。
+放中间件是为了 **fail-closed**：默认拒绝，只有 `PUBLIC_PATHS` 例外 ——
+改成逐路由挂依赖的话，漏挂一个就是一个开放接口。
 
-### 5.1 分离部署（D1）：三项配置必须成套
+**授权在路由依赖**（`require_write` / `require_superadmin` / `assert_*_visible`）：
+中间件看不到路径与查询参数，做不了归属校验。
+
+- 公网必须配置 `API_KEY`（`deploy/.env`，chmod 600）；空 key = **完全无鉴权**，启动打 WARNING
+- 未认证且 `Accept: text/html` 的 GET → 302 到 `/qa/login`；否则 401 JSON
+- 已登录但没权限 = **403**，不是 401 —— 401 会让前端以为该重新登录，陷入登录循环
+
+### 5.1 角色与权限矩阵
+
+| 能力 | 超管 | 运营 | 客户 |
+|------|:---:|:---:|:---:|
+| 看数据（counts / responses / 截图） | 全部 | 全部 | **仅本 workspace** |
+| 品牌 / 别名 / 竞品 / 提问词 增改删 | ✓ | ✓ | ✗ |
+| 发起抓取、重试、重标注、灌 L0 | ✓ | ✓ | ✗ |
+| 用户增删改 | ✓ | ✗ | ✗ |
+
+`users.workspace_id` **只对 client 有意义**（= 他能看的品牌范围，对上 `brands.workspace_id`）；
+超管/运营为 NULL。客户是**纯只读**：抓取消耗 DeepSeek 登录态且不可撤销，不放给外部角色。
+
+### 5.2 归属校验：三个口子，第三个最隐蔽
+
+**不可见一律 404，不是 403。** 403 等于确认「该 id 存在但不属于你」，
+客户据此能枚举出别家有多少品牌、多少样本。
+
+| # | 口子 | 做法 |
+|---|------|------|
+| 1 | 显式带 `brand_id` / `prompt_id` 的接口 | 逐个 `assert_brand_visible` / `assert_prompt_visible` |
+| 2 | 列表接口的**默认范围** | 客户身份下强制注入 workspace 过滤，不是可选参数。`/v1/crawl-jobs` 更严：客户必须带 `prompt_id`，任务列表本身就泄露别家在监测什么 |
+| 3 | **截图按 basename 取，与品牌毫无关联** | 反查 `screenshot_path` → response → job → prompt → brand → workspace |
+
+> 第 3 条是**结构性缺口**：文件名带时间戳、可枚举。前两条堵了、这条不堵，等于全白做。
+
+**`visible_workspace_id` 必须 fail-closed。** 它用 `None` 表示「看全部」，
+所以「本该受限却拿不到 workspace」的两种情况必须显式拒绝，否则就是放行全部：
+匿名（401）、角色是 client 却没有 workspace_id（403，直接改库能造出这种行）。
+
+### 5.3 CSRF
+
+D2 之前靠「Cookie 只对 GET 有效」挡 CSRF。**会话能用于写之后这条自动作废**，
+换成**双提交 token**：登录下发 `geo_csrf`（**刻意非 HttpOnly**，前端要读它回填
+`X-CSRF-Token`）→ 服务端比对 Cookie 与请求头。跨站页面能让浏览器带 Cookie，
+但同源策略让它读不到值，拼不出匹配的头。
+
+- 开关 `CSRF_PROTECTION_ENABLED`，**默认 false** —— 前端未适配前开了会让所有会话写操作 403
+- 只影响**会话身份的写操作**；`X-API-Key` 不受影响（请求头本就得调用方主动设置，本来免疫）
+- `/qa` 后门 Cookie 仍**只对安全方法有效**，这条老防线保留
+
+### 5.4 分离部署（D1）：三项配置必须成套
 
 前端独立部署后是**跨站**访问，三项缺一不可，缺了的现象是「登录了但一直 401」，
 无任何报错：
@@ -229,7 +276,7 @@ API_COOKIE_SECURE=true                    # 浏览器强制：SameSite=None 必�
   现象是「浏览器全挂但 curl 正常」。
 - 放宽 SameSite **不引入 CSRF**：Cookie 仍只对 GET/HEAD/OPTIONS 有效。
 
-### 5.2 CDN 会绕过鉴权 —— 需要鉴权的响应必须禁缓存
+### 5.5 CDN 会绕过鉴权 —— 需要鉴权的响应必须禁缓存
 
 线上拓扑：`浏览器 → Cloudflare（真证书）→ Caddy（tls internal）→ geo-api:8200`。
 
@@ -417,6 +464,12 @@ curl -s -X POST http://127.0.0.1:8200/v1/crawl-jobs \
 curl -s -X POST -H "X-API-Key: $KEY" \
   'http://127.0.0.1:8200/v1/responses/annotate/run?limit=500'
 
+# 建用户（首个超管也走这里 —— 密码是 argon2 哈希，手写 SQL 生成不了）
+# 密码走交互式输入，不接受命令行参数（否则进 shell history 与 /proc/<pid>/cmdline）
+docker exec -it geo-api python -m app.scripts.create_user \
+  --email you@example.com --role superadmin
+# 客户账号必须带 workspace：--role client --workspace-id 2
+
 # 数据治理（默认 dry-run，确认后去掉 --dry-run）
 docker exec geo-api python -m app.scripts.data_governance_min --dry-run
 
@@ -444,7 +497,6 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 
 | 债 | 现状 | 何时会咬人 |
 |----|------|-----------|
-| **无用户体系** | 单一共享密钥，无 users 表，无归属校验 —— `/v1/counts?brand_id=任意值` 谁都能查 | 做三角色权限时。隔离键 `workspace_id` 已存在但未启用（§3） |
 | **counts 全量加载** | 把所有 `RawResponse`（含 `full_text` 全文）拉进 Python 再累加，不是 SQL 聚合 | 样本量上千后 |
 | **L1 白名单仍缺情感** | `sentiment` / `is_recommended` 恒空（§3.3）；`/v1/counts` 无 `m_recommended` | 前端要情感、推荐率时 |
 | **无批次 / 提问集实体** | 一条 job = 一个样本，「一次检测」不存在（§3）。最初设计里有 `PromptSet`，与 `Organization` / `Workspace` 一样从未建表 | 要「新建一次命名检测并回看」时 |
