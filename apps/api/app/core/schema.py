@@ -74,6 +74,92 @@ _MIGRATIONS = [
 ]
 
 
+def split_statements(sql: str) -> list[str]:
+    """把迁移脚本切成一条条语句。
+
+    **不能用 ``sql.split(";")``** —— 分号不只是语句分隔符，它还会出现在：
+
+    - 行注释里：``-- 见 issue #12; 已修``
+    - 字符串字面量里：``DEFAULT 'a;b'``
+    - ``$$ ... $$`` 包起来的函数体（PL/pgSQL 里每行都以分号结尾）
+
+    裸切遇到上面任何一种都会把一条语句劈成两半，报错还离现场很远。
+    这里按「引号 / 美元引用 / 行注释」状态机走一遍，只在**语句层**的分号处断开。
+    """
+    out: list[str] = []
+    buf: list[str] = []
+    i, n = 0, len(sql)
+    in_line_comment = False
+    quote: str | None = None  # "'" | '"' | 美元引用的完整 tag，如 $$ 或 $fn$
+
+    while i < n:
+        ch = sql[i]
+
+        if in_line_comment:
+            buf.append(ch)
+            if ch == "\n":
+                in_line_comment = False
+            i += 1
+            continue
+
+        if quote is None:
+            if sql.startswith("--", i):
+                in_line_comment = True
+                buf.append(ch)
+                i += 1
+                continue
+            if ch in ("'", '"'):
+                quote = ch
+                buf.append(ch)
+                i += 1
+                continue
+            if ch == "$":
+                end = sql.find("$", i + 1)
+                if end != -1 and sql[i + 1 : end].replace("_", "").isalnum() or (
+                    end == i + 1
+                ):
+                    quote = sql[i : end + 1]
+                    buf.append(quote)
+                    i = end + 1
+                    continue
+            if ch == ";":
+                stmt = "".join(buf).strip()
+                if stmt:
+                    out.append(stmt)
+                buf = []
+                i += 1
+                continue
+            buf.append(ch)
+            i += 1
+            continue
+
+        # 引号 / 美元引用内部
+        if quote in ("'", '"'):
+            buf.append(ch)
+            if ch == quote:
+                # SQL 里连写两个引号表示转义
+                if i + 1 < n and sql[i + 1] == quote:
+                    buf.append(sql[i + 1])
+                    i += 2
+                    continue
+                quote = None
+            i += 1
+            continue
+
+        if sql.startswith(quote, i):  # 美元引用结束
+            buf.append(quote)
+            i += len(quote)
+            quote = None
+            continue
+        buf.append(ch)
+        i += 1
+
+    tail = "".join(buf).strip()
+    if tail:
+        out.append(tail)
+    return out
+
+
 def ensure_schema() -> None:
     """Apply lightweight migrations for existing volumes (idempotent)."""
     with engine.begin() as conn:
@@ -93,10 +179,8 @@ def ensure_schema() -> None:
                 {"id": mid},
             ).scalar()
             # always run IF NOT EXISTS DDL; mark migration once
-            for stmt in sql.strip().split(";"):
-                s = stmt.strip()
-                if s:
-                    conn.execute(text(s))
+            for stmt in split_statements(sql):
+                conn.execute(text(stmt))
             if not exists:
                 conn.execute(
                     text("INSERT INTO schema_migrations (id) VALUES (:id) ON CONFLICT DO NOTHING"),

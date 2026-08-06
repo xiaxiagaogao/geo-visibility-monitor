@@ -537,7 +537,6 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 | **counts 全量加载** | 把所有 `RawResponse`（含 `full_text` 全文）拉进 Python 再累加，不是 SQL 聚合 | 样本量上千后 |
 | **L1 白名单仍缺情感** | `sentiment` / `is_recommended` 恒空（§3.3）；`/v1/counts` 无 `m_recommended` | 前端要情感、推荐率时 |
 | **无批次 / 提问集实体** | 一条 job = 一个样本，「一次检测」不存在（§3）。最初设计里有 `PromptSet`，与 `Organization` / `Workspace` 一样从未建表 | 要「新建一次命名检测并回看」时 |
-| `ensure_schema` 按 `;` 裸切 SQL | 当前迁移能跑；加函数/触发器会碎 | 写复杂迁移时 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL | 调整竞品集合后 |
 | **引用分析做不了** | citations 全库 0 行；根因是从未开联网搜索（§7.0），不是解析 bug | 前端要做引用页时 |
 | id=6 残留会话 URL | `raw_json` 里有一条 DeepSeek 会话 URL，违反「不落库会话 URL」（§7）。旧 `chrome_bridge` 路径遗留，一条 UPDATE 可清 | 随时可清 |
