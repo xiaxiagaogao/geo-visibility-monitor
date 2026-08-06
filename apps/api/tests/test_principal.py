@@ -198,3 +198,72 @@ def test_client_without_workspace_is_denied_not_unscoped():
     with pytest.raises(HTTPException) as exc:
         visible_workspace_id(broken)
     assert exc.value.status_code == 403
+
+
+# ---------- CSRF 双提交（D2-4）----------
+
+
+@pytest.fixture
+def csrf_on(monkeypatch):
+    monkeypatch.setenv("CSRF_PROTECTION_ENABLED", "true")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_csrf_off_by_default_so_frontend_can_catch_up(as_user):
+    """默认关 —— 前端未适配前开了会让所有会话写操作 403。"""
+    as_user("operator")
+    c = TestClient(build_app())
+    c.cookies.set(SESSION_COOKIE_NAME, "valid-session")
+    assert c.post("/v1/write-thing").status_code == 200
+
+
+def test_csrf_blocks_session_write_without_header(as_user, csrf_on):
+    """开启后：只有 Cookie 没有请求头 —— 正是跨站攻击者能做到的全部。"""
+    from app.core.security import CSRF_COOKIE_NAME
+
+    as_user("operator")
+    c = TestClient(build_app())
+    c.cookies.set(SESSION_COOKIE_NAME, "valid-session")
+    c.cookies.set(CSRF_COOKIE_NAME, "the-real-token")
+    r = c.post("/v1/write-thing")
+    assert r.status_code == 403
+    assert "CSRF" in r.json()["detail"]
+
+
+def test_csrf_allows_write_when_header_matches_cookie(as_user, csrf_on):
+    """本站前端读得到 Cookie，能回填请求头 —— 跨站读不到，所以造不出。"""
+    from app.core.security import CSRF_COOKIE_NAME
+
+    as_user("operator")
+    c = TestClient(build_app())
+    c.cookies.set(SESSION_COOKIE_NAME, "valid-session")
+    c.cookies.set(CSRF_COOKIE_NAME, "the-real-token")
+    r = c.post("/v1/write-thing", headers={"X-CSRF-Token": "the-real-token"})
+    assert r.status_code == 200
+
+
+def test_csrf_rejects_mismatched_header(as_user, csrf_on):
+    from app.core.security import CSRF_COOKIE_NAME
+
+    as_user("operator")
+    c = TestClient(build_app())
+    c.cookies.set(SESSION_COOKIE_NAME, "valid-session")
+    c.cookies.set(CSRF_COOKIE_NAME, "the-real-token")
+    r = c.post("/v1/write-thing", headers={"X-CSRF-Token": "attacker-guess"})
+    assert r.status_code == 403
+
+
+def test_csrf_does_not_apply_to_reads(as_user, csrf_on):
+    """GET 不改状态，不必付双提交的成本；截图 <img> 也带不了请求头。"""
+    as_user("operator")
+    c = TestClient(build_app())
+    c.cookies.set(SESSION_COOKIE_NAME, "valid-session")
+    assert c.get("/v1/whoami").status_code == 200
+
+
+def test_csrf_does_not_apply_to_machine_calls(csrf_on):
+    """X-API-Key 本来就免疫 CSRF（跨站页面设不了请求头），别把运维脚本一起挡了。"""
+    c = TestClient(build_app())
+    assert c.post("/v1/write-thing", headers={"X-API-Key": KEY}).status_code == 200

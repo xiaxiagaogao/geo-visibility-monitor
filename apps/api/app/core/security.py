@@ -41,6 +41,9 @@ logger = logging.getLogger("geo.security")
 QA_COOKIE_NAME = "geo_qa_key"
 #: D2 用户会话 Cookie（与 core/auth.py 保持一致，此处重复定义以免循环导入）
 SESSION_COOKIE_NAME = "geo_session"
+#: CSRF 双提交用（与 core/auth.py 一致，此处重复定义以免循环导入）
+CSRF_COOKIE_NAME = "geo_csrf"
+CSRF_HEADER_NAME = "x-csrf-token"
 
 # 不需要鉴权的路径：部署脚本 / 容器健康检查 / 登录本身
 PUBLIC_PATHS = frozenset(
@@ -80,6 +83,27 @@ def _key_from_headers(request: Request) -> Optional[str]:
 
 def _wants_html(request: Request) -> bool:
     return "text/html" in (request.headers.get("accept") or "")
+
+
+def _csrf_ok(request: Request) -> bool:
+    """双提交校验：Cookie 里的 CSRF token 必须与请求头一致。
+
+    **为什么这样就能挡住 CSRF**：跨站页面能让浏览器带上我们的 Cookie，
+    但同源策略让它**读不到** Cookie 的值，因此拼不出匹配的请求头。
+
+    只对**会话身份的写操作**生效。``X-API-Key`` 的机器调用不走这里 ——
+    请求头本身就得由调用方主动设置，跨站页面设不了，本来就免疫 CSRF。
+
+    D2 之前挡 CSRF 靠的是「Cookie 只对 GET 有效」。会话必须能用于写之后，
+    那条防线自动作废，必须由这里接上。
+    """
+    if not get_settings().csrf_protection_enabled:
+        return True
+    cookie_val = request.cookies.get(CSRF_COOKIE_NAME)
+    header_val = request.headers.get(CSRF_HEADER_NAME)
+    if not cookie_val or not header_val:
+        return False
+    return secrets.compare_digest(cookie_val, header_val)
 
 
 @dataclass(frozen=True)
@@ -174,11 +198,19 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
             request.state.principal = MACHINE
             return await call_next(request)
 
-        # ② 用户会话 —— 任何方法。写操作的 CSRF 防护由 D2-4 的双提交 token 负责
+        # ② 用户会话 —— 任何方法。写操作额外过 CSRF 双提交
         session_principal = _resolve_user_principal(
             request.cookies.get(SESSION_COOKIE_NAME)
         )
         if session_principal is not None:
+            if request.method not in SAFE_METHODS and not _csrf_ok(request):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": "CSRF token missing or mismatched "
+                        f"(send cookie {CSRF_COOKIE_NAME} value in {CSRF_HEADER_NAME} header)"
+                    },
+                )
             request.state.principal = session_principal
             return await call_next(request)
 

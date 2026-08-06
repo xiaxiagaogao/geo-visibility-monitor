@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # 注意：带 Cookie 的跨站请求**不允许**用 "*"，必须逐个列出。
     cors_allow_origins: str = ""
 
+    # CSRF 双提交校验（D2-4）。**默认关**：前端未适配前开了会让所有会话写操作 403。
+    # 前端在真浏览器里验过「读 geo_csrf Cookie 回填 X-CSRF-Token」之后再置 true。
+    # 只影响**会话身份的写操作**；X-API-Key 的机器调用不受影响（它本来就免疫 CSRF）。
+    csrf_protection_enabled: bool = False
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in (self.cors_allow_origins or "").split(",") if o.strip()]

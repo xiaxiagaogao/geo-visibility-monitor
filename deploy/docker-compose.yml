@@ -38,6 +38,8 @@ services:
       # 缺一项的现象是「登录了但一直 401」，无报错、极难排查。见 .env.example
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
       API_COOKIE_SAMESITE: ${API_COOKIE_SAMESITE:-lax}
+      # D2：CSRF 双提交，默认关，前端适配后再开
+      CSRF_PROTECTION_ENABLED: ${CSRF_PROTECTION_ENABLED:-false}
       # 默认 false：api 镜像里没有 Playwright，真抓模式下它抢到 job 只会失败。
       # 只有确认不起 crawler profile、且 CRAWL_MODE=fake 时才置 true。
       FAKE_WORKER_ENABLED: ${FAKE_WORKER_ENABLED:-false}
