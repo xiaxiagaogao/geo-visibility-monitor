@@ -66,6 +66,7 @@ def list_responses(
     brand_id: Optional[int] = None,
     answer_status: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0, description="跳过前 N 条；与 total 配合翻页"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
@@ -117,7 +118,7 @@ def list_responses(
         ).where(Prompt.brand_id.in_(allowed_brands))
 
     total = int(db.scalar(cq) or 0)
-    items = list(db.scalars(q.limit(limit)).all())
+    items = list(db.scalars(q.offset(offset).limit(limit)).all())
     return RawResponseListOut(items=[_to_out(r) for r in items], total=total)
 
 

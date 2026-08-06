@@ -91,7 +91,7 @@ RawResponse ──< Citation
 | crawl_jobs | 采集 | pending → running → success/failed；**`sample_index` = 同一 prompt 的第几次采样**。一条 job = **一个样本**，不是一个批次 |
 | raw_responses | L0+L1 | `full_text` 必须是**原文**；`answer_status`；`annotator_version` |
 | mentions | L1 | 见下方字段说明 |
-| citations | L0 | 解析质量随平台变化；联网检索关闭时可能整体为空 |
+| citations | L0 | **当前全库 0 行**，根因见 §7.2 |
 
 **没有「批次 / 检测」实体。** 35 个样本 = 35 个 `crawl_jobs` 行。
 要「新建一次叫 X 的检测并在列表里回看」，需要新增实体或按 `created_at` 日期分组。
@@ -190,6 +190,11 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 要行标题得自己去 `/v1/prompts` 关联。同理 `group_by=day` 的 key 是 **UTC 日期**。
 
 **响应里 `competitors[]` 一律按 `brand_id` 关联，不许按数组下标** —— 顺序不保证。
+
+### 列表分页
+
+`/v1/responses` 与 `/v1/crawl-jobs` 支持 `limit`（≤200）+ `offset`；
+响应里的 `total` 是**过滤后的全量计数**，不受分页影响，前端据此算页数。
 
 **不做：** `category` 过滤参数（前端读 `/v1/prompts` 自行归类）。  
 **不做：** API 直接返回提及率等比率权威字段。
@@ -376,6 +381,38 @@ SoV(安踏) = 21 / 137 = 15.3%
 
 source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计数排除 fake）。
 
+### 7.0 引用（citations）为什么一条都没有
+
+**结论：全库 0 行 / 50 条回答。这不是解析 bug，是回答里本来就没有引用。**
+
+2026-08-06 实测：
+
+| 检查 | 结果 |
+|------|------|
+| 正文含「已阅读 N 个网页」（联网标志） | **0 / 50** |
+| `raw_json` 含 `cite` 字样 | 0 |
+| `raw_json` 含 `search` 字样 | 0 |
+| `raw_json` 含 http 链接 | 1 —— 是 id=6 的**会话 URL**（旧 `chrome_bridge` 路径遗留），不是引用 |
+
+两层原因，**顺序不能颠倒**：
+
+1. **抓取时从未开启 DeepSeek 的联网搜索。** 不联网就没有引用来源可解析 ——
+   这是主因，改代码也变不出数据
+2. `_extract_citations` **只在非 SSE 分支里跑**（`response.json()` 那条），
+   而 DeepSeek 走的是流式 —— 即使将来开了联网，这条路径也抓不到
+
+另外 `raw_json` **不存响应体**，只存元数据（`source` / `stream_chunks` 计数 /
+`session_deleted` / `captured_at`），所以也无法从存量数据里回捞引用。
+
+**要做引用分析，需要三步（缺一不可）：**
+
+① provider 里点开「联网搜索」开关 → ② `_extract_citations` 也在 SSE 分支调用
+→ ③ 重抓样本
+
+> ⚠️ **③ 会破坏现有基线的可比性。** §6.3 的 35 条（安踏 60.0%）是在**不联网**
+> 条件下测的；联网会改变回答内容分布。混着统计就没有口径了 ——
+> 要么整套重抓，要么把联网样本单独成集。这是产品决策，不是实现细节。
+
 ### 7.1 平台：「已知」与「能跑」是两件事
 
 `app/providers/registry.py` 是**唯一真相源**，加平台只改这一个文件。
@@ -417,10 +454,10 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 | `apps/api` | FastAPI **和** 抓取 worker（`app.worker_main`）都在这里 |
 | `packages/metrics` | 匹配/分桶/情感等纯逻辑 + 单测 |
 | `deploy/` | compose、Dockerfile、post-receive hook、init.sql |
-| `apps/crawler/` | **死代码**，无人引用 —— `Dockerfile.crawler` 只 COPY `apps/api` + `packages/metrics`，跑的是 `app.worker_main` |
 
 容器：`geo-api` · `geo-crawler` · `geo-postgres`。
-**`geo-crawler` 容器跑的是 `apps/api` 的 worker，不是 `apps/crawler/` 目录。**
+**`geo-crawler` 容器跑的是 `apps/api` 的 `app.worker_main`** —— 曾经有个
+`apps/crawler/` 目录无人引用，已删除（`Dockerfile.crawler` 从来只 COPY `apps/api`）。
 
 ```text
 本机 push main → VPS post-receive（强制 checkout main + docker compose up）→ /opt/geo-demo
@@ -502,7 +539,8 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 | **无批次 / 提问集实体** | 一条 job = 一个样本，「一次检测」不存在（§3）。最初设计里有 `PromptSet`，与 `Organization` / `Workspace` 一样从未建表 | 要「新建一次命名检测并回看」时 |
 | `ensure_schema` 按 `;` 裸切 SQL | 当前迁移能跑；加函数/触发器会碎 | 写复杂迁移时 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL | 调整竞品集合后 |
-| `apps/crawler/` 死代码 | 整目录无人引用（§9） | 读代码的人会被误导 |
+| **引用分析做不了** | citations 全库 0 行；根因是从未开联网搜索（§7.0），不是解析 bug | 前端要做引用页时 |
+| id=6 残留会话 URL | `raw_json` 里有一条 DeepSeek 会话 URL，违反「不落库会话 URL」（§7）。旧 `chrome_bridge` 路径遗留，一条 UPDATE 可清 | 随时可清 |
 
 ---
 

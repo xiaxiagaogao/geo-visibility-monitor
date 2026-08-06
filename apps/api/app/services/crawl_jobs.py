@@ -94,6 +94,7 @@ def list_jobs(
     platform: Optional[str] = None,
     prompt_id: Optional[int] = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> Tuple[List[CrawlJob], int]:
     q = select(CrawlJob).order_by(CrawlJob.id.desc())
     cq = select(func.count()).select_from(CrawlJob)
@@ -107,7 +108,7 @@ def list_jobs(
         q = q.where(CrawlJob.prompt_id == prompt_id)
         cq = cq.where(CrawlJob.prompt_id == prompt_id)
     total = int(db.scalar(cq) or 0)
-    items = list(db.scalars(q.limit(min(limit, 200))).all())
+    items = list(db.scalars(q.offset(max(offset, 0)).limit(min(limit, 200))).all())
     return items, total
 
 
