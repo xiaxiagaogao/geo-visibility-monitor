@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -161,6 +161,56 @@ class Mention(Base):
     matched_term: Mapped[Optional[str]] = mapped_column(Text)
 
     response: Mapped[RawResponse] = relationship(back_populates="mentions")
+
+
+class User(Base):
+    """D2：用户与角色。
+
+    ``workspace_id`` **只对 client 有意义** —— 它是这个客户能看到的品牌范围，
+    对上 ``brands.workspace_id``。superadmin / operator 看全部，此列为 NULL。
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    #: argon2 哈希。**永远不要落明文，也不要日志里打它**
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    #: superadmin | operator | client
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    workspace_id: Mapped[Optional[int]] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    sessions: Mapped[List["Session"]] = relationship(
+        back_populates="user", cascade="all, delete", passive_deletes=True
+    )
+
+
+class Session(Base):
+    """D2：服务端会话。
+
+    只存 token 的 **SHA-256**，不存明文 —— 一次库备份泄露不能换成可用会话。
+    这里不用 argon2：token 是 32 字节高熵随机值，本就不可爆破，
+    而每个请求都要查一次，慢哈希在这里是纯负担。密码才需要慢哈希。
+
+    登出与吊销 = **删行**，不做软删（没有审计页，软删只是多一个要处处判断的状态）。
+    """
+
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="sessions")
 
 
 class Citation(Base):

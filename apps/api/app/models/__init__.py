@@ -11,6 +11,8 @@ from app.models.entities import (
     Prompt,
     RawResponse,
     SchemaMigration,
+    Session,
+    User,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "Prompt",
     "RawResponse",
     "SchemaMigration",
+    "Session",
+    "User",
 ]

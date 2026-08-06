@@ -133,3 +133,28 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO schema_migrations (id) VALUES ('003_l2_mentions_unique')
 ON CONFLICT (id) DO NOTHING;
+
+-- ── D2：用户体系与三角色 ──
+-- workspace_id 只对 client 有意义（= 他能看到的品牌范围，对上 brands.workspace_id）；
+-- superadmin / operator 看全部，此列为 NULL。
+CREATE TABLE IF NOT EXISTS users (
+    id            SERIAL PRIMARY KEY,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL CHECK (role IN ('superadmin','operator','client')),
+    workspace_id  INT,
+    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_login_at TIMESTAMPTZ
+);
+
+-- 只存 token 的 SHA-256；登出/吊销 = 删行，不做软删
+CREATE TABLE IF NOT EXISTS sessions (
+    id         SERIAL PRIMARY KEY,
+    user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
