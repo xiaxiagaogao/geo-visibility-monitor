@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from dataclasses import dataclass
 from typing import Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -38,9 +39,13 @@ from app.core.config import get_settings
 logger = logging.getLogger("geo.security")
 
 QA_COOKIE_NAME = "geo_qa_key"
+#: D2 用户会话 Cookie（与 core/auth.py 保持一致，此处重复定义以免循环导入）
+SESSION_COOKIE_NAME = "geo_session"
 
-# 不需要鉴权的路径：部署脚本 / 容器健康检查要用
-PUBLIC_PATHS = frozenset({"/health", "/qa/login", "/favicon.ico"})
+# 不需要鉴权的路径：部署脚本 / 容器健康检查 / 登录本身
+PUBLIC_PATHS = frozenset(
+    {"/health", "/qa/login", "/favicon.ico", "/v1/auth/login"}
+)
 
 # Cookie 只对这些方法有效 —— 它们不改状态，跨站也读不到响应
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -77,28 +82,121 @@ def _wants_html(request: Request) -> bool:
     return "text/html" in (request.headers.get("accept") or "")
 
 
+@dataclass(frozen=True)
+class Principal:
+    """「这个请求是谁」。由中间件解析，放在 ``request.state.principal``。
+
+    三种来源见 D2 设计稿 §1。``machine`` 是共享密钥与 ``/qa`` 后门，
+    **等同超管但没有用户身份**（拿不到 user_id，也不受 workspace 限制）。
+    """
+
+    kind: str  # machine | user | anonymous
+    user_id: Optional[int] = None
+    role: Optional[str] = None
+    workspace_id: Optional[int] = None
+
+    @property
+    def is_authenticated(self) -> bool:
+        return self.kind != "anonymous"
+
+    @property
+    def effective_role(self) -> Optional[str]:
+        """machine 折算成超管，这样权限判断只需要看一个字段。"""
+        if self.kind == "machine":
+            return "superadmin"
+        return self.role
+
+    @property
+    def can_write(self) -> bool:
+        from app.core.auth import WRITE_ROLES
+
+        return self.effective_role in WRITE_ROLES
+
+    @property
+    def sees_all_brands(self) -> bool:
+        """False = 只能看自己 workspace 的品牌（client）。"""
+        from app.core.auth import GLOBAL_READ_ROLES
+
+        return self.effective_role in GLOBAL_READ_ROLES
+
+
+ANONYMOUS = Principal(kind="anonymous")
+MACHINE = Principal(kind="machine")
+
+
+def _resolve_user_principal(token: Optional[str]) -> Optional[Principal]:
+    """会话 Cookie → Principal。要查库，所以单独拆出来便于测试替换。"""
+    if not token:
+        return None
+    # 延迟导入：security 是底层模块，不该在导入期就拉起 ORM 与连接池
+    from app.core.auth import resolve_session
+    from app.core.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        user = resolve_session(db, token)
+        if user is None:
+            return None
+        return Principal(
+            kind="user",
+            user_id=user.id,
+            role=user.role,
+            workspace_id=user.workspace_id,
+        )
+    finally:
+        db.close()
+
+
 class ApiKeyMiddleware(BaseHTTPMiddleware):
+    """认证（不是授权）。
+
+    **只认「你是谁」，不判「你能干什么」** —— 后者在路由依赖里做，
+    因为中间件看不到路径参数与查询参数，做不了归属校验（D2 设计稿 §7）。
+
+    放在中间件而不是依赖里，是为了 **fail-closed**：默认拒绝，
+    只有 ``PUBLIC_PATHS`` 例外。若改成逐路由挂依赖，漏挂一个就是一个开放接口。
+    """
+
     async def dispatch(self, request: Request, call_next):
+        request.state.principal = ANONYMOUS
+
         if not api_key_configured():
+            # 本机开发：不设 API_KEY 即整体不校验（启动时已 WARNING）
+            request.state.principal = MACHINE
             return await call_next(request)
 
         path = request.url.path
         if path in PUBLIC_PATHS:
             return await call_next(request)
 
+        # ① 共享密钥（机器）——任何方法
         if verify_key(_key_from_headers(request)):
+            request.state.principal = MACHINE
             return await call_next(request)
 
-        # Cookie 只对安全方法有效 —— 写接口拿不到 Cookie 认证，CSRF 无从下手
+        # ② 用户会话 —— 任何方法。写操作的 CSRF 防护由 D2-4 的双提交 token 负责
+        session_principal = _resolve_user_principal(
+            request.cookies.get(SESSION_COOKIE_NAME)
+        )
+        if session_principal is not None:
+            request.state.principal = session_principal
+            return await call_next(request)
+
+        # ③ /qa 后门 Cookie —— 只对安全方法，写接口认不了它，CSRF 无从下手
         if request.method in SAFE_METHODS:
             if verify_key(request.cookies.get(QA_COOKIE_NAME)):
+                request.state.principal = MACHINE
                 return await call_next(request)
             if _wants_html(request) and path != LOGIN_PATH:
                 return RedirectResponse(url=LOGIN_PATH, status_code=302)
 
         return JSONResponse(
             status_code=401,
-            content={"detail": "missing or invalid API key (X-API-Key)"},
+            # 提示要列全通道：调用方看到「缺 X-API-Key」却在用会话登录时会一头雾水
+            content={
+                "detail": "missing or invalid credentials "
+                "(X-API-Key header, or log in via POST /v1/auth/login)"
+            },
         )
 
 
