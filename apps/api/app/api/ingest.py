@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_write
+from app.core.security import Principal
 from app.models import Citation, CrawlJob, Prompt, RawResponse
 from app.schemas.crawl import CitationOut, MentionOut, RawResponseOut
 from app.services.annotate import annotate_response
@@ -38,7 +39,9 @@ class IngestL0Body(BaseModel):
 
 
 @router.post("/l0", response_model=RawResponseOut, status_code=status.HTTP_201_CREATED)
-def ingest_l0(body: IngestL0Body, db: Session = Depends(get_db)):
+def ingest_l0(body: IngestL0Body, db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+):
     """Accept externally captured L0 (e.g. logged-in Chrome bridge) and run L1."""
     prompt = db.get(Prompt, body.prompt_id)
     if not prompt:

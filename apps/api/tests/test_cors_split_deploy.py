@@ -173,6 +173,12 @@ def test_screenshot_is_not_cacheable_by_shared_caches(tmp_path, monkeypatch):
 
     app = FastAPI()
     app.include_router(qa_router.router)
+    # 这个 app 没挂中间件，身份默认是匿名，而归属校验对匿名是 fail-closed（401）。
+    # 本用例只关心缓存头，所以直接注入一个机器身份。
+    from app.api.deps import current_principal
+    from app.core.security import MACHINE
+
+    app.dependency_overrides[current_principal] = lambda: MACHINE
     r = TestClient(app).get("/v1/media/screenshots/evidence.png")
 
     assert r.status_code == 200

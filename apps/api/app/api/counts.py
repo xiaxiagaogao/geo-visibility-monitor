@@ -5,7 +5,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import assert_brand_visible, assert_prompt_visible, current_principal, get_db
+from app.core.security import Principal
 from app.schemas.counts import CountsResponse
 from app.services import counts as counts_svc
 
@@ -29,8 +30,13 @@ def get_counts(
         description="可选：只统计该 source，如 deepseek_web / chrome_bridge",
     ),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
 ):
     """L2 counts only — no rates. Frontend L3 divides m/n."""
+    # brand_id 是必填参数，客户改一个数字就能查别家 —— 必须逐个校验
+    assert_brand_visible(db, principal, brand_id)
+    if prompt_id is not None:
+        assert_prompt_visible(db, principal, prompt_id)
     data = counts_svc.compute_counts(
         db,
         brand_id=brand_id,

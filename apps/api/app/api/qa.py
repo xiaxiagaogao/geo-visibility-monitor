@@ -9,7 +9,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_db
+from app.api.deps import assert_screenshot_visible, current_principal, get_db
+from app.core.security import Principal
 from app.core.config import get_settings
 from app.core.security import (
     api_key_configured,
@@ -209,7 +210,11 @@ def qa_response_detail(
 
 @router.get("/qa/media/screenshots/{filename}")
 @router.get("/v1/media/screenshots/{filename}")
-def qa_screenshot(filename: str):
+def qa_screenshot(
+    filename: str,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
     """证据截图（只接受 basename）。
 
     两个路径指向同一处理函数：``/qa/...`` 给运维预览页，``/v1/...`` 给正式前端 ——
@@ -227,6 +232,10 @@ def qa_screenshot(filename: str):
     safe = Path(filename).name
     if safe != filename or ".." in filename:
         raise HTTPException(status_code=400, detail="bad filename")
+
+    # 归属校验：这个路由只按文件名取图，与品牌毫无关联，而文件名带时间戳、可枚举。
+    # 不校验的话，前面所有归属校验都白做 —— 客户照样能看到别家品牌的证据图。
+    assert_screenshot_visible(db, principal, safe)
 
     roots = []
     env_dir = os.environ.get("SCREENSHOT_DIR")

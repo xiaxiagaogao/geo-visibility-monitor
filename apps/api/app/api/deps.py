@@ -58,8 +58,27 @@ def require_superadmin(principal: Principal = Depends(current_principal)) -> Pri
 
 
 def visible_workspace_id(principal: Principal) -> Optional[int]:
-    """None = 看全部；否则只能看这个 workspace 下的品牌。"""
-    return None if principal.sees_all_brands else principal.workspace_id
+    """None = 看全部；否则只能看这个 workspace 下的品牌。
+
+    **这里必须 fail-closed。** ``None`` 同时是「看全部」的含义，所以任何
+    「本该受限却拿不到 workspace」的情况都不能落到 None 上，否则就是放行全部：
+
+    - 匿名身份：正常走不到这里（中间件先挡），但不能靠「正常情况」
+    - 角色是 client 却没有 workspace_id：接口层建号时校验过，
+      但直接改库能造出这种行，那时它会变成一个能看全部数据的客户
+    """
+    if not principal.is_authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="not authenticated"
+        )
+    if principal.sees_all_brands:
+        return None
+    if principal.workspace_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="account has no workspace assigned",
+        )
+    return principal.workspace_id
 
 
 def _not_found(what: str) -> HTTPException:

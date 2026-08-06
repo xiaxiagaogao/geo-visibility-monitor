@@ -2,11 +2,18 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_db
+from app.api.deps import (
+    assert_prompt_visible,
+    current_principal,
+    get_db,
+    require_write,
+    visible_brand_ids,
+)
+from app.core.security import Principal
 from app.models import Prompt, RawResponse
 from app.schemas.crawl import (
     CitationOut,
@@ -31,7 +38,16 @@ def list_crawl_jobs(
     prompt_id: Optional[int] = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
 ):
+    if prompt_id is not None:
+        assert_prompt_visible(db, principal, prompt_id)
+    elif visible_brand_ids(db, principal) is not None:
+        # 客户不带 prompt_id 时不能列全部任务 —— 任务本身也泄露别家在监测什么
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="prompt_id is required for your role",
+        )
     items, total = job_svc.list_jobs(
         db,
         status_filter=job_status,
@@ -46,7 +62,11 @@ def list_crawl_jobs(
 
 
 @router.post("", response_model=List[CrawlJobOut], status_code=status.HTTP_201_CREATED)
-def create_crawl_jobs(body: CrawlJobCreate, db: Session = Depends(get_db)):
+def create_crawl_jobs(
+    body: CrawlJobCreate,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+):
     jobs = job_svc.create_jobs(db, body)
     return [CrawlJobOut(**job_svc.job_to_out(db, j)) for j in jobs]
 
@@ -55,6 +75,7 @@ def create_crawl_jobs(body: CrawlJobCreate, db: Session = Depends(get_db)):
 def worker_run_once(
     batch_size: int = Query(5, ge=1, le=50),
     db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
 ):
     """Manually process pending jobs (also runs in background loop)."""
     ids = run_once(db, batch_size)
@@ -62,8 +83,13 @@ def worker_run_once(
 
 
 @router.get("/{job_id}", response_model=CrawlJobDetailOut)
-def get_crawl_job(job_id: int, db: Session = Depends(get_db)):
+def get_crawl_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
     job = job_svc.get_job_or_404(db, job_id)
+    assert_prompt_visible(db, principal, job.prompt_id)
     prompt = db.get(Prompt, job.prompt_id)
     base = job_svc.job_to_out(db, job)
     resp = None
@@ -102,6 +128,10 @@ def get_crawl_job(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{job_id}/retry", response_model=CrawlJobOut)
-def retry_crawl_job(job_id: int, db: Session = Depends(get_db)):
+def retry_crawl_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+):
     job = job_svc.retry_job(db, job_id)
     return CrawlJobOut(**job_svc.job_to_out(db, job))

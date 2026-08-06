@@ -6,7 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_db
+from app.api.deps import (
+    assert_brand_visible,
+    assert_prompt_visible,
+    assert_response_visible,
+    current_principal,
+    get_db,
+    require_write,
+    visible_brand_ids,
+)
+from app.core.security import Principal
 from app.models import CrawlJob, Prompt, RawResponse
 from app.schemas.crawl import (
     CitationOut,
@@ -58,7 +67,17 @@ def list_responses(
     answer_status: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
 ):
+    if brand_id is not None:
+        assert_brand_visible(db, principal, brand_id)
+    if prompt_id is not None:
+        assert_prompt_visible(db, principal, prompt_id)
+    # 不带任何品牌维度时，客户必须被收敛到自己的品牌集合，否则默认返回全部
+    allowed_brands = None
+    if brand_id is None and prompt_id is None:
+        allowed_brands = visible_brand_ids(db, principal)
+
     q = (
         select(RawResponse)
         .options(
@@ -87,13 +106,28 @@ def list_responses(
             cq = cq.join(Prompt, Prompt.id == CrawlJob.prompt_id).where(
                 Prompt.brand_id == brand_id
             )
+    if allowed_brands is not None:
+        if not allowed_brands:
+            return RawResponseListOut(items=[], total=0)
+        q = q.join(CrawlJob, CrawlJob.id == RawResponse.job_id).join(
+            Prompt, Prompt.id == CrawlJob.prompt_id
+        ).where(Prompt.brand_id.in_(allowed_brands))
+        cq = cq.join(CrawlJob, CrawlJob.id == RawResponse.job_id).join(
+            Prompt, Prompt.id == CrawlJob.prompt_id
+        ).where(Prompt.brand_id.in_(allowed_brands))
+
     total = int(db.scalar(cq) or 0)
     items = list(db.scalars(q.limit(limit)).all())
     return RawResponseListOut(items=[_to_out(r) for r in items], total=total)
 
 
 @router.get("/{response_id}", response_model=RawResponseOut)
-def get_response(response_id: int, db: Session = Depends(get_db)):
+def get_response(
+    response_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    assert_response_visible(db, principal, response_id)
     row = _load_response(db, response_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="response not found")
@@ -101,7 +135,11 @@ def get_response(response_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{response_id}/annotate", response_model=RawResponseOut)
-def post_annotate_one(response_id: int, db: Session = Depends(get_db)):
+def post_annotate_one(
+    response_id: int,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+):
     if not db.get(RawResponse, response_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="response not found")
     annotate_response(db, response_id, replace=True)
@@ -118,6 +156,7 @@ class AnnotateBatchOut(BaseModel):
 def post_annotate_batch(
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
 ):
     """Backfill / re-run L1 for responses missing current annotator_version."""
     ids = annotate_unannotated(db, limit=limit)

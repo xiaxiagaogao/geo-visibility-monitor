@@ -164,3 +164,37 @@ def test_only_client_is_workspace_scoped():
     assert visible_workspace_id(Principal("user", role="operator", workspace_id=9)) is None
     assert visible_workspace_id(Principal("user", role="superadmin")) is None
     assert visible_workspace_id(Principal("machine")) is None
+
+
+# ---------- fail-closed ----------
+
+
+def test_anonymous_never_silently_sees_everything():
+    """匿名不能落到「None = 看全部」那条路上。
+
+    visible_workspace_id 用 None 表示「不受限」，所以任何「本该受限却拿不到
+    workspace」的情况都必须显式拒绝，否则就是放行全部。
+    """
+    from fastapi import HTTPException
+
+    from app.api.deps import visible_workspace_id
+    from app.core.security import ANONYMOUS
+
+    with pytest.raises(HTTPException) as exc:
+        visible_workspace_id(ANONYMOUS)
+    assert exc.value.status_code == 401
+
+
+def test_client_without_workspace_is_denied_not_unscoped():
+    """角色是 client 却没有 workspace —— 建号接口拦得住，直接改库造得出。
+
+    这种行若按「None = 看全部」处理，就变成一个能看全部数据的客户账号。
+    """
+    from fastapi import HTTPException
+
+    from app.api.deps import visible_workspace_id
+
+    broken = Principal(kind="user", user_id=1, role="client", workspace_id=None)
+    with pytest.raises(HTTPException) as exc:
+        visible_workspace_id(broken)
+    assert exc.value.status_code == 403
