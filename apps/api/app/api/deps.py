@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import ROLE_SUPERADMIN
 from app.core.db import SessionLocal
 from app.core.security import ANONYMOUS, Principal
-from app.models import Brand, CrawlJob, Prompt, RawResponse
+from app.models import Brand, CrawlJob, Prompt, RawResponse, Run, Task
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -107,6 +107,36 @@ def assert_prompt_visible(db: Session, principal: Principal, prompt_id: int) -> 
     if brand_id is None:
         raise _not_found("prompt")
     assert_brand_visible(db, principal, brand_id)
+
+
+def assert_task_visible(db: Session, principal: Principal, task_id: int) -> None:
+    """任务可见性：task → brand → workspace。"""
+    ws = visible_workspace_id(principal)
+    if ws is None:
+        return
+    brand_id = db.scalar(select(Task.brand_id).where(Task.id == task_id))
+    if brand_id is None:
+        raise _not_found("task")
+    assert_brand_visible(db, principal, brand_id)
+
+
+def assert_run_visible(db: Session, principal: Principal, run_id: int) -> None:
+    """运行可见性：run → task → brand → workspace。"""
+    ws = visible_workspace_id(principal)
+    if ws is None:
+        return
+    task_id = db.scalar(select(Run.task_id).where(Run.id == run_id))
+    if task_id is None:
+        raise _not_found("run")
+    assert_task_visible(db, principal, task_id)
+
+
+def visible_task_ids(db: Session, principal: Principal) -> Optional[List[int]]:
+    """该身份能看到的全部 task_id；None = 不限。列表接口用它注入过滤。"""
+    brand_ids = visible_brand_ids(db, principal)
+    if brand_ids is None:
+        return None
+    return list(db.scalars(select(Task.id).where(Task.brand_id.in_(brand_ids))).all())
 
 
 def assert_response_visible(db: Session, principal: Principal, response_id: int) -> None:
