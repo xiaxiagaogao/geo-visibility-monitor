@@ -27,6 +27,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services import tasks as task_svc
+from app.services.brands import get_brand_or_404
 
 router = APIRouter(prefix="/v1", tags=["tasks"])
 
@@ -100,6 +101,14 @@ def create_task(
     principal: Principal = Depends(require_write),
 ):
     assert_brand_visible(db, principal, body.brand_id)
+    # assert_brand_visible 对 sees_all_brands 的角色（superadmin/operator/machine）
+    # 直接 return，不查 Brand 表。存在性要单独校验，否则超管传个不存在的
+    # brand_id 会一路走到 db.commit() 才被外键拦下，抛未捕获的 IntegrityError
+    # 500 —— 而不是干净的 404。既有写法见 services/prompts.py 的 create_prompt。
+    get_brand_or_404(db, body.brand_id)
+    # 平台 code 必须校验，理由见 services/tasks.py 的 validate_platforms 文档
+    # 字符串：不挡的话 create_run 会为打错字/未接入的平台批量建出永远跑不了的 job。
+    task_svc.validate_platforms(body.platforms)
     task = Task(
         brand_id=body.brand_id,
         name=body.name,
@@ -136,6 +145,11 @@ def update_task(
     task = db.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+    if body.platforms is not None:
+        # 只在这次请求真的带了 platforms 时才校验 —— body.platforms 为 None
+        # 代表「没传这个字段」，沿用 task 现有的 platforms，不该拿旧值重新校验
+        # （旧值建任务时已经校验过一次）。
+        task_svc.validate_platforms(body.platforms)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(task, field, value)
     db.commit()

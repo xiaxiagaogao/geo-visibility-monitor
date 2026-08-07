@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Iterable
 
+from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     Brand,
     CompetitorLink,
@@ -15,6 +17,7 @@ from app.models import (
     RunPrompt,
     Task,
 )
+from app.providers import registry
 
 # job 状态优先级：只要还有没跑完的，run 就没跑完
 _UNFINISHED = ("running", "pending")
@@ -105,3 +108,32 @@ def run_job_status_counts(db: Session, run_id: int) -> dict:
         .group_by(CrawlJob.status)
     )
     return {status: n for status, n in rows}
+
+
+def validate_platforms(platforms: Iterable[str]) -> None:
+    """建任务 / 改 platforms 时，把打错字或未接入的平台挡在这里。
+
+    照 ``services/crawl_jobs.py`` 里 ``create_jobs`` 的两道校验来（``is_known``
+    → ``is_runnable``），理由与那边的注释一致：不挡的话 ``create_run`` 会为这些
+    code 批量建 job，real 模式下逐个抛 RuntimeError 被兜底标成 ``failed`` ——
+    用户看到一堆「抓取失败」，真相是「这个平台没接」，两者排查方向完全不同。
+
+    放在服务层而不是路由/schema 层：``create_jobs`` 就是在服务层做这件事，
+    这里保持一致；且校验依赖 ``crawl_mode`` 这个运行期配置，不是纯粹的输入形状
+    校验，不适合放进 Pydantic validator。
+    """
+    crawl_mode = get_settings().crawl_mode
+    for code in platforms:
+        if not registry.is_known(code):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"platform '{code}' unknown; must be one of {list(registry.known_codes())}",
+            )
+        if not registry.is_runnable(code, crawl_mode=crawl_mode):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"platform '{code}' 尚未接入（Provider 未实现），无法发起真实抓取。"
+                    f" 当前可用：{[c for c in registry.known_codes() if registry.is_runnable(c, crawl_mode=crawl_mode)]}"
+                ),
+            )
