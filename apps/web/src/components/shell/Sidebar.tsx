@@ -7,20 +7,18 @@ import type { ReactNode } from 'react'
 import styles from './shell.module.css'
 
 /**
- * 五个入口，**不分组**。
+ * 导航 —— **等 IA 定稿**，现在只有占位一条。
  *
- * GeoMonitor 用「分析 / 内容 / 设计系统」三组标题，那是因为它是内容生产全链路；
- * 我们砍到一组，加标题只是噪音。
+ * 原来是五条：总览 / 采集批次 / 覆盖缺口 / 引用分析 / 原始回答。
+ * 它们随单品牌页面一起删了，原因不是页面做得不好，是这套 IA 的前提错了：
+ * 五条全部隐含「当前只有一个被监测品牌」，没有品牌或检测任务这一层。
  *
- * 覆盖缺口排第三 —— 它是唯一数据完全齐备且输出可执行的页。
+ * 重建时至少要先回答：入口是任务列表还是品牌列表？
+ * 「引用分析」不必回来（citations 全库 0 行且根因不可修，API.md §9）。
+ *
+ * 「不分组」这条判断可以留着 —— 入口少的时候加分组标题只是噪音。
  */
-const NAV = [
-  { href: '/', label: '总览', icon: GridIcon },
-  { href: '/batches/', label: '采集批次', icon: LayersIcon },
-  { href: '/gaps/', label: '覆盖缺口', icon: AlertIcon },
-  { href: '/citations/', label: '引用分析', icon: LinkIcon },
-  { href: '/responses/', label: '原始回答', icon: MessageIcon },
-]
+const NAV = [{ href: '/', label: '总览', icon: GridIcon }]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -74,11 +72,10 @@ export function Sidebar() {
         </a>
       </nav>
 
-      <div className={styles.sideFoot}>
-        只读看板 · 数据口径 L2 counts
-        <br />
-        配置与发起走 /qa
-      </div>
+      {/* 「配置与发起走 /qa」是把这个前端定位成纯看板时写的，和产品方向已经不符：
+          /qa 是运维质检页，不是正式产品前端，而超管/运营本来就该在这里
+          建品牌、管提问词、发起抓取（API.md §3）。IA 定稿时这行要改。 */}
+      <div className={styles.sideFoot}>数据口径 L2 counts</div>
     </aside>
   )
 }

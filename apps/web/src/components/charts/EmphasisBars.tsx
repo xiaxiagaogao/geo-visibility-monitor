@@ -1,5 +1,5 @@
 import { formatFraction, formatRate, rate } from '@/lib/l3/rates'
-import type { BarDatum } from '@/lib/selectors'
+import type { BarDatum } from '@/lib/types'
 
 import styles from './charts.module.css'
 

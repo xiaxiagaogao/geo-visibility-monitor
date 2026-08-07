@@ -1,177 +1,37 @@
-import Link from 'next/link'
-
-import { EmphasisBars } from '@/components/charts/EmphasisBars'
-import { Badge, KpiCount, KpiDegraded, KpiGrid, KpiRate, Panel, PanelNote, Table, ui } from '@/components/ui'
-import { BATCHES, TOTALS } from '@/lib/fixtures'
-import { formatRate, rate } from '@/lib/l3/rates'
-import {
-  brandComparison,
-  brandName,
-  fullHitPromptCount,
-  gapList,
-  ownRateByPrompt,
-  promptText,
-  zeroHitPromptCount,
-} from '@/lib/selectors'
-
-import styles from './overview.module.css'
+import { EmptyState, Panel, PanelNote } from '@/components/ui'
 
 /**
- * 总览。
+ * 占位页 —— IA 重构期间的唯一路由。
  *
- * 这一页只有一个任务：**让 60% 这个数字当场自我解释**。
- * 60% 是「5 条满分 + 2 条挂零」平均出来的，不是稳定表现 ——
- * 所以 KPI 底下必须紧跟逐提问分布，不能让大数字单独站着。
+ * 这里原来是总览看板（KPI 行 + 逐提问 emphasis 条 + 缺口前三 + 品牌对比）。
+ * 它连同另外四个页面一起删了，根因不是页面质量，是**整套 IA 的前提错了**：
+ * 五个页面全部隐含「系统里只有一个被监测品牌」，`OWN_BRAND_ID` 是模块级常量，
+ * 派生数据的七个 selector 全是零参数函数。而后端从第一天起就是多品牌的
+ * （`GET /v1/brands` 返回列表，`/v1/counts` 的 brand_id 是必填参数）——
+ * 是前端把这个能力压掉了。
  *
- * 明确不做：GeoMonitor 工作台那种营销大字首屏。
+ * 保留下来的是与品牌数量无关的部分：设计 token、UI 原语、
+ * L3 纯函数（`rate` / `findGaps`）及其 29 个测试、外壳骨架。
+ * 想看被删的五个页面：`git show cdb4a97:apps/web/src/app/'(dashboard)'/page.tsx`
  */
-export default function OverviewPage() {
-  const perPrompt = ownRateByPrompt()
-  const brands = brandComparison()
-  const gaps = gapList()
-  const zeroCount = zeroHitPromptCount()
-  const fullCount = fullHitPromptCount()
-
+export default function PlaceholderPage() {
   return (
     <>
-      <KpiGrid>
-        <KpiCount
-          label="有效样本"
-          info="分母定义：answer_status = ok，已排除 fake 来源"
-          value={TOTALS.nValid}
-          note={`${TOTALS.nValid} / ${TOTALS.nTotalResponses} 全部有效`}
-        />
-        <KpiRate
-          label="本品提及率"
-          info="本品被提及的样本数 ÷ 有效样本数"
-          m={TOTALS.brand.mMentioned}
-          n={TOTALS.nValid}
-        />
-        {/* 写这页时 position_rank 恒 NULL，所以走降级态。**后端已经落库了**
-            （MentionOut.position_rank，API.md §7），这里还降级只是因为固定数据里没这个字段 ——
-            接 API 那一轮换成真的 KpiRate。API.md §10 的真实分布是 #1×6，即 6/21。 */}
-        <KpiDegraded
-          label="首位提及率"
-          info="本品出场顺位为 1 的样本数 ÷ 本品被提及样本数。注意是「第一个被提到」，不是「被推荐第一」"
-          reason="暂无排名数据"
-          note="待前端接入 position_rank"
-        />
-        <KpiCount
-          label="覆盖缺口"
-          info="本品缺席或明显落后、且竞品在场的提问数"
-          value={gaps.length}
-          note={`${gaps.filter((g) => g.tier === 'absent').length} 条完全缺席 · ${gaps.filter((g) => g.tier === 'trailing').length} 条明显落后`}
-          alert={gaps.length > 0}
-        />
-      </KpiGrid>
-
-      <Panel
-        title="60% 是两极平均出来的，不是稳定表现"
-        subtitle={`${perPrompt.length} 条提问里 ${fullCount} 条满分、${zeroCount} 条挂零 —— 平均值把这个结构盖掉了`}
-        right={<Badge tone="danger">{zeroCount} 条挂零</Badge>}
-      >
-        <EmphasisBars data={perPrompt} />
-      </Panel>
-
-      <div className={styles.split}>
-        <Panel
-          title="覆盖缺口 · 优先处理"
-          subtitle="按失分量排序 —— 竞品比本品多拿了多少次提及"
-          right={
-            <Link href="/gaps/" className={ui.rowLink}>
-              查看全部 {gaps.length} 条 ›
-            </Link>
-          }
-        >
-          <Table>
-            <thead>
-              <tr>
-                <th>缺口提问</th>
-                <th>本品</th>
-                <th>在场竞品</th>
-                <th style={{ textAlign: 'right' }}>失分量</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gaps.slice(0, 3).map((g) => (
-                <tr key={g.promptId}>
-                  <td>
-                    <div>{promptText(g.promptId)}</div>
-                    <div style={{ marginTop: 3 }}>
-                      <Badge tone={g.tier === 'absent' ? 'danger' : 'warning'}>
-                        {g.tier === 'absent' ? '完全缺席' : '明显落后'}
-                      </Badge>
-                    </div>
-                  </td>
-                  <td className={ui.numeric} style={{ color: g.ownM === 0 ? 'var(--danger)' : undefined }}>
-                    {g.ownM}/{g.n}
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)' }}>
-                    {g.competitorsPresent
-                      .slice(0, 3)
-                      .map((c) => `${brandName(c.brandId)} ${c.m}/${g.n}`)
-                      .join(' · ')}
-                  </td>
-                  <td className={ui.numeric} style={{ textAlign: 'right', fontWeight: 600 }}>
-                    {g.score}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Panel>
-
-        <Panel title="最近采集批次" subtitle="批次 = 采集日期">
-          <Table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>样本</th>
-                <th>本品提及率</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              {BATCHES.map((b) => {
-                const samples = b.rows.reduce((acc, r) => acc + r.samples, 0)
-                const hits = b.rows.reduce((acc, r) => acc + r.m, 0)
-                return (
-                  <tr key={b.date}>
-                    <td>
-                      <div className={ui.numeric}>{b.date}</div>
-                      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
-                        {b.label}
-                      </div>
-                    </td>
-                    <td className={ui.numeric}>{b.expanded ? samples : '13'}</td>
-                    <td className={ui.numeric}>
-                      {b.expanded ? formatRate(rate(hits, samples)) : '0.0%'}
-                    </td>
-                    <td>
-                      <Badge tone="ok" dot>
-                        成功
-                      </Badge>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </Table>
-        </Panel>
-      </div>
-
-      <Panel
-        title="品牌提及对比"
-        subtitle="emphasis：本品强调色，竞品统一灰 —— 8 个品牌不需要 8 种颜色"
-      >
-        <EmphasisBars data={brands} />
+      <Panel title="IA 重构中" subtitle="多品牌与检测任务的信息架构待定">
+        <EmptyState>
+          <strong style={{ color: 'var(--text-secondary)' }}>页面待重建</strong>
+          <span>
+            原五页看板按单品牌构建，前提不成立，已移除。
+            <br />
+            组件库、设计 token 与 L3 纯函数保留在树里，可直接复用。
+          </span>
+        </EmptyState>
       </Panel>
 
       <PanelNote>
-        读法：国产 / 性价比 / 篮球类提问下，本品与国产品牌成片命中、国际品牌成片空白；
-        专业跑鞋 / 训练类正好反过来。这个互补结构就是这套监测集给出的第一个结论 ——
-        也是「60%」这个数字背后的真相。每条提问只跑 3–5 次采样，比率的置信区间很宽，
-        请按数量级读而不是按小数点读。
+        重建前要先定的两件事：入口是检测任务列表还是品牌列表；以及后端新增的
+        「检测任务」实体长什么样 —— 现有 crawl-job 的粒度是「一条提问的一次采样」，
+        35 条样本就是 35 个平铺的 job，中间没有能把它们归成一次检测的东西。
       </PanelNote>
     </>
   )

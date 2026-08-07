@@ -2,7 +2,8 @@
  * 后端契约类型 —— 逐字对应 apps/api/app/schemas/*.py。
  *
  * 本轮还没接 API，但类型先按真实契约定死：
- * fixtures 也用这套类型，接 API 时组件层不用改。
+ * 这一层是照着 API 契约定的，与品牌数量无关，IA 重构后继续可用。
+ * （原来还有一份 fixtures 共用这套类型，已随单品牌页面删除。）
  */
 
 /** apps/api/app/schemas/counts.py :: DenominatorCounts */
@@ -136,4 +137,21 @@ export interface PlatformOption {
   id: string
   label: string
   connected: boolean
+}
+
+/**
+ * 图表视图模型 —— 一根 emphasis 横条要的全部数据。
+ *
+ * 原来定义在 `lib/selectors.ts`（已随单品牌页面删除），挪到这里：
+ * 它与品牌数量无关，`own` 只标记「这一根是本品」，谁是本品由调用方决定。
+ *
+ * **同时带 m 和 n 是刻意的**：凡显示比率必须同时显示 m / n（API.md §4.2 第 4 条），
+ * 只传一个算好的 rate 进来，这条纪律在类型层面就守不住了。
+ */
+export interface BarDatum {
+  key: string | number
+  label: string
+  m: number
+  n: number
+  own?: boolean
 }
