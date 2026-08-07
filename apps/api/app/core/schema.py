@@ -81,7 +81,7 @@ _MIGRATIONS = [
             id          SERIAL PRIMARY KEY,
             brand_id    INT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
             name        TEXT NOT NULL,
-            platforms   JSONB NOT NULL DEFAULT '[]',
+            platforms   JSONB NOT NULL DEFAULT '[]'::jsonb,
             samples     INT NOT NULL DEFAULT 3,
             is_active   BOOLEAN NOT NULL DEFAULT TRUE,
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -96,7 +96,7 @@ _MIGRATIONS = [
         CREATE TABLE IF NOT EXISTS runs (
             id          SERIAL PRIMARY KEY,
             task_id     INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-            platforms   JSONB NOT NULL DEFAULT '[]',
+            platforms   JSONB NOT NULL DEFAULT '[]'::jsonb,
             note        TEXT,
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );

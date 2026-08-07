@@ -92,6 +92,7 @@ class CrawlJob(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     prompt_id: Mapped[int] = mapped_column(ForeignKey("prompts.id", ondelete="CASCADE"))
+    #: 可空——迁移前已有的 job 没有 run，非空会让 006 迁移直接失败
     run_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("runs.id", ondelete="CASCADE"), nullable=True
     )

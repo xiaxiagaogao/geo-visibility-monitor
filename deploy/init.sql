@@ -158,3 +158,52 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+-- ── 检测任务与运行 ──
+-- 此前 35 个样本 = 35 个平铺的 crawl_jobs 行，没有任何东西能把它们归成「一次检测」。
+CREATE TABLE IF NOT EXISTS tasks (
+    id          SERIAL PRIMARY KEY,
+    brand_id    INT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    platforms   JSONB NOT NULL DEFAULT '[]'::jsonb,
+    samples     INT NOT NULL DEFAULT 3 CHECK (samples BETWEEN 1 AND 20),
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_brand ON tasks(brand_id);
+
+-- runs 刻意没有 status 列：由其下 crawl_jobs 的状态派生。
+-- 存一份就要有人同步，而 job 状态在 worker 里变、run 在 API 里变。
+CREATE TABLE IF NOT EXISTS runs (
+    id          SERIAL PRIMARY KEY,
+    task_id     INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    platforms   JSONB NOT NULL DEFAULT '[]'::jsonb,
+    note        TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_runs_task_created ON runs(task_id, created_at DESC);
+
+-- 快照一：提问集。连 text 一起存 —— 提问词正文可改，
+-- 只存 id 的话历史运行的问题会跟着变。
+CREATE TABLE IF NOT EXISTS run_prompts (
+    run_id      INT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    prompt_id   INT NOT NULL,
+    prompt_text TEXT NOT NULL,
+    PRIMARY KEY (run_id, prompt_id)
+);
+
+-- 快照二：竞品集。不加外键到 brands —— 竞品品牌被删之后，
+-- 历史运行仍应保留「当时拿它比过」这个事实。
+CREATE TABLE IF NOT EXISTS run_competitors (
+    run_id              INT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    competitor_brand_id INT NOT NULL,
+    brand_name          TEXT NOT NULL,
+    PRIMARY KEY (run_id, competitor_brand_id)
+);
+
+-- 可空：迁移前已有的 job 没有 run。非空会让这条迁移直接失败。
+-- （init.sql 是全新库的一次性初始化，这里理论上总是空表，可空是为了
+-- 与 schema.py 的 006 迁移在既有库上保持同一份表结构定义。）
+ALTER TABLE crawl_jobs ADD COLUMN IF NOT EXISTS run_id INT
+    REFERENCES runs(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_crawl_jobs_run ON crawl_jobs(run_id);
