@@ -17,6 +17,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 PROBE = "__pytest_task_run__"
+PROBE_LIKE = f"{PROBE}%"
 
 
 @pytest.fixture
@@ -27,13 +28,105 @@ def db():
     try:
         yield s
     finally:
+        # rollback 必须在 _purge 之前、且在同一个 finally 里：
+        # 被测的 create_run 若在自己 commit() 之前抛错，连接会卡在
+        # aborted 事务里，这时任何查询（包括 _purge 自己的 DELETE）
+        # 都会被 Postgres 拒绝，先 rollback 把连接捞回可用状态。
         s.rollback()
+        _purge(s)
         s.close()
+
+
+def _purge(session) -> None:
+    """按外键顺序清掉本测试造的数据 —— 不依赖待测的级联行为。
+
+    刻意用原始 SQL 按 PROBE 前缀清，而不是 db.delete(brand) 交给 ORM
+    级联：级联正是本模块在测的东西，拿被测对象当测试工具，级联一旦
+    真的坏了，清理步骤会跟着测试一起失败，留下脏数据污染下一次跑。
+    """
+    from sqlalchemy import text
+
+    like = {"p": PROBE_LIKE}
+    session.execute(
+        text(
+            """
+            DELETE FROM crawl_jobs WHERE prompt_id IN
+              (SELECT id FROM prompts WHERE text LIKE :p);
+            """
+        ),
+        like,
+    )
+    session.execute(
+        text(
+            """
+            DELETE FROM run_prompts WHERE run_id IN (
+              SELECT r.id FROM runs r
+              JOIN tasks t ON t.id = r.task_id
+              JOIN brands b ON b.id = t.brand_id
+              WHERE b.name LIKE :p
+            );
+            """
+        ),
+        like,
+    )
+    session.execute(
+        text(
+            """
+            DELETE FROM run_competitors WHERE run_id IN (
+              SELECT r.id FROM runs r
+              JOIN tasks t ON t.id = r.task_id
+              JOIN brands b ON b.id = t.brand_id
+              WHERE b.name LIKE :p
+            );
+            """
+        ),
+        like,
+    )
+    session.execute(
+        text(
+            """
+            DELETE FROM runs WHERE task_id IN (
+              SELECT t.id FROM tasks t
+              JOIN brands b ON b.id = t.brand_id
+              WHERE b.name LIKE :p
+            );
+            """
+        ),
+        like,
+    )
+    session.execute(
+        text(
+            """
+            DELETE FROM tasks WHERE brand_id IN
+              (SELECT id FROM brands WHERE name LIKE :p);
+            """
+        ),
+        like,
+    )
+    session.execute(
+        text(
+            """
+            DELETE FROM competitor_links WHERE brand_id IN
+              (SELECT id FROM brands WHERE name LIKE :p)
+              OR competitor_brand_id IN
+              (SELECT id FROM brands WHERE name LIKE :p);
+            """
+        ),
+        like,
+    )
+    session.execute(text("DELETE FROM prompts WHERE text LIKE :p"), like)
+    session.execute(text("DELETE FROM brands WHERE name LIKE :p"), like)
+    session.commit()
 
 
 @pytest.fixture
 def fixture_brand(db):
-    """一个主品牌 + 一个竞品 + 两条启用提问 + 一条停用提问。"""
+    """一个主品牌 + 一个竞品 + 两条启用提问 + 一条停用提问。
+
+    只负责建数据，不负责清理 —— 清理统一交给 db fixture 的 finally，
+    否则 fixture 的 LIFO 出栈顺序会让这里的清理先于 db 的 rollback()
+    执行，出错时清理本身也会被 aborted 事务拖累。
+    """
     from app.models import Brand, CompetitorLink, Prompt
 
     own = Brand(name=f"{PROBE}_own", workspace_id=1)
@@ -47,10 +140,7 @@ def fixture_brand(db):
         Prompt(brand_id=own.id, text=f"{PROBE} q3", is_active=False),
     ])
     db.commit()
-    yield own, rival
-    for b in (own, rival):
-        db.delete(db.get(Brand, b.id))
-    db.commit()
+    return own, rival
 
 
 def test_snapshot_freezes_prompts_and_competitors(db, fixture_brand):
@@ -130,6 +220,24 @@ def test_empty_prompt_set_creates_no_jobs(db, fixture_brand):
     db.commit()
 
     task = Task(brand_id=own.id, name=f"{PROBE} 空集", platforms=["deepseek"], samples=2)
+    db.add(task)
+    db.commit()
+    run = create_run(db, task)
+
+    assert db.scalars(select(CrawlJob).where(CrawlJob.run_id == run.id)).all() == []
+
+
+def test_empty_platforms_creates_no_jobs(db, fixture_brand):
+    """platforms=[] 时三层循环的中间层空转，产出 0 条 job —— 效果和提问集为空一样。
+
+    路由/schema 层还没接（后续任务），眼下没有任何东西保证
+    task.platforms 非空，这条边界必须自己钉住。
+    """
+    from app.models import CrawlJob, Task
+    from app.services.tasks import create_run
+
+    own, _ = fixture_brand
+    task = Task(brand_id=own.id, name=f"{PROBE} 无平台", platforms=[], samples=2)
     db.add(task)
     db.commit()
     run = create_run(db, task)
