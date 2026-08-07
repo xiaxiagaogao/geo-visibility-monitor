@@ -861,6 +861,140 @@ def test_latest_run_endpoint_exists():
     assert hasattr(tasks_api, "latest_run")
 ```
 
+- [ ] **Step 1b: 再写一条行为级的越权测试（需真库）**
+
+上面那五条是 `inspect` 断言，**证明不了行为**。反例：把
+`assert_task_visible` 里的调用包进 `try/except HTTPException: pass`，
+或者传错参数（永远传 `task_id` 而不是解出来的 `brand_id`），
+源码里 `"assert_brand_visible"` 和 `"_not_found"` 两个字符串照样都在，
+五条断言全绿，而实际已经完全开放越权。
+
+「归属校验」这个主题必须有一条真的建两个 workspace、真的跨查、真的收 404 的用例。
+
+建 `apps/api/tests/test_task_rbac_behavior.py`，照
+`apps/api/tests/test_task_run_snapshot.py` 的模式（`pytestmark` skipif +
+`PROBE` 前缀 + `db` fixture 里 `rollback()` 在前、原始 SQL `_purge` 在后）：
+
+```python
+"""跨 workspace 越权 —— 需要真实 Postgres。
+
+结构测试（test_task_rbac.py）只能验「代码里有没有调那个函数」，
+验不了「真跨查时到底返回什么」。这一条补上后者。
+"""
+from __future__ import annotations
+
+import os
+
+import pytest
+from fastapi import HTTPException
+
+TEST_DB = os.environ.get("GEO_TEST_DATABASE_URL")
+pytestmark = pytest.mark.skipif(
+    not TEST_DB, reason="需要 GEO_TEST_DATABASE_URL 指向真实 Postgres"
+)
+
+PROBE = "__pytest_rbac__"
+
+
+def _purge(session) -> None:
+    """按外键顺序清理，不依赖被测的级联行为。"""
+    from sqlalchemy import text
+
+    p = f"{PROBE}%"
+    for sql in (
+        "DELETE FROM crawl_jobs WHERE prompt_id IN (SELECT id FROM prompts WHERE text LIKE :p)",
+        "DELETE FROM run_prompts WHERE run_id IN (SELECT r.id FROM runs r JOIN tasks t ON t.id = r.task_id JOIN brands b ON b.id = t.brand_id WHERE b.name LIKE :p)",
+        "DELETE FROM run_competitors WHERE run_id IN (SELECT r.id FROM runs r JOIN tasks t ON t.id = r.task_id JOIN brands b ON b.id = t.brand_id WHERE b.name LIKE :p)",
+        "DELETE FROM runs WHERE task_id IN (SELECT t.id FROM tasks t JOIN brands b ON b.id = t.brand_id WHERE b.name LIKE :p)",
+        "DELETE FROM tasks WHERE brand_id IN (SELECT id FROM brands WHERE name LIKE :p)",
+        "DELETE FROM prompts WHERE text LIKE :p",
+        "DELETE FROM brands WHERE name LIKE :p",
+    ):
+        session.execute(text(sql), {"p": p})
+    session.commit()
+
+
+@pytest.fixture
+def db():
+    from app.core.db import SessionLocal
+
+    s = SessionLocal()
+    try:
+        yield s
+    finally:
+        s.rollback()
+        _purge(s)
+        s.close()
+
+
+@pytest.fixture
+def two_workspaces(db):
+    """workspace 1 和 workspace 2 各一个品牌、各一个任务、各一次运行。"""
+    from app.models import Brand, Prompt, Task
+    from app.services.tasks import create_run
+
+    made = []
+    for ws in (1, 2):
+        brand = Brand(name=f"{PROBE}_ws{ws}", workspace_id=ws)
+        db.add(brand)
+        db.flush()
+        db.add(Prompt(brand_id=brand.id, text=f"{PROBE} q{ws}", is_active=True))
+        task = Task(
+            brand_id=brand.id, name=f"{PROBE} t{ws}", platforms=["deepseek"], samples=1
+        )
+        db.add(task)
+        db.commit()
+        made.append((brand, task, create_run(db, task)))
+    return made
+
+
+def _client(workspace_id: int):
+    """workspace 受限的客户身份。"""
+    from app.core.security import Principal
+
+    return Principal(
+        kind="user", role="client", user_id=999, workspace_id=workspace_id
+    )
+
+
+def test_client_cannot_see_other_workspace_task(db, two_workspaces):
+    from app.api.deps import assert_task_visible
+
+    (_, _, _), (_, task2, _) = two_workspaces
+    with pytest.raises(HTTPException) as exc:
+        assert_task_visible(db, _client(1), task2.id)
+    assert exc.value.status_code == 404, "必须是 404 —— 403 等于确认这条存在"
+
+
+def test_client_cannot_see_other_workspace_run(db, two_workspaces):
+    from app.api.deps import assert_run_visible
+
+    (_, _, _), (_, _, run2) = two_workspaces
+    with pytest.raises(HTTPException) as exc:
+        assert_run_visible(db, _client(1), run2.id)
+    assert exc.value.status_code == 404
+
+
+def test_client_can_see_own_task(db, two_workspaces):
+    """反向用例 —— 只验「拒绝」不验「放行」的话，一个永远抛 404 的实现也能全绿。"""
+    from app.api.deps import assert_task_visible
+
+    (_, task1, _), _ = two_workspaces
+    assert_task_visible(db, _client(1), task1.id)  # 不抛即通过
+
+
+def test_visible_task_ids_scopes_to_workspace(db, two_workspaces):
+    from app.api.deps import visible_task_ids
+
+    (_, task1, _), (_, task2, _) = two_workspaces
+    ids = visible_task_ids(db, _client(1))
+    assert task1.id in ids
+    assert task2.id not in ids
+```
+
+> `Principal` 的构造参数以 `apps/api/app/core/security.py` 为准，
+> 动手前先读它，不要照抄上面的字段名。对不上就停下来问。
+
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
@@ -1256,6 +1390,21 @@ def test_service_applies_run_filter():
     src = inspect.getsource(counts_svc)
     assert "run_id" in src, "counts 服务层必须用上 run_id"
     assert "CrawlJob.run_id" in src, "过滤要走 crawl_jobs.run_id"
+
+
+def test_competitors_come_from_snapshot_when_run_given():
+    """**这条是这个任务真正的重点。**
+
+    只给响应集合加 run 过滤是不够的 —— 分母（提问集）对上了，
+    但竞品集如果还查当前的 CompetitorLink，快照就只用了一半：
+    八月给品牌加一个竞品，七月那次 run 的缺口清单和竞品列照样被重算。
+
+    建 job 时用冻结快照、统计时绕开快照查当前配置，是自相矛盾的。
+    """
+    src = inspect.getsource(counts_svc)
+    assert "RunCompetitor" in src, (
+        "带 run_id 时竞品集必须取自 RunCompetitor 快照，不能查当前 CompetitorLink"
+    )
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -1295,6 +1444,59 @@ def _base_response_query(
 改 `compute_counts`（`counts.py:177`）的签名，在 `prompt_id` 之后加
 `run_id: Optional[int] = None,`，并在 `counts.py:204` 调用 `_base_response_query`
 的地方把 `run_id=run_id` 传进去。
+
+**接着是这个任务真正的重点 —— 竞品集也要走快照。**
+
+`competitor_ids`（`counts.py:86`）现在查的是**当前**的 `CompetitorLink`：
+
+```python
+def competitor_ids(db: Session, brand_id: int) -> List[int]:
+    return list(
+        db.scalars(
+            select(CompetitorLink.competitor_brand_id).where(
+                CompetitorLink.brand_id == brand_id
+            )
+        ).all()
+    )
+```
+
+只加 run 过滤而不动它，快照就只用了一半：分母对上了，竞品集还是活的。
+改成带 `run_id` 时读快照：
+
+```python
+def competitor_ids(
+    db: Session, brand_id: int, run_id: Optional[int] = None
+) -> List[int]:
+    """竞品集。
+
+    **带 run_id 时必须读 RunCompetitor 快照，不能查当前的 CompetitorLink。**
+    否则「建 job 时用冻结快照、统计时查当前配置」自相矛盾 ——
+    八月给品牌加一个竞品，七月那次 run 的缺口清单和竞品列会被当场重算，
+    而这正是 RunCompetitor 存在的全部理由。
+
+    不带 run_id 是品牌级累计口径（跨 run），此时没有「当时」可言，
+    只能用当前配置。
+    """
+    if run_id is not None:
+        return list(
+            db.scalars(
+                select(RunCompetitor.competitor_brand_id).where(
+                    RunCompetitor.run_id == run_id
+                )
+            ).all()
+        )
+    return list(
+        db.scalars(
+            select(CompetitorLink.competitor_brand_id).where(
+                CompetitorLink.brand_id == brand_id
+            )
+        ).all()
+    )
+```
+
+把 `RunCompetitor` 加进 `counts.py:12` 的 `from app.models import ...`（保持字母序），
+并把 `compute_counts` 里 `comp_ids = competitor_ids(db, brand_id)`（`counts.py:199`）
+改成 `comp_ids = competitor_ids(db, brand_id, run_id)`。
 
 `apps/api/app/api/counts.py` 的 `get_counts` 签名加 `run_id: Optional[int] = None`，
 透传给 `compute_counts`，并加进响应的 `filters` 回显（照既有 `platform` 的写法）。
