@@ -1196,6 +1196,17 @@ def create_task(
     principal: Principal = Depends(require_write),
 ):
     assert_brand_visible(db, principal, body.brand_id)
+    # ⚠️ assert_brand_visible 对 sees_all_brands 的角色直接 return，**不查 Brand 表**。
+    #    存在性要单独校验，否则超管传个不存在的 brand_id 会一路走到 commit
+    #    才被外键拦下，抛未捕获的 IntegrityError 500 而不是干净的 404。
+    #    既有写法见 services/prompts.py:35 的 create_prompt。
+    get_brand_or_404(db, body.brand_id)
+    # ⚠️ 平台 code 必须校验。services/crawl_jobs.py:51-68 的注释写明了为什么：
+    #    「未接入的平台在这里就挡掉。以前放行到 worker 才 RuntimeError，
+    #      用户看到的是『抓取失败』而不是『这个平台没接』——两者排查方向完全不同。」
+    #    不挡的话 create_run 会为打错字的平台批量建出永远跑不了的 job。
+    #    校验放服务层（与 create_jobs 一致），update_task 改 platforms 时同样要调。
+    validate_platforms(body.platforms)
     task = Task(
         brand_id=body.brand_id,
         name=body.name,
