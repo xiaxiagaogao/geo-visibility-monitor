@@ -15,7 +15,7 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=120)
-    platforms: Optional[List[str]] = None
+    platforms: Optional[List[str]] = Field(default=None, min_length=1)
     samples: Optional[int] = Field(default=None, ge=1, le=20)
     is_active: Optional[bool] = None
 

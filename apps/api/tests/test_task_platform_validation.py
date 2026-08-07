@@ -11,9 +11,11 @@ import inspect
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.api import tasks as tasks_api
 from app.core.config import get_settings
+from app.schemas.task import TaskUpdate
 from app.services import tasks as task_svc
 
 
@@ -58,3 +60,25 @@ def test_known_but_unrunnable_platform_rejected_in_real_mode(real_crawl_mode):
 def test_deepseek_still_runnable_in_real_mode(real_crawl_mode):
     """deepseek 有 real Provider —— real 模式下不该被这道校验误伤。"""
     task_svc.validate_platforms(["deepseek"])
+
+
+def test_task_update_schema_rejects_empty_platforms():
+    """PATCH {"platforms": []} 必须在 schema 层就被拒。
+
+    改之前 TaskUpdate.platforms 缺 min_length=1（TaskCreate 有），空列表能
+    通过校验，task_svc.validate_platforms([]) 空循环放行，task.platforms
+    被写成 []；此后每次发起运行三层循环的中间层空转，静默变成 0-job 空转 run。
+    """
+    with pytest.raises(ValidationError):
+        TaskUpdate(platforms=[])
+
+
+def test_task_update_schema_still_allows_omitted_platforms():
+    """反向用例：不传 platforms 字段（沿用旧值）不该被这条新校验误伤。"""
+    body = TaskUpdate()
+    assert body.platforms is None
+
+
+def test_task_update_schema_allows_nonempty_platforms():
+    body = TaskUpdate(platforms=["deepseek"])
+    assert body.platforms == ["deepseek"]

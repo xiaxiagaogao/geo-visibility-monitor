@@ -18,6 +18,7 @@ from app.models import (
     Mention,
     Prompt,
     RawResponse,
+    RunCompetitor,
 )
 
 logger = logging.getLogger("geo.annotate")
@@ -142,16 +143,40 @@ def assign_position_ranks(matches: List[Tuple[int, MentionMatch]]) -> Dict[int, 
     return {bid: rank for rank, (_, bid) in enumerate(body_hits, start=1)}
 
 
-def target_brand_ids(db: Session, owner_brand_id: int) -> List[int]:
-    """Owner brand + its competitors."""
+def target_brand_ids(
+    db: Session, owner_brand_id: int, run_id: Optional[int] = None
+) -> List[int]:
+    """Owner brand + its competitors.
+
+    **带 run_id 时必须读 RunCompetitor 快照,不能查当前的 CompetitorLink** ——
+    与 services/counts.py 的 competitor_ids 是同一条纪律。run 建 job 时冻结的
+    竞品集是 [A, B]；如果这批 job 完成前有人整体替换了品牌的竞品配置
+    （PUT /v1/brands/{id}/competitors）或对失败 job 做了 retry，抽取层按
+    「当时的活配置」生成 Mention 行，就会和之后 /v1/counts?run_id= 用快照
+    算出的 track_ids 对不上 —— B 从「有算」悄悄变成「未算」，不报错、不可见。
+
+    不带 run_id 是 ad-hoc job（没有 run 归属），行为不变：查当前 CompetitorLink。
+
+    返回值第一个必须仍是 owner_brand_id（本品）——快照里只有竞品没有本品，
+    不能把本品弄丢。
+    """
     ids = [owner_brand_id]
-    comps = list(
-        db.scalars(
-            select(CompetitorLink.competitor_brand_id).where(
-                CompetitorLink.brand_id == owner_brand_id
-            )
-        ).all()
-    )
+    if run_id is not None:
+        comps = list(
+            db.scalars(
+                select(RunCompetitor.competitor_brand_id).where(
+                    RunCompetitor.run_id == run_id
+                )
+            ).all()
+        )
+    else:
+        comps = list(
+            db.scalars(
+                select(CompetitorLink.competitor_brand_id).where(
+                    CompetitorLink.brand_id == owner_brand_id
+                )
+            ).all()
+        )
     for c in comps:
         if c not in ids:
             ids.append(c)
@@ -183,7 +208,7 @@ def annotate_response(db: Session, response_id: int, *, replace: bool = True) ->
     # 两趟：先把所有品牌的命中收齐，才能算出场顺位（单趟写不出跨品牌的名次）
     matches = [
         (bid, match_brand(body, _aliases_for_brand(db, bid), citation_text=cite_text))
-        for bid in target_brand_ids(db, prompt.brand_id)
+        for bid in target_brand_ids(db, prompt.brand_id, job.run_id)
     ]
     ranks = assign_position_ranks(matches)
 

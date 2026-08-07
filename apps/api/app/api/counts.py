@@ -5,7 +5,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import assert_brand_visible, assert_prompt_visible, current_principal, get_db
+from app.api.deps import (
+    assert_brand_visible,
+    assert_prompt_visible,
+    assert_run_visible,
+    current_principal,
+    get_db,
+)
 from app.core.security import Principal
 from app.schemas.counts import CountsResponse
 from app.services import counts as counts_svc
@@ -38,6 +44,8 @@ def get_counts(
     assert_brand_visible(db, principal, brand_id)
     if prompt_id is not None:
         assert_prompt_visible(db, principal, prompt_id)
+    if run_id is not None:
+        assert_run_visible(db, principal, run_id)
     data = counts_svc.compute_counts(
         db,
         brand_id=brand_id,

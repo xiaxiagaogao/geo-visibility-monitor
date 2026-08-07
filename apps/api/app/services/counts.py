@@ -9,7 +9,16 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import CompetitorLink, CrawlJob, Mention, Prompt, RawResponse, RunCompetitor
+from app.models import (
+    CompetitorLink,
+    CrawlJob,
+    Mention,
+    Prompt,
+    RawResponse,
+    Run,
+    RunCompetitor,
+    Task,
+)
 from app.services.annotate import ANNOTATOR_VERSION
 from app.services.brands import get_brand_or_404
 
@@ -81,6 +90,25 @@ def is_fake_response(resp: RawResponse) -> bool:
     if text.startswith("【假数据"):
         return True
     return False
+
+
+def _assert_run_belongs_to_brand(db: Session, run_id: int, brand_id: int) -> None:
+    """校验这个 run 确实属于这个 brand（沿 Run → Task → Task.brand_id 查一次）。
+
+    放在这里而不是只在路由层做，理由是下面 ``competitor_ids`` 的快照分支
+    完全信任「run 与 brand 匹配」这个前提 —— 不匹配时它会把另一个租户
+    run 快照里的 competitor_brand_id 原样吐出去。两者必须在同一层保证。
+
+    不可见/不匹配一律 404，不是 403 —— 见 deps.py 的 ``_not_found``。
+    """
+    task_brand_id = db.scalar(
+        select(Task.brand_id)
+        .select_from(Run)
+        .join(Task, Task.id == Run.task_id)
+        .where(Run.id == run_id)
+    )
+    if task_brand_id is None or task_brand_id != brand_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
 
 
 def competitor_ids(
@@ -211,6 +239,8 @@ def compute_counts(
     source: Optional[str] = None,
 ) -> dict:
     get_brand_or_404(db, brand_id)
+    if run_id is not None:
+        _assert_run_belongs_to_brand(db, run_id, brand_id)
     group_by = (group_by or "none").lower()
     if group_by not in ("none", "day", "platform", "prompt"):
         raise HTTPException(
