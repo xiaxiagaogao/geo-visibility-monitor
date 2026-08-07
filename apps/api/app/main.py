@@ -26,6 +26,7 @@ from app.api import auth as auth_router
 from app.api import config as config_router
 from app.api import qa as qa_router
 from app.api import ingest as ingest_router
+from app.api import tasks as tasks_router
 from app.api import users as users_router
 from app.core.config import get_settings
 from app.core.db import check_connection
@@ -78,6 +79,7 @@ app.include_router(auth_router.router)
 app.include_router(users_router.router)
 app.include_router(qa_router.router)
 app.include_router(ingest_router.router)
+app.include_router(tasks_router.router)
 
 
 class AnalyzeRequest(BaseModel):
