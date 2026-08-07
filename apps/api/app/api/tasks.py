@@ -16,7 +16,7 @@ from app.api.deps import (
     visible_task_ids,
 )
 from app.core.security import Principal
-from app.models import CrawlJob, Run, Task
+from app.models import Run, Task
 from app.schemas.task import (
     RunDetailOut,
     RunListOut,
