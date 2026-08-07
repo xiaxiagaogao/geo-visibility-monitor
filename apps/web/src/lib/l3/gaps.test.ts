@@ -86,7 +86,7 @@ describe('gapScore / gapPriority', () => {
   })
 })
 
-describe('findGaps · 对上 docs/29 §3.3 那张表', () => {
+describe('findGaps · 对上安踏那五条缺口', () => {
   // 安踏监测集真实数据，列序：李宁 耐克 阿迪 特步 361度 鸿星尔克 亚瑟士
   const inputs: GapInput[] = [
     { promptId: 101, n: 5, ownM: 5, competitors: [comp(35, 5), comp(38, 5), comp(39, 5), comp(40, 5)] },

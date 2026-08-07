@@ -91,9 +91,17 @@
   font-weight: 500;
 }
 
-.submit:hover {
+.submit:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+}
+
+/* 接口未对接期间字段与按钮都 disabled —— 看上去也必须是不可用的，
+   否则一个点了没反应的实心按钮比禁用更让人困惑 */
+.input:disabled,
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .note {

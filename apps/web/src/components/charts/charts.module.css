@@ -155,7 +155,7 @@
   line-height: 1.1;
 }
 
-/* 出场顺位。后端还没落库 position_rank，所以现在恒不显示 */
+/* 出场顺位。后端已落库 position_rank，固定数据里还没填，所以现在恒不显示 */
 .cellRank {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -163,7 +163,8 @@
   line-height: 1.1;
 }
 
-/* 顺序色阶 —— 亮度单调，格内文字色按档定（docs/29 §6.2 有实测对比度） */
+/* 顺序色阶 —— 亮度单调，格内文字色按档定（各档对比度跑过验证器）。
+   GeoMonitor 原色阶亮度非单调，中段深色字压近黑底读不出来，没有照搬 */
 .l1 {
   background: var(--seq-1);
   color: var(--seq-1-ink);

@@ -23,7 +23,8 @@ import { gapList, promptText } from '@/lib/selectors'
 
 /**
  * 采集批次 —— 批次就是**一天**。
- * 对持续监测来说「一天」是天然的批次，且零后端改动（docs/29 拍板 ⑦）。
+ * 后端没有「批次 / 检测」这个实体（API.md §9），只能按 created_at 日期分组当批次。
+ * 对持续监测来说「一天」也确实是天然的批次，且零后端改动。
  */
 export function BatchesView() {
   const router = useRouter()
@@ -66,7 +67,7 @@ export function BatchesView() {
           label="首位提及率"
           info="本品出场顺位为 1 的样本数 ÷ 本品被提及样本数"
           reason="暂无排名数据"
-          note="待后端落库 position_rank"
+          note="待前端接入 position_rank"
         />
         <KpiCount
           label="覆盖缺口"
@@ -97,7 +98,7 @@ export function BatchesView() {
           </Panel>
           <PanelNote>
             排名可能没有序号 ——「已提及·未排名」必须和「未提及」视觉区分，绝不伪造名次。
-            后端落库 <code>position_rank</code> 之前，格内一个 <code>#</code> 都不显示。
+            接上 <code>position_rank</code> 之前，格内一个 <code>#</code> 都不显示。
             每条提问 3–5 次采样，比率的置信区间很宽，请按数量级读。
           </PanelNote>
         </>
@@ -106,9 +107,9 @@ export function BatchesView() {
       {tab === 'citations' ? (
         <Panel title="本批引用来源">
           <EmptyState>
-            引用聚合接上 <code>GET /v1/responses</code> 后展开。
+            采集样本时未开启联网搜索，模型回答里不含引用来源。
             <br />
-            真实引用量还没核实过 —— 若普遍为空，这一块会整体降级而不是画假图。
+            这不是采集故障 —— 要有数据得开联网后重采，而重采会破坏与现有基线的可比性。
           </EmptyState>
         </Panel>
       ) : null}

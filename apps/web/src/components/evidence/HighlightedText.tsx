@@ -10,9 +10,15 @@ export interface Highlight {
 /**
  * L0 全文，命中处内联高亮。
  *
- * ⚠️ `highlights` 现在恒为空数组 —— 后端还给不出 offset：
- * `match_brand` 算出了 offset 与 matched_term，但 `annotate.py` 切完
- * evidence_snippet 就把它们丢了，`mentions` 表**根本没有这两列**（docs/29 §5.2）。
+ * ⚠️ `highlights` 现在恒为空数组，但**原因已经不是后端给不出**：
+ * 写这个组件时 `mentions` 表确实没有 offset 列，后来后端补上了 ——
+ * `MentionOut` 现在有 `first_offset` 与 `matched_term`（API.md §7）。
+ * 空数组只是因为本轮还吃固定数据，接上 API 就有值。
+ *
+ * 接的时候按 API.md §7.1 那条不变量自检，错位会立刻暴露：
+ *   full_text.slice(first_offset, first_offset + matched_term.length) === matched_term
+ * 后端在全库 179 条命中上验过 179/179。
+ * 注意字段名要映射：后端 `first_offset` / `matched_term` → 这里的 `offset` / `matchedTerm`。
  *
  * 这里**故意不做**「前端按 matched_term 自己在 full_text 里找」的兜底：
  * 那等于在前端重造一套匹配逻辑，会和 L1 的口径分叉，

@@ -130,7 +130,8 @@ export interface CrawlJob {
   response_id: number | null
 }
 
-/** 平台在 UI 上的接入状态 —— 无 Provider 时禁止假装可跑（docs/23 §2） */
+/** 平台在 UI 上的接入状态 —— 无 Provider 时禁止假装可跑。
+ *  对应 GET /v1/config/platforms 的 available / implemented（API.md §5） */
 export interface PlatformOption {
   id: string
   label: string

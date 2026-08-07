@@ -1,5 +1,5 @@
 /**
- * 设计 token —— docs/29 §6
+ * 设计 token —— 浅色为主 + 深色可切，取值源自 GeoMonitor 设计稿
  *
  * 中性色 / accent / 情感 / 平台色 直接来自 Claude Design 项目「GEO 分析仪表盘」。
  * 图表相关的色（矩阵顺序色阶、emphasis 对）是**重新取的**并跑过 dataviz 验证器，
@@ -49,7 +49,7 @@
 
   /* ── 矩阵顺序色阶 · 单一 teal 色相，亮度单调 ──
      validate_palette.js --ordinal --surface #FFFFFF：四项全 PASS
-     格内文字色按档定，见 --seq-*-ink（实测对比度写在 docs/29 §6.2） */
+     格内文字色按档定，见 --seq-*-ink（各档对比度跑过验证器） */
   --seq-1: #14b8a6; /* ≤33%  · 深墨 6.94:1 */
   --seq-2: #0d9488; /* 34–66% · 深墨 4.62:1 */
   --seq-3: #115e59; /* ≥67%  · 白字 7.58:1 */

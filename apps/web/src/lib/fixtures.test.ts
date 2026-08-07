@@ -7,7 +7,7 @@ import { rate } from './l3/rates'
  * 这些不是「测试数据结构」，是**核对真实数字**。
  * 矩阵是逐格从设计稿抄下来的，一旦手抖，总览的 60.0% 和矩阵就会对不上 ——
  * 这几条断言就是为了让那种错当场炸掉，而不是等上线后被人发现看板在骗人。
- * 基准见 docs/27 §6。
+ * 基准见 API.md §10（快照日期 2026-08-06，重抓后会变）。
  */
 describe('安踏监测集固定数据自洽性', () => {
   it('每行样本数求和 = 35 条有效样本', () => {
@@ -37,7 +37,7 @@ describe('安踏监测集固定数据自洽性', () => {
     }
   })
 
-  it('八个品牌命中总数 137 —— 这是 docs/27 §6 记的基准', () => {
+  it('八个品牌命中总数 137 —— 这是 API.md §10 记的基准', () => {
     const total = TOTALS.competitors.reduce((acc, c) => acc + c.mMentioned, TOTALS.brand.mMentioned)
     expect(total).toBe(137)
   })

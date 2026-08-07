@@ -19,11 +19,11 @@ import styles from './overview.module.css'
 /**
  * 总览。
  *
- * 这一页只有一个任务：**让 60% 这个数字当场自我解释**（docs/27 §6.1）。
+ * 这一页只有一个任务：**让 60% 这个数字当场自我解释**。
  * 60% 是「5 条满分 + 2 条挂零」平均出来的，不是稳定表现 ——
  * 所以 KPI 底下必须紧跟逐提问分布，不能让大数字单独站着。
  *
- * 明确不做：GeoMonitor 工作台那种营销大字首屏（docs/27 §12）。
+ * 明确不做：GeoMonitor 工作台那种营销大字首屏。
  */
 export default function OverviewPage() {
   const perPrompt = ownRateByPrompt()
@@ -47,12 +47,14 @@ export default function OverviewPage() {
           m={TOTALS.brand.mMentioned}
           n={TOTALS.nValid}
         />
-        {/* 后端还没落库 position_rank —— 走降级态而不是显示 0%（docs/29 §5.3） */}
+        {/* 写这页时 position_rank 恒 NULL，所以走降级态。**后端已经落库了**
+            （MentionOut.position_rank，API.md §7），这里还降级只是因为固定数据里没这个字段 ——
+            接 API 那一轮换成真的 KpiRate。API.md §10 的真实分布是 #1×6，即 6/21。 */}
         <KpiDegraded
           label="首位提及率"
           info="本品出场顺位为 1 的样本数 ÷ 本品被提及样本数。注意是「第一个被提到」，不是「被推荐第一」"
           reason="暂无排名数据"
-          note="待后端落库 position_rank"
+          note="待前端接入 position_rank"
         />
         <KpiCount
           label="覆盖缺口"

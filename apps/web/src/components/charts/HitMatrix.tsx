@@ -20,11 +20,11 @@ const LEVEL_CLASS = {
  * 我们的列是**品牌**（八个品牌跑一个平台）—— 因为只接了 DeepSeek。
  * 结构同构，等第二个 Provider 上线再决定要不要加一层。
  *
- * 格子四态（docs/29 §3.2）：
+ * 格子四态：
  *   命中·有顺位 → `3/3` + `#2`   命中·无顺位 → `3/3`
  *   未提及 → 虚线空格            本品挂零 → 虚线 + danger 描边
  *
- * 「绝不伪造名次」是 GeoMonitor 的原则，照搬：`position_rank` 后端还没落库，
+ * 「绝不伪造名次」是 GeoMonitor 的原则，照搬：`position_rank` 固定数据里还没填，
  * 那就一个 `#` 都不显示，而不是拿别的数糊上去。
  */
 export function HitMatrix({
@@ -122,7 +122,7 @@ function Cell({
   n: number
   isOwn: boolean
   label: string
-  /** 出场顺位。后端还没落库 position_rank，所以恒为 undefined */
+  /** 出场顺位。后端已有该字段（API.md §7），固定数据没填，故恒为 undefined */
   rank?: number
   onPick?: () => void
 }) {

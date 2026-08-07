@@ -1,7 +1,7 @@
 /**
  * 固定数据 —— 这一轮只搭框架与风格，还没接 API。
  *
- * ⚠️ 这里**不是编的**：全部是 2026-08-02 安踏监测集的真实数字（docs/27 §6），
+ * ⚠️ 这里**不是编的**：全部是安踏监测集的真实数字（对得上 API.md §10），
  *    35 条 answer_status=ok 样本，逐格与 v2 设计稿核对过。
  *    接 API 时整份文件删掉，`lib/api/*` 返回同样的类型即可，组件不用改。
  *
@@ -40,7 +40,8 @@ export const BRAND_NAMES: Record<number, string> = {
   41: '亚瑟士',
 }
 
-/** docs/23 §2：无数据的平台必须灰显「未接入」，不能给假选项 */
+/** 无 Provider 的平台必须灰显「未接入」，不能给假选项。
+ *  接 API 后这份清单读 GET /v1/config/platforms，不许硬编码（API.md §5） */
 export const PLATFORMS: PlatformOption[] = [
   { id: 'deepseek', label: 'DeepSeek', connected: true },
   { id: 'doubao', label: '豆包', connected: false },
@@ -127,7 +128,7 @@ export const TOTALS = {
 }
 
 /**
- * 采集批次 —— 批次就是**一天**（docs/29 拍板 ⑦）。
+ * 采集批次 —— 批次就是**一天**。
  * 我们的 CrawlJob 是一条样本（35 条样本 = 35 个 job），没有「批次」这个实体，
  * 按 `group_by=day` 分组是零后端改动的做法。
  */
@@ -165,8 +166,9 @@ export const BATCHES: Batch[] = [
 /**
  * 证据模态的样例回答（v2 稿 2c 用的就是这条）。
  *
- * `mentions` 里**没有 offset** —— mentions 表根本没这两列（docs/28 §2.4），
- * 所以全文内联高亮这一轮做不了，留接口不留假实现。
+ * 这里的 `mentions` 没填 offset —— 写 fixture 时后端还没这个字段。
+ * **现在后端有了**（`MentionOut.first_offset` / `matched_term`，API.md §7），
+ * 接 API 时高亮就能亮起来，不必再等后端。
  */
 export const SAMPLE_RESPONSE: RawResponse = {
   id: 29,
@@ -187,12 +189,16 @@ export const SAMPLE_RESPONSE: RawResponse = {
   created_at: '2026-08-02T10:12:00Z',
   citations: [],
   /**
-   * ⚠️ `position_rank` 全部为 null，不是偷懒 —— 这是**库里的真实状态**：
-   * annotate.py 每写一条 mention 都硬编码 `position_rank=None`（列存在但从没算过）。
-   * 填上 #1 #2 #3 就是在编数据，也会让「首位提及率」的降级态显得自相矛盾。
-   * 后端按 offset 升序回填之后，这里换成真实序号，UI 自动从降级态恢复。
+   * ⚠️ 这两个字段的状态**已经不一样了**，别再当成同一类处理：
    *
-   * `sentiment` 同理，annotate.py 也是写死 None，等后端接 LLM。
+   * · `position_rank` —— 写这份 fixture 时 annotate.py 硬编码 None，现在**已经算了**
+   *   （按 first_offset 升序派生）。这里仍为 null 纯粹是 fixture 没跟上，
+   *   接 API 就有真值，「首位提及率」的降级态届时自动消失。
+   *   注意口径：它是**出场顺位**，不是推荐名次 —— 回答里先提到未监测品牌时，
+   *   我方 rank=1 的含义是「我们关心的品牌里它最先出现」（API.md §7.1）。
+   *
+   * · `sentiment` —— annotate.py 至今写死 None，**后端确实还给不出**。
+   *   这一位要长期走「暂无情感数据」降级态，等后端接 LLM。
    */
   mentions: [
     { id: 1, brand_id: 34, mentioned: true, mention_type: 'body', position_bucket: 'head', position_rank: null, evidence_snippet: null },

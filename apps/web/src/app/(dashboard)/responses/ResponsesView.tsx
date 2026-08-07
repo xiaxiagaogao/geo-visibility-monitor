@@ -15,7 +15,8 @@ const SAMPLE_PROMPT_ID = 101
 export function ResponsesView() {
   const params = useSearchParams()
 
-  // 详情走查询参数而不是 /responses/123 —— 静态导出没有动态路由段（docs/28 §2.1）。
+  // 详情走查询参数而不是 /responses/123 —— 静态导出（next.config.ts output:'export'）
+  // 要求动态段能被 generateStaticParams 预先枚举，而 response id 是持续增长的。
   // 顺带好处：URL 就是可分享的永久链接，刷新不丢。
   const pickedPrompt = Number(params.get('p') ?? SAMPLE_PROMPT_ID)
   const mismatched = pickedPrompt !== SAMPLE_PROMPT_ID
@@ -58,9 +59,9 @@ export function ResponsesView() {
         />
 
         <p className={styles.pending}>
-          命中位置内联高亮尚未开启：后端 <code>mentions</code> 表还没有{' '}
-          <code>first_offset</code> / <code>matched_term</code> 两列。
-          前端不会自己去正文里重找品牌名 —— 那会和 L1 标注口径分叉。
+          命中位置内联高亮尚未开启：后端已提供 <code>first_offset</code> /{' '}
+          <code>matched_term</code>，等前端接上接口即可点亮。
+          在那之前不会自己去正文里重找品牌名 —— 那会和 L1 标注口径分叉。
         </p>
 
         <p className={styles.sectionLabel}>L1 标注 · 命中品牌（{hits.length}）</p>
@@ -132,7 +133,7 @@ export function ResponsesView() {
           </div>
           <div className={styles.metaRow}>
             <span className={styles.metaKey}>别名命中</span>
-            <Degraded>待后端补 matched_term</Degraded>
+            <Degraded>待前端接入 matched_term</Degraded>
           </div>
         </Panel>
 

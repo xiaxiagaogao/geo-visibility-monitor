@@ -73,7 +73,8 @@ export function KpiGrid({ children }: { children: ReactNode }) {
  * 比率型 KPI。
  *
  * props **强制要 `m` 和 `n`**，没有只收 rate 的重载 ——
- * 这样「孤零零的百分比」在类型层面就写不出来（docs/29 §7.2）。
+ * 这样「孤零零的百分比」在类型层面就写不出来 —— 凡显示比率必须同时显示 m / n
+ * （API.md §4.2 第 4 条），这是这个产品可信度的来源。
  */
 export function KpiRate({
   label,
@@ -237,7 +238,7 @@ export function Table({ children }: { children: ReactNode }) {
   return <table className={styles.table}>{children}</table>
 }
 
-/* ══════ 三态：每个数据组件必备（docs/29 §7.1）══════ */
+/* ══════ 三态：每个数据组件必备 —— 加载 / 空 / 降级 ══════ */
 
 export function Skeleton({ height = 16, width = '100%' }: { height?: number; width?: string }) {
   return <div className={styles.skeleton} style={{ height, width }} />

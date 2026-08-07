@@ -14,7 +14,7 @@ const RANGES = [
  *
  * GeoMonitor 把「更多筛选」单独放第二行，那行只有一个按钮，白占 44px 高度。
  *
- * 选中值最终要 ⇄ URL query 双向同步（docs/29 §4），接 API 时接上；
+ * 选中值最终要 ⇄ URL query 双向同步（URL 是唯一状态源，刷新/分享/后退才自洽），接 API 时接上；
  * 现在固定数据只有一个品牌一个平台，先把控件形态定下来。
  */
 export function FilterBar() {
