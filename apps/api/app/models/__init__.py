@@ -10,8 +10,12 @@ from app.models.entities import (
     MetricSnapshot,
     Prompt,
     RawResponse,
+    Run,
+    RunCompetitor,
+    RunPrompt,
     SchemaMigration,
     Session,
+    Task,
     User,
 )
 
@@ -25,7 +29,11 @@ __all__ = [
     "MetricSnapshot",
     "Prompt",
     "RawResponse",
+    "Run",
+    "RunCompetitor",
+    "RunPrompt",
     "SchemaMigration",
     "Session",
+    "Task",
     "User",
 ]

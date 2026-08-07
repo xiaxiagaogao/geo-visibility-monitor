@@ -92,6 +92,9 @@ class CrawlJob(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     prompt_id: Mapped[int] = mapped_column(ForeignKey("prompts.id", ondelete="CASCADE"))
+    run_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), nullable=True
+    )
     platform: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     sample_index: Mapped[int] = mapped_column(Integer, server_default="1")
@@ -259,3 +262,74 @@ class SchemaMigration(Base):
     applied_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class Task(Base):
+    """命名的监测定义 —— 可反复执行，每次执行产生一个 Run。"""
+
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    platforms: Mapped[Any] = mapped_column(JSONB, server_default="[]")
+    samples: Mapped[int] = mapped_column(Integer, server_default="3")
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    runs: Mapped[list["Run"]] = relationship(
+        back_populates="task", cascade="all, delete", passive_deletes=True
+    )
+
+
+class Run(Base):
+    """一次执行。**没有 status 列** —— 由其下 job 的状态派生（后续任务实现）。"""
+
+    __tablename__ = "runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
+    platforms: Mapped[Any] = mapped_column(JSONB, server_default="[]")
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    task: Mapped[Task] = relationship(back_populates="runs")
+    prompts: Mapped[list["RunPrompt"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
+    competitors: Mapped[list["RunCompetitor"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class RunPrompt(Base):
+    """提问集快照。存 text 而不只是 id —— 提问词正文可改。"""
+
+    __tablename__ = "run_prompts"
+
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    prompt_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    prompt_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    run: Mapped[Run] = relationship(back_populates="prompts")
+
+
+class RunCompetitor(Base):
+    """竞品集快照。刻意不设到 brands 的外键 —— 竞品被删后，
+    「当时拿它比过」这个事实仍应留在历史运行里。"""
+
+    __tablename__ = "run_competitors"
+
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    competitor_brand_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brand_name: Mapped[str] = mapped_column(Text, nullable=False)
+
+    run: Mapped[Run] = relationship(back_populates="competitors")
