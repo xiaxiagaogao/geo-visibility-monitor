@@ -14,22 +14,35 @@
 
 ## 前置：怎么跑测试
 
-**本机跑不了。** 本机没装 `fastapi` / `sqlalchemy`，`import app.*` 直接失败。全部在 VPS 的容器里跑：
+**本机跑，不要为了跑测试去 push 生产。** 仓库根目录有个 `.venv`（已 gitignore）装好了后端依赖：
 
 ```bash
-# 1. 推代码（post-receive 自动 build + up + 跑 ensure_schema）
-git push vps main
-
-# 2. 生产镜像不含 dev 依赖，重建后要重装一次
-ssh -i <pem> root@96.9.213.230 'docker exec geo-api pip install -q pytest httpx'
-
-# 3. 跑全套（含需真库的用例）
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/ -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/ -q
 ```
 
-不需要真库的用例（`inspect` 断言那类）在同一条命令里一起跑。
+**当前基线：155 passed, 7 skipped。** 那 7 条 skip 是需要真实 Postgres 的用例
+（靠 `GEO_TEST_DATABASE_URL` 是否设置来跳过）。每个任务做完都要跑这条命令，
+且**通过数只能增不能减**。
+
+venv 坏了就重建：
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -q --upgrade pip setuptools wheel
+.venv/bin/pip install -q -e ./packages/metrics -e ./apps/api pytest httpx
+```
+
+### 需要真库的用例（Task 1 / 3 / 7）
+
+本机没有 Postgres，这三个任务的 DB 用例会 skip —— **skip 不等于通过**。
+它们统一攒到最后，在 VPS 上一次性验（见「完成判据」）。
+
+子代理该做的是：**把 DB 用例写好、确认本机是 skip 而不是 error、提交**，
+然后在报告里注明「DB 用例待 VPS 验证」。
+
+> ⚠️ **子代理不许执行 `git push vps main`。** 那会触发 post-receive
+> 直接部署到生产（`docker compose up -d --build`）。推生产由主控会话在
+> 拿到明确许可后统一做。
 
 **迁移怎么加：** 不写 `deploy/migrations/*.sql`（那是遗留副本）。往
 `apps/api/app/core/schema.py` 的 `_MIGRATIONS` 列表尾部追加一个 `(id, sql)` 元组，
@@ -126,12 +139,17 @@ def test_run_has_no_status_column(conn):
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/test_task_run_schema.py -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_run_schema.py -q
 ```
 
-预期：`test_tables_exist` FAIL，报 `缺表 tasks`。
+本机没有 Postgres，**预期是 skipped，不是 error**。
+
+skip 说明用例能被收集、import 没报错 —— 这是本机能验到的全部。
+「跑起来看它红」这一步在真库上才有意义，攒到最后由主控会话在 VPS 上做，
+届时预期 `test_tables_exist` FAIL，报 `缺表 tasks`。
+
+**别为了让它在本机变红而去掉 skipif。** 那会让这个用例在没有库的环境里
+变成 error，CI 与本机都跑不过。
 
 - [ ] **Step 3: 加迁移**
 
@@ -288,11 +306,16 @@ class RunCompetitor(Base):
 ```bash
 git add apps/api/app/core/schema.py apps/api/app/models/ apps/api/tests/test_task_run_schema.py
 git commit -m "feat(api): Task/Run 实体建表 —— 一批 job 终于能归成一次检测"
-git push vps main
-ssh -i <pem> root@96.9.213.230 'docker exec geo-api pip install -q pytest httpx'
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/test_task_run_schema.py -q'
+# 不 push —— 推生产由主控会话统一做
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_run_schema.py -q
+```
+
+本机没有 Postgres，预期是 **skipped**（不是 error）。skip 说明用例本身能被收集、import 不报错。真正的验证在 VPS，攒到最后一起做。
+
+```bash
+# 留给主控会话：
+# docker exec -w /app/apps/api -e PYTHONPATH=. \
+#   -e GEO_TEST_DATABASE_URL="$DATABASE_URL" geo-api python -m pytest tests/test_task_run_schema.py -q
 ```
 
 预期：3 passed。
@@ -300,9 +323,7 @@ ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
 - [ ] **Step 7: 确认既有测试没被打断**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/ -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/ -q
 ```
 
 预期：全绿。特别注意 `test_cascade_delete.py` —— 新加的外键可能影响删品牌的级联。
@@ -356,8 +377,7 @@ def test_no_jobs_is_empty():
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_run_status.py -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_run_status.py -q
 ```
 
 预期：FAIL，`ModuleNotFoundError: No module named 'app.services.tasks'`。
@@ -404,9 +424,8 @@ def derive_run_status(counts: Dict[str, int]) -> str:
 ```bash
 git add apps/api/app/services/tasks.py apps/api/tests/test_run_status.py
 git commit -m "feat(api): run 状态由 job 派生，不落列"
-git push vps main
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_run_status.py -q'
+# 不 push —— 推生产由主控会话统一做
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_run_status.py -q
 ```
 
 预期：6 passed。
@@ -566,12 +585,17 @@ def test_empty_prompt_set_creates_no_jobs(db, fixture_brand):
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/test_task_run_snapshot.py -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_run_snapshot.py -q
 ```
 
-预期：FAIL，`ImportError: cannot import name 'create_run'`。
+本机没有 Postgres，**预期是 skipped，不是 error**。
+
+skip 说明用例能被收集、import 没报错 —— 这是本机能验到的全部。
+「跑起来看它红」这一步在真库上才有意义，攒到最后由主控会话在 VPS 上做，
+届时预期 FAIL，`ImportError: cannot import name 'create_run'`。
+
+**别为了让它在本机变红而去掉 skipif。** 那会让这个用例在没有库的环境里
+变成 error，CI 与本机都跑不过。
 
 - [ ] **Step 3: 实现**
 
@@ -663,10 +687,16 @@ def run_job_status_counts(db: Session, run_id: int) -> dict:
 ```bash
 git add apps/api/app/services/tasks.py apps/api/tests/test_task_run_snapshot.py
 git commit -m "feat(api): 发起 run 先冻结口径再建 job —— 顺序反了会静默错"
-git push vps main
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/test_task_run_snapshot.py -q'
+# 不 push —— 推生产由主控会话统一做
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_run_snapshot.py -q
+```
+
+本机没有 Postgres，预期是 **skipped**（不是 error）。skip 说明用例本身能被收集、import 不报错。真正的验证在 VPS，攒到最后一起做。
+
+```bash
+# 留给主控会话：
+# docker exec -w /app/apps/api -e PYTHONPATH=. \
+#   -e GEO_TEST_DATABASE_URL="$DATABASE_URL" geo-api python -m pytest tests/test_task_run_snapshot.py -q
 ```
 
 预期：4 passed。
@@ -725,8 +755,7 @@ def test_invisible_is_404_not_403():
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_task_rbac.py -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_rbac.py -q
 ```
 
 预期：FAIL，`assert hasattr(deps, "assert_task_visible")`。
@@ -771,9 +800,8 @@ def visible_task_ids(db: Session, principal: Principal) -> Optional[List[int]]:
 ```bash
 git add apps/api/app/api/deps.py apps/api/tests/test_task_rbac.py
 git commit -m "feat(api): 任务/运行归属校验 —— 不可见一律 404"
-git push vps main
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_task_rbac.py -q'
+# 不 push —— 推生产由主控会话统一做
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_rbac.py -q
 ```
 
 预期：5 passed。
@@ -836,8 +864,7 @@ def test_latest_run_endpoint_exists():
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_task_routes.py -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_routes.py -q
 ```
 
 预期：FAIL，`ModuleNotFoundError: No module named 'app.api.tasks'`。
@@ -1179,9 +1206,8 @@ app.include_router(tasks_api.router)
 git add apps/api/app/schemas/task.py apps/api/app/api/tasks.py apps/api/app/main.py \
         apps/api/tests/test_task_routes.py
 git commit -m "feat(api): /v1/tasks 与 /v1/runs 路由"
-git push vps main
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_task_routes.py -q'
+# 不 push —— 推生产由主控会话统一做
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_task_routes.py -q
 ```
 
 预期：6 passed。然后手工验一次（`$KEY` 是 `deploy/.env` 里的 `API_KEY`）：
@@ -1235,8 +1261,7 @@ def test_service_applies_run_filter():
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  geo-api python -m pytest tests/test_counts_run_filter.py -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/test_counts_run_filter.py -q
 ```
 
 预期：FAIL，`assert "run_id" in sig.parameters`。
@@ -1280,10 +1305,8 @@ def _base_response_query(
 git add apps/api/app/services/counts.py apps/api/app/api/counts.py \
         apps/api/tests/test_counts_run_filter.py
 git commit -m "feat(api): counts 支持 run_id 过滤 —— 任务详情 KPI 要按次算"
-git push vps main
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/ -q'
+# 不 push —— 推生产由主控会话统一做
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/ -q
 ```
 
 预期：全绿。**特别验一条回归**：不带 `run_id` 时结果必须和改动前一致——
@@ -1421,7 +1444,7 @@ if __name__ == "__main__":
 ```bash
 git add apps/api/app/scripts/backfill_run.py
 git commit -m "feat(api): 历史 job 回填脚本 —— 否则唯一的真实数据在新 IA 里不可见"
-git push vps main
+# 不 push —— 推生产由主控会话统一做
 ssh -i <pem> root@96.9.213.230 \
   'docker exec geo-api python -m app.scripts.backfill_run --brand-id 34 --dry-run'
 ```
@@ -1480,15 +1503,13 @@ Run ──< RunPrompt · RunCompetitor（口径快照）
 ```bash
 git add docs/BACKEND.md docs/API.md
 git commit -m "docs: 回填 Task/Run —— 删掉「无批次实体」这条已不成立的说法"
-git push vps main
+# 不 push —— 推生产由主控会话统一做
 ```
 
 - [ ] **Step 4: 全套回归**
 
 ```bash
-ssh -i <pem> root@96.9.213.230 'docker exec -w /app/apps/api -e PYTHONPATH=. \
-  -e GEO_TEST_DATABASE_URL="postgresql+psycopg://geo:geo@postgres:5432/geo" \
-  geo-api python -m pytest tests/ -q'
+cd apps/api && PYTHONPATH=. ../../.venv/bin/python -m pytest tests/ -q
 ssh -i <pem> root@96.9.213.230 'docker exec geo-api python -m app.scripts.verify_l2 --brand-id 34'
 ```
 
