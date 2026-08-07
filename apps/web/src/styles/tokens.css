@@ -1,0 +1,166 @@
+/**
+ * 设计 token —— docs/29 §6
+ *
+ * 中性色 / accent / 情感 / 平台色 直接来自 Claude Design 项目「GEO 分析仪表盘」。
+ * 图表相关的色（矩阵顺序色阶、emphasis 对）是**重新取的**并跑过 dataviz 验证器，
+ * 原稿那套亮度非单调，中段格子的数值实测读不出来。
+ *
+ * 改动任何图表色之前先跑：
+ *   node <dataviz>/scripts/validate_palette.js "#hex,#hex" --mode light --surface "#FFFFFF" --ordinal
+ */
+
+:root {
+  /* ── 品牌 accent ── */
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-press: #115e59;
+  --accent-contrast: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+
+  /* ── 状态：只做徽章，且必须配文字/图标，绝不当图表系列色 ── */
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+
+  /* ── 情感：本期全部走降级态，先定义好 ── */
+  --sentiment-positive: #16a34a;
+  --sentiment-neutral: #64748b;
+  --sentiment-negative: #dc2626;
+
+  /* ── 平台色：只用得上 deepseek，其余保留定义待第二个 Provider ── */
+  --platform-deepseek: #4f46e5;
+  --platform-doubao: #3b82f6;
+  --platform-yuanbao: #f97316;
+  --platform-qwen: #9333ea;
+  --platform-wenxin: #06b6d4;
+  --platform-kimi: #ec4899;
+
+  /* ── 中性 ── */
+  --bg-app: #f5f7fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-hover: #f3f6f9;
+  --border: #e4e9f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f1b2d;
+  --text-secondary: #4b5a70;
+  --text-tertiary: #93a1b5;
+
+  /* ── 矩阵顺序色阶 · 单一 teal 色相，亮度单调 ──
+     validate_palette.js --ordinal --surface #FFFFFF：四项全 PASS
+     格内文字色按档定，见 --seq-*-ink（实测对比度写在 docs/29 §6.2） */
+  --seq-1: #14b8a6; /* ≤33%  · 深墨 6.94:1 */
+  --seq-2: #0d9488; /* 34–66% · 深墨 4.62:1 */
+  --seq-3: #115e59; /* ≥67%  · 白字 7.58:1 */
+  --seq-1-ink: #0f1b2d;
+  --seq-2-ink: #0f1b2d;
+  --seq-3-ink: #ffffff;
+
+  /* ── emphasis 横条：本品 vs 竞品 ──
+     ΔE 28.6（正常视觉）/ 23.9（最差色觉类型）PASS
+     ⚠️ 竞品填充**不许**换成 #64748b —— 与 accent 在绿色盲下 ΔE 仅 5.3 */
+  --bar-own: #0d9488;
+  --bar-other: #cbd5e1;
+  --bar-track: #f1f5f9;
+
+  /* ── 阴影 ── */
+  --shadow-sm: 0 1px 2px rgba(15, 27, 45, 0.05), 0 1px 3px rgba(15, 27, 45, 0.04);
+  --shadow-md: 0 2px 6px rgba(15, 27, 45, 0.06), 0 6px 16px rgba(15, 27, 45, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 27, 45, 0.12);
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-press: #99f6e4;
+  --accent-contrast: #052e2b;
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--bg-surface));
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+
+  --sentiment-positive: #34d399;
+  --sentiment-neutral: #94a3b8;
+  --sentiment-negative: #f87171;
+
+  --platform-deepseek: #818cf8;
+  --platform-doubao: #60a5fa;
+  --platform-yuanbao: #fb923c;
+  --platform-qwen: #c084fc;
+  --platform-wenxin: #22d3ee;
+  --platform-kimi: #f472b6;
+
+  --bg-app: #0a1120;
+  --bg-surface: #111c2e;
+  --bg-elevated: #16233a;
+  --bg-subtle: #182640;
+  --bg-hover: #1b2a45;
+  --border: #24344f;
+  --border-strong: #35486a;
+  --text-primary: #eaf0f8;
+  --text-secondary: #a4b4cc;
+  --text-tertiary: #64789b;
+
+  /* 深色顺序色阶 —— **方向与浅色相反**。
+     浅底上「越深 = 越高」，因为深色离白底最远；
+     深底上必须「越亮 = 越高」，否则最高档 #0F766E 贴着 #0A1120 往后退，
+     反而是最弱的一档最扎眼。判据是「离底色越远 = 值越大」，不是绝对明暗。
+     surface #111C2E 上四项全 PASS，最暗端对底 3.12:1。 */
+  --seq-1: #0f766e; /* ≤33%   · 白字  5.47:1 */
+  --seq-2: #2dd4bf; /* 34–66% · 深墨  9.29:1 */
+  --seq-3: #5eead4; /* ≥67%   · 深墨 11.68:1 */
+  --seq-1-ink: #ffffff;
+  --seq-2-ink: #0f1b2d;
+  --seq-3-ink: #0f1b2d;
+
+  /* ΔE 33.0（正常视觉）/ 30.7（最差色觉类型）PASS */
+  --bar-own: #2dd4bf;
+  --bar-other: #4a5f85;
+  --bar-track: #182640;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
+
+:root {
+  /* ── 字体 ── */
+  --font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Microsoft YaHei', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* ── 字阶：数据 / h1 / h2 / body / 辅助 ── */
+  --fs-data: 30px;
+  --fs-h1: 17px;
+  --fs-h2: 15px;
+  --fs-body: 14px;
+  --fs-sm: 13px;
+  --fs-xs: 12px;
+  --fs-2xs: 11px;
+
+  /* ── 间距阶：卡片内 16–20，卡片间 16，内容区 24 ── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+
+  /* ── 圆角 ── */
+  --r-xs: 5px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* ── 布局 ── */
+  --sidebar-w: 244px;
+  --content-max: 1180px;
+}

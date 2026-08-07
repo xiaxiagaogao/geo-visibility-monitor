@@ -1,0 +1,278 @@
+.root {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+}
+
+/* ═══ Sidebar ═══ */
+.sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+}
+
+.mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #2563eb));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  flex: none;
+  color: var(--accent-contrast);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brandName {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.brandSub {
+  font-size: var(--fs-2xs);
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.nav {
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.navItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.navItemOn {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.navIcon {
+  flex: none;
+  opacity: 0.85;
+}
+
+.navSep {
+  height: 1px;
+  background: var(--border);
+  margin: var(--sp-3) 11px;
+}
+
+.sideFoot {
+  margin-top: auto;
+  padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-2xs);
+  color: var(--text-tertiary);
+  line-height: 1.6;
+}
+
+/* ═══ 右侧主体 ═══ */
+.body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-6);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbarStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex: none;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.iconBtn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ═══ FilterBar —— 压成一行（GeoMonitor 原稿第二行只有一个按钮，白占 44px）═══ */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px var(--sp-6);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterLabel {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin-right: 2px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.chipOn {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* 未接入的平台：灰到一眼看出点不了，而不是看起来能点但没反应 */
+.chipOff {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chipDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.segItem {
+  height: 28px;
+  padding: 0 11px;
+  background: var(--bg-surface);
+  border: none;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  border-right: 1px solid var(--border);
+}
+
+.segItem:last-child {
+  border-right: none;
+}
+
+.segItem:hover {
+  background: var(--bg-hover);
+}
+
+.segOn {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
+/* ═══ 内容区 ═══ */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-6);
+}
+
+.content {
+  max-width: var(--content-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+@media (max-width: 900px) {
+  .root {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+}

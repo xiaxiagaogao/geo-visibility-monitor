@@ -1,0 +1,363 @@
+/* ═══ 按钮 ═══ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 500;
+}
+
+.btnPrimary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-contrast);
+}
+
+/* ═══ Panel ═══ */
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.panelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.panelTitle {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  margin: 0;
+}
+
+.panelSub {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin: 3px 0 0;
+  line-height: 1.6;
+}
+
+.panelNote {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.75;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-subtle);
+  border-radius: var(--r-sm);
+}
+
+/* ═══ KPI 卡 ═══ */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--sp-4);
+}
+
+.kpi {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* 左侧竖条只在异常时着色 —— 正常态是中性的，红条一出现就有信息量。
+   GeoMonitor 给四张卡配了绿/绿/橙/红纯装饰，破了它自己「全站同色=同义」的规矩。 */
+.kpi::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--border);
+}
+
+.kpiAlert::before {
+  background: var(--danger);
+}
+
+.kpiLabel {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.kpiValue {
+  font-size: var(--fs-data);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: var(--sp-2) 0 var(--sp-1);
+  letter-spacing: -0.5px;
+}
+
+.kpiValueAlert {
+  color: var(--danger);
+}
+
+.kpiValueMuted {
+  color: var(--text-tertiary);
+  font-size: var(--fs-h2);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* 分母副文案是强制的 —— 凡出现比率必须同时显示 m/n */
+.kpiDenom {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* ═══ Badge ═══ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  white-space: nowrap;
+}
+
+.badgeOk {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--bg-surface));
+}
+
+.badgeDanger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--bg-surface));
+}
+
+.badgeWarning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--bg-surface));
+}
+
+.badgeAccent {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--bg-surface));
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* ═══ ⓘ 口径提示 ═══ */
+.infoDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--text-tertiary);
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  margin-left: 5px;
+  cursor: help;
+  flex: none;
+}
+
+/* ═══ Tabs ═══ */
+.tabs {
+  display: flex;
+  gap: var(--sp-5);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-5);
+}
+
+.tab {
+  position: relative;
+  padding: 0 0 10px;
+  background: none;
+  border: none;
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabOn {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.tabOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+}
+
+.tabCount {
+  margin-left: 5px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  opacity: 0.8;
+}
+
+/* ═══ 表 ═══ */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.table th {
+  text-align: left;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-size: var(--fs-xs);
+  padding: 0 var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 11px var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowLink {
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.rowLink:hover {
+  text-decoration: underline;
+}
+
+/* ═══ 三态 + 降级态 ═══ */
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-7) var(--sp-4);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
+  line-height: 1.8;
+}
+
+.stateIcon {
+  color: var(--text-tertiary);
+}
+
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--bg-surface));
+  background: color-mix(in srgb, var(--danger) 6%, var(--bg-surface));
+  border-radius: var(--r-sm);
+}
+
+.errorTitle {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.errorDetail {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* 降级态：采到了，但这个维度后端还没算 —— 和「空」必须区分开，
+   否则用户会以为是采集出了问题 */
+.degraded {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-subtle) 25%,
+    var(--bg-hover) 37%,
+    var(--bg-subtle) 63%
+  );
+  background-size: 800px 100%;
+  animation: geo-shimmer 1.4s infinite linear;
+  border-radius: var(--r-xs);
+}
