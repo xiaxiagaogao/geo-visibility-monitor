@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import CompetitorLink, CrawlJob, Mention, Prompt, RawResponse
+from app.models import CompetitorLink, CrawlJob, Mention, Prompt, RawResponse, RunCompetitor
 from app.services.annotate import ANNOTATOR_VERSION
 from app.services.brands import get_brand_or_404
 
@@ -83,7 +83,27 @@ def is_fake_response(resp: RawResponse) -> bool:
     return False
 
 
-def competitor_ids(db: Session, brand_id: int) -> List[int]:
+def competitor_ids(
+    db: Session, brand_id: int, run_id: Optional[int] = None
+) -> List[int]:
+    """竞品集。
+
+    **带 run_id 时必须读 RunCompetitor 快照,不能查当前的 CompetitorLink。**
+    否则「建 job 时用冻结快照、统计时查当前配置」自相矛盾 ——
+    八月给品牌加一个竞品,七月那次 run 的缺口清单和竞品列会被当场重算,
+    而这正是 RunCompetitor 存在的全部理由。
+
+    不带 run_id 是品牌级累计口径(跨 run),此时没有「当时」可言,
+    只能用当前配置。
+    """
+    if run_id is not None:
+        return list(
+            db.scalars(
+                select(RunCompetitor.competitor_brand_id).where(
+                    RunCompetitor.run_id == run_id
+                )
+            ).all()
+        )
     return list(
         db.scalars(
             select(CompetitorLink.competitor_brand_id).where(
@@ -99,6 +119,7 @@ def _base_response_query(
     brand_id: int,
     platform: Optional[str],
     prompt_id: Optional[int],
+    run_id: Optional[int],
     dt_from: Optional[datetime],
     dt_to: Optional[datetime],
 ):
@@ -113,6 +134,8 @@ def _base_response_query(
         q = q.where(RawResponse.platform == platform)
     if prompt_id is not None:
         q = q.where(CrawlJob.prompt_id == prompt_id)
+    if run_id is not None:
+        q = q.where(CrawlJob.run_id == run_id)
     if dt_from is not None:
         q = q.where(RawResponse.created_at >= dt_from)
     if dt_to is not None:
@@ -180,6 +203,7 @@ def compute_counts(
     brand_id: int,
     platform: Optional[str] = None,
     prompt_id: Optional[int] = None,
+    run_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     group_by: str = "none",
@@ -196,7 +220,7 @@ def compute_counts(
 
     dt_from = _parse_dt(date_from)
     dt_to = _parse_dt(date_to, end=True)
-    comp_ids = competitor_ids(db, brand_id)
+    comp_ids = competitor_ids(db, brand_id, run_id)
     track_ids = [brand_id] + [c for c in comp_ids if c != brand_id]
 
     responses = list(
@@ -206,6 +230,7 @@ def compute_counts(
                 brand_id=brand_id,
                 platform=platform,
                 prompt_id=prompt_id,
+                run_id=run_id,
                 dt_from=dt_from,
                 dt_to=dt_to,
             ).order_by(RawResponse.id.asc())
@@ -296,6 +321,7 @@ def compute_counts(
         "filters": {
             "platform": platform,
             "prompt_id": prompt_id,
+            "run_id": run_id,
             "from": date_from,
             "to": date_to,
             "include_fake": include_fake,
