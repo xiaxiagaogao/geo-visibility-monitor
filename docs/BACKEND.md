@@ -170,11 +170,27 @@ full_text[first_offset : first_offset + len(matched_term)] == matched_term
 （`PUT /v1/brands/{id}/competitors` 是整体替换语义）。不冻结的话，
 八月给某品牌加一个竞品，七月那次 run 的结论会被当场重算。
 
-**这条纪律必须贯穿到统计侧。** `/v1/counts` 带 `run_id` 时，
-竞品集取自 `run_competitors` 而非当前的 `competitor_links`（`services/counts.py:competitor_ids`）——
-只给响应集合加 run 过滤是不够的，那样分母对上了、竞品集还是活的，快照只用了一半。
+**这条纪律要贯穿两层，少一层都会静默出错。**
 
-不带 `run_id` 是品牌级累计口径（跨 run），此时没有「当时」可言，只能用当前配置。
+| 层 | 函数 | 带 run_id 时读 |
+|----|------|---------------|
+| 统计 | `services/counts.py:competitor_ids` | `run_competitors` 快照 |
+| **抽取** | `services/annotate.py:target_brand_ids` | `run_competitors` 快照 |
+
+只做统计层是不够的 —— 那样分母对上了、竞品集还是活的，快照只用了一半。
+
+**只做统计层还有一个更隐蔽的洞：** 统计层能查对的前提是「该查的 mention 行本来就存在」。
+run 冻结竞品集 `[A, B]` 之后，若在 job 跑完前有人整体替换了竞品配置，
+或对失败 job 做了 `retry`，抽取层会按**当时的活配置**生成 mention 行 ——
+于是 `counts` 按快照要 `[A, B]`，而 B 的行压根没生成。
+B 就从「有算」变成「未算」，**不报错、不可见**。
+
+不带 `run_id` 是品牌级累计口径（跨 run），此时没有「当时」可言，只能用当前配置；
+`run_id` 为空的 ad-hoc job（走 `/v1/crawl-jobs` 直接建的）行为不变。
+
+**`/v1/counts` 传 `run_id` 时还会校验两件事**：这个 run 你看得见
+（`assert_run_visible`），以及它确实属于这个 `brand_id`（否则 404）。
+不校验的话，拿自己的 brand_id 配别家的 run_id 能把对方快照里的竞品 id 枚举出来。
 
 ---
 
