@@ -99,6 +99,7 @@ fetch(url, { method: 'POST', credentials: 'include',
 | `brand_id` | ✓ | 监测主品牌 |
 | `platform` | | 如 `deepseek` |
 | `prompt_id` | | |
+| `run_id` | | **同时把竞品集切到该 run 的快照**，见 §8.5.2 |
 | `from` / `to` | | ISO 日期或时间；`to` **含当天末**（纯日期自动补到 23:59:59） |
 | `group_by` | | `none`(默认) \| `day` \| `platform` \| `prompt` |
 | `include_fake` | | 默认 `false` |
@@ -281,6 +282,61 @@ full_text.slice(first_offset, first_offset + matched_term.length) === matched_te
 
 ---
 
+## 8.5 检测任务与运行
+
+**任务（Task）= 命名的监测定义**（一个主品牌 + 平台 + 采样数），可反复执行。
+**运行（Run）= 一次执行**。`crawl_jobs` 挂在 run 下面。
+
+| 方法 | 路径 | 备注 |
+|------|------|------|
+| GET / POST | `/v1/tasks` | 列表按 workspace 自动收敛；建任务仅超管/运营 |
+| GET / PATCH | `/v1/tasks/{id}` | PATCH **不含 `brand_id`** —— 任务过不了户 |
+| GET | `/v1/tasks/{id}/runs` | 该任务的执行历史 |
+| POST | `/v1/tasks/{id}/runs` | 发起一次运行，仅超管/运营 |
+| GET | `/v1/runs/latest` | **我能看到的最新一次运行**。客户首页分流用；一次都没有时 404 |
+| GET | `/v1/runs/{id}` | 带口径快照 |
+
+`TaskOut`：`id` · `brand_id` · `name` · `platforms[]` · `samples` · `is_active` ·
+`created_at` · `latest_run_id?` · `latest_run_at?` · `latest_run_status?`
+
+`RunOut`：`id` · `task_id` · `platforms[]` · `note?` · `created_at` · **`status`** · `n_jobs`
+
+`RunDetailOut` = `RunOut` + **`prompts[]`**（`prompt_id` + `prompt_text`）
++ **`competitors[]`**（`competitor_brand_id` + `brand_name`）
+
+### 8.5.1 `status` 是算出来的，不是存的
+
+`runs` 表**没有 status 列**，它由该 run 下 job 的状态派生：
+
+```text
+empty    一条 job 都没有（提问集为空或平台为空）—— 是配置问题，不是成功
+pending  还有 job 没开始
+running  有 job 正在跑（优先于 pending）
+success  全部成功
+partial  部分成功  ← 单独一档
+failed   全部失败
+```
+
+**`partial` 不能当成 success 显示。** 部分成功意味着分母少了一截，
+所有比率会静默偏高。
+
+### 8.5.2 快照：为什么两次 run 之间的差异是可信的
+
+`RunDetailOut` 里的 `prompts` 和 `competitors` 是**发起那一刻冻结的**，
+不是实时查的。提问词正文改了、竞品集加人了，都不会回头改写历史运行。
+
+**这直接影响你怎么调 counts：**
+
+```text
+/v1/counts?brand_id=34&run_id=128   这一次运行的数（竞品集取自该 run 的快照）
+/v1/counts?brand_id=34              该品牌历史累计（竞品集用当前配置）
+```
+
+任务详情页的 KPI 必须带 `run_id`。不带的话算的是这个品牌所有 run 混在一起的数，
+而且用的是当前竞品集——两次打开会因为别人改了配置而变。
+
+---
+
 ## 9. 后端**现在给不了**的（前端要走降级态，不是空态）
 
 | 缺什么 | 影响 | 前端怎么办 |
@@ -288,7 +344,6 @@ full_text.slice(first_offset, first_offset + matched_term.length) === matched_te
 | `sentiment` / `sentiment_score` 恒 `NULL` | 情感 pill、正面率、风险问题 | 显示「暂无情感数据」 |
 | `is_recommended` 恒 `False`，counts 无 `m_recommended` | 推荐率 | 算不出，不要做这个指标 |
 | **`citations` 全库 0 行** | 引用分析整页 | **这页现在做不了**。根因是抓取时从未开联网搜索，不是解析 bug；要做需先开联网 + 重抓（会破坏现有基线可比性） |
-| 无「批次 / 检测」实体 | 「新建一次命名检测并回看」 | 只能按 `created_at` 日期分组当批次 |
 | 只有 DeepSeek 一个平台 | 多平台对比 | 维度留着，可用性读 `/v1/config/platforms` |
 
 > **降级态 ≠ 空态。** 「没采到数据」和「这个维度后端还没算」要用不同文案，

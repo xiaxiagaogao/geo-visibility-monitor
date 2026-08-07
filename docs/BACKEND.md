@@ -79,6 +79,8 @@ L1 判定在后端 Python（`packages/metrics`），L3 派生在前端 TypeScrip
 Brand ──< Alias
 Brand ──< CompetitorLink >── Brand
 Brand ──< Prompt ──< CrawlJob ──< RawResponse
+Brand ──< Task ──< Run ──< CrawlJob（run_id 可空：Task/Run 之前的旧 job 没有）
+Run ──< RunPrompt · RunCompetitor（口径快照）
 RawResponse ──< Mention（每回答×每品牌唯一，DB 有 UNIQUE 约束）
 RawResponse ──< Citation
 ```
@@ -92,9 +94,12 @@ RawResponse ──< Citation
 | raw_responses | L0+L1 | `full_text` 必须是**原文**；`answer_status`；`annotator_version` |
 | mentions | L1 | 见下方字段说明 |
 | citations | L0 | **当前全库 0 行**，根因见 §7.2 |
+| tasks | 配置 | 命名的监测定义：一个主品牌 + 平台 + 采样数，可反复执行 |
+| runs | 采集 | 一次执行。**刻意没有 `status` 列** —— 由其下 job 的状态派生（`services/tasks.py:derive_run_status`）。存一份就要有人同步，而 job 状态在 worker 里变、run 在 API 里变，漂移是迟早的事，而漂移了的状态列比没有更糟：它看起来权威 |
+| run_prompts / run_competitors | 采集 | **口径快照**，见下方 §3.4 |
 
-**没有「批次 / 检测」实体。** 35 个样本 = 35 个 `crawl_jobs` 行。
-要「新建一次叫 X 的检测并在列表里回看」，需要新增实体或按 `created_at` 日期分组。
+**「一次检测」现在有实体了**（`tasks` / `runs`），此前只能按 `created_at` 日期分组硬凑。
+一条 job 仍然 = 一个样本；`run_id` 把一批 job 归成一次执行。
 
 **answer_status：** `ok` \| `empty` \| `too_short` \| `error`  
 （侧栏误抓、明确假数据等 → `error`，不进分母。）
@@ -149,6 +154,30 @@ full_text[first_offset : first_offset + len(matched_term)] == matched_term
 
 ---
 
+### 3.4 口径快照：这个模型唯一「冗余」的部分，也是它唯一的价值
+
+发起一次 run 时，**先把当次口径冻结进快照表，再按快照建 job**。顺序不能反：
+反过来的话，两步之间任何一次配置修改都会让 job 用新口径跑、快照记旧口径，
+而这**不会报错**，只会让某次 run 的数字对不上它自己的快照。
+
+| 快照 | 存了什么 | 为什么 |
+|------|---------|--------|
+| `run_prompts` | `prompt_id` **+ `prompt_text`** | 提问词正文可改。只存 id 的话，历史运行的问题会跟着变 |
+| `run_competitors` | `competitor_brand_id` **+ `brand_name`**，**刻意不设到 `brands` 的外键** | 竞品品牌被删之后，「当时拿它比过」这个事实仍应留在历史运行里 |
+| `runs.platforms` | 平台 code 列表（JSONB） | 平台不是实体，只是注册表里的 code，建关联表没有收益 |
+
+**防的是什么：** 提及率的分母是提问集，缺口清单与失分量取决于竞品集，两者都能被随时改
+（`PUT /v1/brands/{id}/competitors` 是整体替换语义）。不冻结的话，
+八月给某品牌加一个竞品，七月那次 run 的结论会被当场重算。
+
+**这条纪律必须贯穿到统计侧。** `/v1/counts` 带 `run_id` 时，
+竞品集取自 `run_competitors` 而非当前的 `competitor_links`（`services/counts.py:competitor_ids`）——
+只给响应集合加 run 过滤是不够的，那样分母对上了、竞品集还是活的，快照只用了一半。
+
+不带 `run_id` 是品牌级累计口径（跨 run），此时没有「当时」可言，只能用当前配置。
+
+---
+
 ## 4. API 地图
 
 Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
@@ -162,9 +191,12 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 | 竞品关系 | PUT | `/v1/brands/{id}/competitors`（整体替换 id 列表） |
 | Prompt | CRUD | `/v1/prompts` · `/v1/prompts/{id}` |
 | 任务 | GET/POST | `/v1/crawl-jobs` · `/{id}` · `/{id}/retry` · `/worker/run-once` |
+| 检测任务 | CRUD | `/v1/tasks` · `/v1/tasks/{id}`（PATCH 不含 `brand_id`，过不了户） |
+| 发起运行 | GET/POST | `/v1/tasks/{id}/runs` |
+| 运行 | GET | `/v1/runs/latest`（**路由必须排在下一条之前**，否则 `latest` 会被当成 id 解析成 422）· `/v1/runs/{id}`（带口径快照） |
 | 明细 | GET | `/v1/responses` · `/{id}` |
 | 重标 | POST | `/v1/responses/{id}/annotate` · `/annotate/run` |
-| 计数 | GET | `/v1/counts` |
+| 计数 | GET | `/v1/counts`（**`run_id` 会同时切换竞品集到快照**，见 §3.4） |
 | 登录 | POST | `/v1/auth/login`（公开）· `/v1/auth/logout` · GET `/v1/auth/me` |
 | 用户 | CRUD | `/v1/users` · `/v1/users/{id}` —— **仅超管** |
 | 口径 | GET | `/v1/config/metrics` |
@@ -507,8 +539,13 @@ docker exec -it geo-api python -m app.scripts.create_user \
   --email you@example.com --role superadmin
 # 客户账号必须带 workspace：--role client --workspace-id 2
 
-# 数据治理（默认 dry-run，确认后去掉 --dry-run）
+# 数据治理。⚠️ 注意 --dry-run 是**可选开关**，不加就直接写库（与下面的回填脚本相反）
 docker exec geo-api python -m app.scripts.data_governance_min --dry-run
+
+# 历史 job 回填到一个补建的 run（Task/Run 引入前的样本 run_id 为空，新 IA 里不可见）
+# 这个脚本**默认只读**，--apply 才写库 —— 它建实体、改外键，比清理脚本危险
+docker exec geo-api python -m app.scripts.backfill_run --brand-id 34
+docker exec geo-api python -m app.scripts.backfill_run --brand-id 34 --apply
 
 # 自检
 docker exec geo-api python -m app.scripts.verify_l2 --brand-id <id>
@@ -536,7 +573,6 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 |----|------|-----------|
 | **counts 全量加载** | 把所有 `RawResponse`（含 `full_text` 全文）拉进 Python 再累加，不是 SQL 聚合 | 样本量上千后 |
 | **L1 白名单仍缺情感** | `sentiment` / `is_recommended` 恒空（§3.3）；`/v1/counts` 无 `m_recommended` | 前端要情感、推荐率时 |
-| **无批次 / 提问集实体** | 一条 job = 一个样本，「一次检测」不存在（§3）。最初设计里有 `PromptSet`，与 `Organization` / `Workspace` 一样从未建表 | 要「新建一次命名检测并回看」时 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL | 调整竞品集合后 |
 | **引用分析做不了** | citations 全库 0 行；根因是从未开联网搜索（§7.0），不是解析 bug | 前端要做引用页时 |
 | id=6 残留会话 URL | `raw_json` 里有一条 DeepSeek 会话 URL，违反「不落库会话 URL」（§7）。旧 `chrome_bridge` 路径遗留，一条 UPDATE 可清 | 随时可清 |
