@@ -162,11 +162,18 @@ lib/l3/       不许碰 fetch 和 React
 前端 IA 建立在 `Task` / `Run` 之上，这两个实体后端**还不存在**
 （`BACKEND.md` §11 已记录这个缺口）。前端开工前需要：
 
-1. `Task` 表：命名、`brand_id`、平台、采样数、提问集选择
-2. `Run` 表：`task_id`、状态、起止时间
-3. 三张快照关联表：run × prompts、run × competitor_ids、run × platforms
-4. `crawl_jobs` 加 `run_id` 外键
-5. 一个能回答「我的 workspace 下最新一次 run 是哪个」的接口 —— 客户首页分流要用
+1. `tasks` 表：`brand_id`、命名、平台、采样数
+2. `runs` 表：`task_id`、平台快照。**没有 status 列** —— 由其下 job 的状态派生，
+   存一份就要有人同步，而一个和实际漂移了的状态列比没有更糟：它看起来权威
+3. 两张快照表：`run_prompts`（含 `prompt_text`，因为提问词正文可改）、
+   `run_competitors`（含 `brand_name`，且刻意不设到 `brands` 的外键——
+   竞品被删后「当时拿它比过」这个事实仍应留着）
+4. `crawl_jobs` 加 `run_id` 外键（**可空**：迁移前已有的 job 没有 run）
+5. `GET /v1/runs/latest` —— 客户首页分流要用；顺带 `/v1/counts` 支持 `run_id` 过滤，
+   否则任务详情的 KPI 算的是该品牌历史全部样本，不是这一次
+
+现有 35 条安踏样本的 `run_id` 是空的，需要一次回填，否则唯一的真实数据
+在任务式 IA 里完全不可见。
 
 在此之前前端能做的：`lib/api` 基础设施、登录、品牌 / 提问词 / 用户管理页
 （这些只依赖已有接口）。
