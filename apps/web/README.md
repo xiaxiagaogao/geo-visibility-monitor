@@ -245,8 +245,15 @@ pnpm build
 **Node 运行时**（`output: 'standalone'`），不是静态导出。
 `pnpm build` 产出 `.next/standalone/server.js`，起这个进程即可。
 
-换来真实路由与服务端登录拦截；代价是 VPS 上多一个常驻进程，
-且要改共用的 Caddyfile（同机还有别的项目，改前备份，只 `reload` 不 `restart`）。
+换来的是**真实路由**（`/tasks/[id]` 不必用 `generateStaticParams` 预枚举 id）。
+代价是 VPS 上多一个常驻进程，且要改共用的 Caddyfile
+（同机还有 `fund.xg22.top` / `option.xg22.top`，改前备份，只 `reload` 不 `restart`）。
+
+> **原先这里还写着「服务端能在渲染前拦未登录」—— 那是错的。**
+> `geo_session` 是 `geo-api.xg22.top` 的 host-only Cookie，
+> `geo.xg22.top` 上的 Next 服务器同样看不到它。鉴权判断只能在客户端做
+> （服务端仍然守着，前端只是决定渲染什么）。
+> 要拿回服务端拦截，得让生产也走前端代理，那是另一个决定。
 
 > **这一段是决定，不是现状。** 部署侧尚未实施：`deploy/` 下还没有前端的
 > Dockerfile / compose 服务，Caddy 也还没有 `geo.xg22.top` 的站点配置。

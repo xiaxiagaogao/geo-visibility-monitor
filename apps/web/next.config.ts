@@ -11,7 +11,10 @@ import type { NextConfig } from 'next'
  *
  * 换成 Node 运行时得到：
  *   · 真实路由 /tasks/34/runs/128/r/29 —— 运营要把证据链接发给客户
- *   · 服务端能在渲染前拦未登录，不会先闪一下空壳再跳登录
+ * （原先这里还列了「服务端能在渲染前拦未登录」—— 那条是错的：
+ *   geo_session 是 geo-api.xg22.top 的 host-only Cookie，
+ *   geo.xg22.top 上的 Next 服务器同样看不到。鉴权只能在客户端判断。）
+ *
  * 代价（尚未实施，见 README §9）：
  *   VPS 上多一个常驻进程，且要改共用的 Caddyfile（同机还有别的项目，
  *   改前备份、只 reload 不 restart）。
