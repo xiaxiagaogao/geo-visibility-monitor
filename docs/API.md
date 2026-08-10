@@ -32,7 +32,8 @@
 // geo_session : HttpOnly，JS 读不到（XSS 偷不走）
 // geo_csrf    : 非 HttpOnly，**前端要读它**，见 §2.1
 { "user_id": 1, "email": "you@example.com", "role": "operator",
-  "workspace_id": null, "kind": "user" }
+  "workspace_id": null, "kind": "user",
+  "csrf_token": "…" }   // ← 写操作要用它，见 §2.1
 ```
 
 **登录失败一律 401 且只有一句话** —— 不区分「用户不存在 / 密码错 / 账号停用」，
@@ -53,13 +54,22 @@
 
 ### 2.1 CSRF（**当前默认关闭**，前端就绪后开）
 
-写操作要把 `geo_csrf` Cookie 的值放进 `X-CSRF-Token` 请求头：
+写操作要把 token 放进 `X-CSRF-Token` 请求头。
+
+**token 从响应体拿，不要去读 Cookie。** 跨域部署下你读不到 ——
+`geo_csrf` 是 `geo-api.xg22.top` 的 host-only Cookie，而你在 `geo.xg22.top`。
+`login` 与 `me` 的响应体里都有 `csrf_token`，存内存即可（**别进 localStorage**）。
 
 ```ts
-const csrf = document.cookie.match(/(?:^|;\s*)geo_csrf=([^;]*)/)?.[1]
+// 登录时拿到；刷新页面后从 GET /v1/auth/me 重新拿
+const { csrf_token } = await login(email, password)
+
 fetch(url, { method: 'POST', credentials: 'include',
-             headers: { 'X-CSRF-Token': csrf ?? '', 'Content-Type': 'application/json' } })
+             headers: { 'X-CSRF-Token': csrf_token, 'Content-Type': 'application/json' } })
 ```
+
+> ⚠️ **开发期走代理会掩盖这个问题。** next rewrites 下 Cookie 落在 localhost，
+> `document.cookie` 读得到，老写法验证会通过 —— 然后一上生产全线 403。
 
 > 后端开关 `CSRF_PROTECTION_ENABLED` 现在是 `false`，**不带这个头也能写**。
 > 但请从第一天就带上 —— 等前端在真浏览器里验通了，后端会打开开关；

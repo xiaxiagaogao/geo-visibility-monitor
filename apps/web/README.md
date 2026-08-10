@@ -192,15 +192,21 @@ GET /v1/counts?brand_id=34&run_id=27   → 35 / 21，与不带 run_id 时一致
 身份只有一条通道：**会话 Cookie**。`X-API-Key` 是机器凭证，权限等同超管，
 **绝不打进前端包**（API.md §1）。
 
+**CSRF token 从响应体拿，不是读 Cookie。** 跨域部署下读不到 ——
+`geo_csrf` 是 `geo-api.xg22.top` 的 host-only Cookie，前端在 `geo.xg22.top`。
+`login` 与 `me` 的响应体都带 `csrf_token`，存**内存**（别进 localStorage）。
+
 ```ts
 // 所有写操作无条件带 CSRF 头，不给「先不带以后再加」留口子
-const csrf = document.cookie.match(/(?:^|;\s*)geo_csrf=([^;]*)/)?.[1]
 fetch(url, {
   method: 'POST',
   credentials: 'include',                        // 跨站不带这个就没有身份
-  headers: { 'X-CSRF-Token': csrf ?? '', 'Content-Type': 'application/json' },
+  headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json' },
 })
 ```
+
+> ⚠️ **开发期走 rewrites 代理会掩盖这件事**：那时 Cookie 落在 localhost，
+> `document.cookie` 读得到。照老办法写会在本地验证通过、上生产全线 403。
 
 后端 `CSRF_PROTECTION_ENABLED` 当前是 `false`，不带头也能写。
 前端在真浏览器里验通之后后端会打开开关，**那之后没带头的写操作全部 403**。
