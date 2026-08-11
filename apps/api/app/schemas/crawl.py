@@ -99,6 +99,39 @@ class RawResponseListOut(BaseModel):
     total: int
 
 
+class RawResponseSummaryOut(BaseModel):
+    """列表用的轻量投影 —— **没有 full_text，也没有 raw_json**。
+
+    单开一个模型而不是把 ``RawResponseOut.full_text`` 改成可选：
+    「有时有有时没有」的字段会让类型撒谎，前端拿到 undefined 时不会报错，
+    只会渲染出一片空白。这里少的字段在类型上就是不存在的。
+
+    ``text_preview`` / ``text_length`` 由 SQL 的 substr / length 算出来，
+    大列根本不进 Python —— 这是这个端点存在的全部理由。
+    """
+
+    id: int
+    job_id: int
+    platform: str
+    prompt_text: str
+    #: 正文前 N 字（N = api/responses.py::PREVIEW_CHARS），列表里给个人眼锚点
+    text_preview: str
+    #: 正文总字数。配合 preview 让「这条被截断了」变成可判断的事实
+    text_length: int
+    screenshot_path: Optional[str] = None
+    latency_ms: Optional[int] = None
+    answer_status: Optional[str] = None
+    annotator_version: Optional[str] = None
+    created_at: datetime
+    #: 逐品牌标注照常给全 —— 它是列表里唯一有结论的东西，且体量比 full_text 小两个量级
+    mentions: List[MentionOut] = Field(default_factory=list)
+
+
+class RawResponseSummaryListOut(BaseModel):
+    items: List[RawResponseSummaryOut]
+    total: int
+
+
 class WorkerRunOut(BaseModel):
     processed: int
     job_ids: List[int]

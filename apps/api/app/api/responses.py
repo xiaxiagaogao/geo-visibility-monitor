@@ -17,12 +17,14 @@ from app.api.deps import (
     visible_brand_ids,
 )
 from app.core.security import Principal
-from app.models import CrawlJob, Prompt, RawResponse
+from app.models import CrawlJob, Mention, Prompt, RawResponse
 from app.schemas.crawl import (
     CitationOut,
     MentionOut,
     RawResponseListOut,
     RawResponseOut,
+    RawResponseSummaryListOut,
+    RawResponseSummaryOut,
 )
 from app.services.annotate import annotate_response, annotate_unannotated
 from pydantic import BaseModel
@@ -171,6 +173,118 @@ def list_responses(
     total = int(db.scalar(cq) or 0)
     items = list(db.scalars(q.offset(offset).limit(limit)).all())
     return RawResponseListOut(items=[_to_out(r) for r in items], total=total)
+
+
+#: 列表里每条正文只带这么多字。够看出「这条在讲什么」，又不至于把整页拖成几百 KB。
+PREVIEW_CHARS = 160
+
+
+def _summary_columns():
+    """轻量投影选的列。**这里没有 full_text 和 raw_json** ——
+
+    正文只以 substr 出来的前 ``PREVIEW_CHARS`` 字 + 总长度两个派生值出现，
+    截断发生在数据库那侧：大列既不进 Python 也不过网。
+    """
+    return (
+        RawResponse.id,
+        RawResponse.job_id,
+        RawResponse.platform,
+        RawResponse.prompt_text,
+        func.substr(RawResponse.full_text, 1, PREVIEW_CHARS).label("text_preview"),
+        func.length(RawResponse.full_text).label("text_length"),
+        RawResponse.screenshot_path,
+        RawResponse.latency_ms,
+        RawResponse.answer_status,
+        RawResponse.annotator_version,
+        RawResponse.created_at,
+    )
+
+
+@router.get("/summary", response_model=RawResponseSummaryListOut)
+def list_response_summaries(
+    platform: Optional[str] = None,
+    prompt_id: Optional[int] = None,
+    brand_id: Optional[int] = None,
+    run_id: Optional[int] = Query(
+        None, description="只看这一次运行的样本（任务详情页的样本列表用它）"
+    ),
+    answer_status: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0, description="跳过前 N 条；与 total 配合翻页"),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    """列表用的轻量投影。过滤参数与 ``GET /v1/responses`` 完全一致。
+
+    **为什么单开一个端点：** 列表页要的是 prompt_text / 平台 / 状态 / 本品命中，
+    而 ``/v1/responses`` 每行都拖着完整 ``full_text`` 和 ``raw_json``
+    （raw_json 里往往还有一份同样的正文）。一页 20 条就能到几百 KB，
+    而其中 99% 的字节在列表上一个像素都不渲染。
+
+    这里 select 的是列不是 ORM 实体：大列在数据库那侧就被 substr 掉了，
+    既不进 Python 也不过网。
+
+    路由声明必须在 ``/{response_id}`` 之前 —— FastAPI 按声明顺序匹配，
+    反过来的话 ``/summary`` 会被当成 response_id 去解析，得到一个 422。
+    """
+    allowed_brands = _resolve_scope(
+        db, principal, prompt_id=prompt_id, brand_id=brand_id, run_id=run_id
+    )
+    if allowed_brands is not None and not allowed_brands:
+        return RawResponseSummaryListOut(items=[], total=0)
+
+    filters = dict(
+        platform=platform,
+        answer_status=answer_status,
+        prompt_id=prompt_id,
+        brand_id=brand_id,
+        run_id=run_id,
+        allowed_brands=allowed_brands,
+    )
+    q = (
+        _scoped(select(*_summary_columns()), **filters)
+        .order_by(RawResponse.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    cq = _scoped(select(func.count()).select_from(RawResponse), **filters)
+
+    total = int(db.scalar(cq) or 0)
+    rows = list(db.execute(q).all())
+
+    # 标注单独取：一次 IN 查询把这一页的全取回来，避免 N 次子查询
+    by_response: dict = {}
+    if rows:
+        mentions = db.scalars(
+            select(Mention)
+            .where(Mention.response_id.in_([r.id for r in rows]))
+            .order_by(Mention.id)
+        ).all()
+        for m in mentions:
+            by_response.setdefault(m.response_id, []).append(m)
+
+    return RawResponseSummaryListOut(
+        items=[
+            RawResponseSummaryOut(
+                id=r.id,
+                job_id=r.job_id,
+                platform=r.platform,
+                prompt_text=r.prompt_text,
+                text_preview=r.text_preview,
+                text_length=r.text_length,
+                screenshot_path=r.screenshot_path,
+                latency_ms=r.latency_ms,
+                answer_status=r.answer_status,
+                annotator_version=r.annotator_version,
+                created_at=r.created_at,
+                mentions=[
+                    MentionOut.model_validate(m) for m in by_response.get(r.id, [])
+                ],
+            )
+            for r in rows
+        ],
+        total=total,
+    )
 
 
 @router.get("/{response_id}", response_model=RawResponseOut)
