@@ -307,7 +307,10 @@ D2 之前靠「Cookie 只对 GET 有效」挡 CSRF。**会话能用于写之后�
 `X-CSRF-Token`）→ 服务端比对 Cookie 与请求头。跨站页面能让浏览器带 Cookie，
 但同源策略让它读不到值，拼不出匹配的头。
 
-- 开关 `CSRF_PROTECTION_ENABLED`，**默认 false** —— 前端未适配前开了会让所有会话写操作 403
+- 开关 `CSRF_PROTECTION_ENABLED`，**2026-08-11 已在生产打开**（compose 默认值仍是 false）。
+  打开前核过三条身份通道：①`X-API-Key` 不过 CSRF ②用户会话写操作才校验
+  ③`/qa` 后门 Cookie 只对安全方法生效。开启后实测：① PATCH 200、③ 登录 302 + 读 200、
+  ③ 拿 qa cookie 做写操作 401、读接口 200
 - 只影响**会话身份的写操作**；`X-API-Key` 不受影响（请求头本就得调用方主动设置，本来免疫）
 - `/qa` 后门 Cookie 仍**只对安全方法有效**，这条老防线保留
 

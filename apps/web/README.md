@@ -207,8 +207,11 @@ fetch(url, {
 
 `credentials: 'include'` 同源下是默认行为，写明只是让意图清楚。
 
-后端 `CSRF_PROTECTION_ENABLED` 当前是 `false`，不带头也能写。
-前端在真浏览器里验通之后后端会打开开关，**那之后没带头的写操作全部 403**。
+后端 `CSRF_PROTECTION_ENABLED` **已于 2026-08-11 打开**：
+没带这个头的会话写操作一律 403。`lib/api/client.ts` 对
+POST/PUT/PATCH/DELETE 无条件带上，所以走这一层就不会漏。
+
+**别绕过 `apiFetch` 直接调 `fetch`** —— 那是唯一会漏掉这个头的方式。
 
 **401 与 403 必须分流处理：**
 

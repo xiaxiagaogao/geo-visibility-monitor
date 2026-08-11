@@ -72,9 +72,12 @@ fetch(url, { method: 'POST', credentials: 'include',
 
 
 
-> 后端开关 `CSRF_PROTECTION_ENABLED` 现在是 `false`，**不带这个头也能写**。
-> 但请从第一天就带上 —— 等前端在真浏览器里验通了，后端会打开开关；
-> 到那时没带头的写操作会全部 403。
+> **开关已于 2026-08-11 打开。** 没带 `X-CSRF-Token` 的会话写操作现在一律 403，
+> 响应 detail 会说清缺什么。
+>
+> 只影响「用户会话 + 写方法」这一条通道：`X-API-Key` 走机器通道不过 CSRF，
+> `/qa` 后门 Cookie 只对安全方法生效，两者都不受影响。
+> `POST /v1/auth/login` 在公开路径里 —— 登录前拿不到 token，自然不能要求它。
 
 ### 2.2 状态码约定
 
