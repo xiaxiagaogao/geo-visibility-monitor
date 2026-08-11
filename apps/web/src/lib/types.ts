@@ -128,6 +128,36 @@ export interface RawResponse {
   mentions: Mention[]
 }
 
+/**
+ * apps/api/app/schemas/crawl.py :: RawResponseSummaryOut
+ *
+ * 列表用的轻量投影（`GET /v1/responses/summary`）。
+ *
+ * **这里没有 `full_text` 和 `raw_json`，而且是故意在类型上就没有。**
+ * 后端也没把它们做成可选字段：「有时有有时没有」的字段会让类型撒谎，
+ * 拿到 undefined 时页面不报错、只渲染空白。要全文去 `GET /v1/responses/{id}`。
+ *
+ * `text_length > text_preview.length` 就是「这条被截断了」的判据 ——
+ * 别去数 preview 的字数（后端按字符截，前端数出来的是 UTF-16 code unit）。
+ */
+export interface RawResponseSummary {
+  id: number
+  job_id: number
+  platform: string
+  prompt_text: string
+  /** 正文前 160 字 */
+  text_preview: string
+  /** 正文总字数 */
+  text_length: number
+  screenshot_path: string | null
+  latency_ms: number | null
+  answer_status: string | null
+  /** 为 null 表示这条**还没跑过 L1 标注** —— 和「标注过但没提及」是两回事 */
+  annotator_version: string | null
+  created_at: string
+  mentions: Mention[]
+}
+
 /** apps/api/app/schemas/crawl.py :: CrawlJobOut */
 export interface CrawlJob {
   id: number
