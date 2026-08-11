@@ -16,11 +16,12 @@ src/
   styles/tokens.css      设计 token（浅色为主 + 深色可切，色阶跑过对比度验证器）
   components/ui/         Panel Badge Kpi* Table Tabs EmptyState Degraded ErrorState Skeleton
   components/charts/     EmphasisBars · HitMatrix（手写 SVG/CSS，不引图表库）
-  components/runs/       RunSwitcher · RunNowButton · GapList（只吃 props）
+  components/runs/       RunSwitcher · RunNowButton · GapList · SampleTable（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText
-  lib/l3/                rates · gaps · matrix · run-status + 58 个测试（不碰 fetch/React）
-  lib/api/               client.ts（唯一取数出口）· auth · brands · tasks · counts + 18 个测试
+  lib/l3/                rates · gaps · matrix · run-status · samples + 68 个测试（不碰 fetch/React）
+  lib/api/               client.ts（唯一取数出口）· auth · brands · tasks · counts ·
+                         responses · crawl-jobs + 18 个测试
   lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
   lib/types.ts           照 API 契约定的类型
   app/(dashboard)/       /tasks · /tasks/new · /tasks/[id] · /tasks/[id]/runs/[runId]
@@ -294,14 +295,30 @@ http://geo.xg22.top, https://geo.xg22.top {
 | C1 CSRF 开关 | ✅ 生产 `true` |
 | B1/B2 前端上线 | ✅ `geo-web` 容器 + Caddy handle |
 | **A5 任务列表 + 新建任务** | ✅ 含第一个真实写操作 |
-| **A6 任务详情 `/tasks/[id]`** | ✅ 版式见 §2.3；「样本列表」tab 除外，见下 |
+| **A6 任务详情 `/tasks/[id]`** | ✅ 版式见 §2.3，**含「样本列表」tab** |
 | A2/A3/A4 品牌 / 提问词 / 用户管理 | ⬜ 只依赖已有接口，刻意排在后面 |
 | A7 证据页 · A8 客户首页分流 | ⬜ **下一步**，A6 已经不挡了 |
 
-**A6 里唯一没做的是「样本列表」tab**，页面上是降级态、写清了原因：
-`/v1/responses` 与 `/v1/crawl-jobs` **都没有 `run_id` 过滤**，
-照现在的接口列出来的是这个品牌历史所有运行的样本，不是这一次的。
-（`crawl_jobs.run_id` 这一列是有的，两个 list 端点没暴露成查询参数而已。）
+**「样本列表」tab 的降级态已经拆掉。** A6 上线时它是降级态，原因是
+`/v1/responses` 与 `/v1/crawl-jobs` 都没有 `run_id` 过滤（列那一列是有的，
+只是没暴露成查询参数）。后端已补：两个端点都加了 `run_id`，
+另加一个 `GET /v1/responses/summary` 轻量投影 ——
+列表一行都不显示 `full_text`，却要为它拖几百 KB 过网，
+所以那个端点**不带 `full_text` 也不带 `raw_json`**（API.md §7）。
+
+样本表里两条要守住的口径：
+
+- **非 `ok` 的样本照列，但标「不进分母」**。不标的话用户会拿表里的行数
+  去对 KPI 里的「有效样本」，然后以为哪边算错了。
+- **「未标注」不等于「未提及」**。前者是我们还没跑 L1，后者是 AI 真没提。
+  显示成同一个词就是把降级态说成结论。
+
+失败的 job **不产出 `RawResponse`**，所以它在样本表里一行都不占 ——
+「这次运行还有几条没回来」只能另打一次 `/v1/crawl-jobs?run_id=&status=failed`
+取 `total`。不数这一次的话，一个 partial 的 run 看起来和完整跑完的一模一样。
+
+行**暂时点不进去**：证据页（A7）还没做，给一个必然 404 的链接比不给更糟。
+面板下方写明了原因，让它看起来像未完成而不是像坏了。
 
 顺带记一笔矩阵：格里**只显示 `m/n`，不显示 `#N`**。设计稿那一档要的是
 「该品牌在这几次采样里的中位出场顺位」，那是个分布，而 counts 只给得出
