@@ -7,18 +7,16 @@ import type { ReactNode } from 'react'
 import styles from './shell.module.css'
 
 /**
- * 导航 —— **等 IA 定稿**，现在只有占位一条。
+ * 导航。**不分组** —— 入口少的时候加分组标题只是噪音。
  *
- * 原来是五条：总览 / 采集批次 / 覆盖缺口 / 引用分析 / 原始回答。
- * 它们随单品牌页面一起删了，原因不是页面做得不好，是这套 IA 的前提错了：
- * 五条全部隐含「当前只有一个被监测品牌」，没有品牌或检测任务这一层。
+ * 「引用分析」不会回来：citations 全库 0 行，根因是采集时从未开联网搜索，
+ * 不是能补个字段解决的（API.md §9）。
  *
- * 重建时至少要先回答：入口是任务列表还是品牌列表？
- * 「引用分析」不必回来（citations 全库 0 行且根因不可修，API.md §9）。
- *
- * 「不分组」这条判断可以留着 —— 入口少的时候加分组标题只是噪音。
+ * 品牌 / 提问词 / 用户管理（A2-A4）还没做，做完再加进来。
  */
-const NAV = [{ href: '/', label: '总览', icon: GridIcon }]
+const NAV = [
+  { href: '/tasks', label: '检测任务', icon: LayersIcon },
+]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -72,15 +70,16 @@ export function Sidebar() {
         </a>
       </nav>
 
-      {/* 「配置与发起走 /qa」是把这个前端定位成纯看板时写的，和产品方向已经不符：
-          /qa 是运维质检页，不是正式产品前端，而超管/运营本来就该在这里
-          建品牌、管提问词、发起抓取（API.md §3）。IA 定稿时这行要改。 */}
+      {/* /qa 只剩运维用途 —— 配置类页面（A2-A4）做完之后它就该从这里拿掉。
+          超管/运营建品牌、管提问词、发起抓取都在产品前端里做（API.md §3）。 */}
       <div className={styles.sideFoot}>数据口径 L2 counts</div>
     </aside>
   )
 }
 
-/* ── 图标：16px 线性，stroke 跟随 currentColor ── */
+/* ── 图标：16px 线性，stroke 跟随 currentColor ──
+   GridIcon / AlertIcon / LinkIcon / MessageIcon 暂时没人用 ——
+   留着给 A2-A4（品牌 / 提问词 / 用户管理）的侧栏入口，别当死代码删。 */
 
 function Icon({ children }: { children: ReactNode }) {
   return (

@@ -10,13 +10,14 @@ import { ThemeToggle } from './ThemeToggle'
 /**
  * 页面标题从路由推，不用 context。
  *
- * ⚠️ 这张表原来有 5 条路由，副标题里还写死了「安踏（运动鞋服）」——
- * 那是单品牌看板的产物。路由随页面一起删了，这里只留总览一条占位，
- * 等检测任务 / 多品牌 IA 定下来重建。
- * 届时副标题多半得从当前任务或品牌推出来，不能再是静态字符串。
+ * ⚠️ **静态表只够用到二级路由。** 到了 /tasks/[id] 这种带 id 的页面，
+ * 标题得是任务名、副标题得是品牌 —— 那些只有数据到手才知道，
+ * 届时要么让页面自己往上报，要么改成 context。别再往这张表里堆。
  */
 const TITLES: Record<string, { title: string; sub: string }> = {
-  '/': { title: '总览', sub: 'IA 重构中' },
+  '/': { title: '总览', sub: '' },
+  '/tasks': { title: '检测任务', sub: '每个任务盯一个品牌 · 一次执行叫一个 run' },
+  '/tasks/new': { title: '新建任务', sub: '' },
 }
 
 export function Topbar() {

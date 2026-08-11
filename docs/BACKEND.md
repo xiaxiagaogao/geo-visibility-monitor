@@ -548,7 +548,7 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 |----|-----|
 | VPS | `96.9.213.230`（Ubuntu 24.04） |
 | 公网入口 | `https://geo.xg22.top`（Cloudflare 橙云 → Caddy 按路径分流 → `127.0.0.1:8200`）。**`geo-api.xg22.top` 已退役** |
-| 前端 | 同上域名的 `/`（Caddy 站点已建，当前是 503 占位，等 B1/B2 部署 Next 进程） |
+| 前端 | 同上域名的 `/` → 容器 `geo-web`（Next standalone，只绑 `127.0.0.1:3000`）。2026-08-11 上线 |
 | Caddy | `/etc/caddy/Caddyfile`，**同机还有 fund. / option. 两个别的项目** —— 改完只 `systemctl reload caddy`，勿 restart；改前先备份 |
 | 工作树 / 裸仓 | `/opt/geo-demo` · `/opt/geo-demo.git` |
 | API | `:8200`（需 Key） |

@@ -1,6 +1,6 @@
 # GEO 监测台 · 前端
 
-> **状态：IA 已定稿，页面待重建。** 树里现在只有组件库、设计 token、L3 纯函数和外壳骨架。
+> **状态：已部署在 https://geo.xg22.top，登录打通（A1 完成）。** 页面层待建（A5 起）。
 > 接口契约看 [`docs/API.md`](../../docs/API.md)（唯一权威，本文不重复字段）。
 > 后端职责看 [`docs/BACKEND.md`](../../docs/BACKEND.md)。
 
@@ -18,12 +18,15 @@ src/
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText
   lib/l3/                rates.ts · gaps.ts + 29 个测试（纯函数，不碰 fetch/React）
+  lib/api/               client.ts（唯一取数出口）· auth.ts + 18 个测试
+  lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
   lib/types.ts           照 API 契约定的类型
-  app/(dashboard)/       只有一个占位页
-  app/login/             版式就绪，接口未接
+  app/(dashboard)/       登录闸门就位，内容还是占位页
+  app/login/             已打通
 ```
 
-**没有的：** `lib/api/`、状态管理、任何真实取数。
+**已有取数：** `lib/api/`（请求层 + auth）与 `lib/auth-context.tsx`。
+**还没有的：** 状态管理、任何业务页面的取数。
 
 之前有一套围绕**单个**品牌构建的五页看板，已整体移除——根因不是页面质量，是前提错了：
 `OWN_BRAND_ID` 是模块级常量，派生数据的七个 selector 全是零参数函数，而后端从第一天起
@@ -252,9 +255,9 @@ pnpm build
 
 代价是 VPS 上多一个常驻进程。Caddyfile 已经配好（见下），不必再动。
 
-> **还差最后一步：** `deploy/` 下还没有前端的 Dockerfile / compose 服务，
-> 所以 `/` 目前是 503 占位。Caddy 站点已经建好了（下面就是现行配置），
-> 部署 Next 进程时不用再动它。
+已于 2026-08-11 上线：`deploy/Dockerfile.web` + compose 的 `web` 服务，
+容器 `geo-web` 端口只绑 `127.0.0.1:3000`（公网只能经 Caddy 进）。
+post-receive 会一并 build 并起它，尾部有直连 3000 的探针。
 
 **前端与 API 同源**，都在 `https://geo.xg22.top`，Caddy 按路径分流：
 
@@ -263,7 +266,7 @@ http://geo.xg22.top, https://geo.xg22.top {
 	handle /v1/*    { reverse_proxy 127.0.0.1:8200 }
 	handle /qa/*    { reverse_proxy 127.0.0.1:8200 }
 	handle /health* { reverse_proxy 127.0.0.1:8200 }
-	handle          { reverse_proxy 127.0.0.1:3000 }   # ← B1/B2 部署 Next 后填这里
+	handle          { reverse_proxy 127.0.0.1:3000 }   # geo-web 容器
 	tls internal
 }
 ```
@@ -271,5 +274,8 @@ http://geo.xg22.top, https://geo.xg22.top {
 **必须同时收 `http://` 与 `https://`**：Cloudflare 是 Flexible 模式、回源走 HTTP:80，
 只写 https 的话 Caddy 会自动 308 到 HTTPS、CF 原样返回 → 无限重定向。
 
-对应 env：`CORS_ALLOW_ORIGINS` 留空 · `API_COOKIE_SAMESITE=lax` · `API_COOKIE_SECURE=true`。
-当前 `/` 是 503 占位，等 Next 进程部署上去（B1/B2）。
+对应 env：`CORS_ALLOW_ORIGINS` 留空 · `API_COOKIE_SAMESITE=lax` ·
+`API_COOKIE_SECURE=true` · `CSRF_PROTECTION_ENABLED=true`。
+
+改 Caddy 的顺序是**先起进程、确认 `127.0.0.1:3000` 活着，再改 handle** ——
+反过来会有一段 `/` 是 502 的中间态。

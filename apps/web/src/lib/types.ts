@@ -1,8 +1,7 @@
 /**
  * 后端契约类型 —— 逐字对应 apps/api/app/schemas/*.py。
  *
- * 本轮还没接 API，但类型先按真实契约定死：
- * 这一层是照着 API 契约定的，与品牌数量无关，IA 重构后继续可用。
+ * 与品牌数量无关，IA 重构后继续可用。
  * （原来还有一份 fixtures 共用这套类型，已随单品牌页面删除。）
  */
 
@@ -131,13 +130,51 @@ export interface CrawlJob {
   response_id: number | null
 }
 
-/** 平台在 UI 上的接入状态 —— 无 Provider 时禁止假装可跑。
- *  对应 GET /v1/config/platforms 的 available / implemented（API.md §5） */
+/**
+ * `GET /v1/config/platforms` 的一项。**别硬编码平台清单**（API.md §5）——
+ * 接第二个平台时后端改一行，前端零改动。
+ *
+ * `available` 与 `implemented` 是**两个字段**，不要合并：
+ *   · `available`   现在建任务能不能跑完 → 决定 chip 可点还是灰显
+ *   · `implemented` 有没有 real Provider → 区分「没接」和「在跑假数据」
+ * 合成一个 boolean 就分不出「豆包没接」和「fake 模式下 deepseek 在产假数据」。
+ */
 export interface PlatformOption {
-  id: string
+  code: string
   label: string
-  connected: boolean
+  available: boolean
+  implemented: boolean
+  note: string | null
 }
+
+/** `GET /v1/config/platforms` 的响应 */
+export interface PlatformsConfig {
+  /** `real` | `fake` —— fake 时产出的是假数据，界面要说明白 */
+  crawl_mode: string
+  items: PlatformOption[]
+}
+
+/** `apps/api/app/schemas/task.py :: TaskOut` */
+export interface Task {
+  id: number
+  brand_id: number
+  name: string
+  platforms: string[]
+  samples: number
+  is_active: boolean
+  created_at: string
+  /** 列表页直接用，不必逐行再打一次 runs 接口 */
+  latest_run_id: number | null
+  latest_run_at: string | null
+  /** `empty` | `pending` | `running` | `success` | `partial` | `failed` */
+  latest_run_status: RunStatus | null
+}
+
+/**
+ * run 状态。**`partial` 是独立一档，不能当 success 显示** ——
+ * 部分成功意味着分母少了一截，所有比率会静默偏高。
+ */
+export type RunStatus = 'empty' | 'pending' | 'running' | 'success' | 'partial' | 'failed'
 
 /**
  * 图表视图模型 —— 一根 emphasis 横条要的全部数据。
