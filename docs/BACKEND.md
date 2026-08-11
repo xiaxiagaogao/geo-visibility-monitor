@@ -554,7 +554,7 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 | API | `:8200`（需 Key） |
 | 库 | `127.0.0.1:5433`（**勿改 0.0.0.0**；默认口令 `geo/geo` 是弱口令，对外前必须改） |
 | 日志 | `/var/log/geo-demo-deploy.log` |
-| 容器 | `geo-api` · `geo-crawler` · `geo-postgres` |
+| 容器 | `geo-api` · `geo-web` · `geo-crawler` · `geo-postgres` |
 | 勿碰 | `:8100` sillytavern · `:8090` fund-dashboard · 现有 nginx |
 
 ```bash
