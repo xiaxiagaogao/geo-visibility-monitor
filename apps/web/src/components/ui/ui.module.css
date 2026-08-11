@@ -137,6 +137,31 @@
   color: var(--text-tertiary);
 }
 
+/* 线性 meter —— 设计稿明确要求「单一比率用 meter 不用环形」，
+   且 m / n 写在轨道下方。轨道让「60%」有了参照物：
+   光一个数字看不出它离满还差多远。 */
+.kpiTrack {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+  margin: 8px 0 6px;
+}
+
+.kpiFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 240ms ease;
+}
+
+/* 挂零不是「没画」，是「真的是 0」—— 给一段红色起始笔画，
+   否则空轨道和加载中长得一样。 */
+.kpiFillZero {
+  background: var(--danger);
+  min-width: 3px;
+}
+
 /* ═══ Badge ═══ */
 .badge {
   display: inline-flex;

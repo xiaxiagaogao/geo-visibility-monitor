@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { formatFraction, formatRate } from '@/lib/l3/rates'
+import { formatFraction, formatRate, rate } from '@/lib/l3/rates'
 
 import styles from './ui.module.css'
 
@@ -91,6 +91,8 @@ export function KpiRate({
   denomLabel?: string
   alert?: boolean
 }) {
+  // null = 不可算（分母为 0），0 = 真的是 0 —— 两者显示完全不同
+  const r = rate(m, n)
   return (
     <div className={`${styles.kpi} ${alert ? styles.kpiAlert : ''}`}>
       <div className={styles.kpiLabel}>
@@ -98,8 +100,18 @@ export function KpiRate({
         {info ? <InfoDot title={info} /> : null}
       </div>
       <div className={`${styles.kpiValue} mono ${alert ? styles.kpiValueAlert : ''}`}>
-        {formatRate(n > 0 ? m / n : null)}
+        {formatRate(r)}
       </div>
+      {/* 线性 meter —— 让「60%」有参照物。分母为 0 时不画轨道：
+          画一条空轨道等于宣称「0%」，而真相是「算不出来」。 */}
+      {r === null ? null : (
+        <div className={styles.kpiTrack}>
+          <div
+            className={`${styles.kpiFill} ${r === 0 ? styles.kpiFillZero : ''}`}
+            style={{ width: `${Math.min(100, r * 100)}%` }}
+          />
+        </div>
+      )}
       <div className={`${styles.kpiDenom} mono`}>{denomLabel ?? formatFraction(m, n)}</div>
     </div>
   )
