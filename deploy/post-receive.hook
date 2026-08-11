@@ -31,8 +31,8 @@ if [ -f "$TARGET/deploy/post-receive.hook" ]; then
 fi
 
 cd "$TARGET/deploy"
-echo "docker compose up postgres api..."
-docker compose up -d --build postgres api
+echo "docker compose up postgres api web..."
+docker compose up -d --build postgres api web
 
 # crawler holds Playwright code; rebuild if container already exists
 if docker ps -a --format '{{.Names}}' | grep -qx geo-crawler; then
@@ -64,6 +64,14 @@ docker compose ps
 # /health 是公开探针；/health/db 与 /health/config 已需要 API_KEY，部署脚本不再探
 curl -s http://127.0.0.1:8200/health || true
 echo
+# 前端探针：Caddy 把非 /v1 /qa /health 的请求转到 3000，这里直连确认进程活着
+for i in $(seq 1 30); do
+  if curl -sf -o /dev/null http://127.0.0.1:3000/login; then
+    echo "web ready"
+    break
+  fi
+  sleep 2
+done
 if ! grep -qE '^API_KEY=.+' .env 2>/dev/null; then
   echo "!! 警告：deploy/.env 未设置 API_KEY —— 8200 端口在公网上完全无鉴权"
 fi

@@ -55,6 +55,19 @@ services:
       postgres:
         condition: service_healthy
 
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    container_name: geo-web
+    restart: unless-stopped
+    # 只监听回环 —— 公网入口是 Caddy，它按路径把非 /v1 /qa /health 的请求转到这里。
+    # 写成 "3000:3000" 会把 Next 直接暴露到公网，绕过 Caddy 的 TLS 与路由。
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
+
   crawler:
     build:
       context: ..

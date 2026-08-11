@@ -1,0 +1,38 @@
+# 前端：Next standalone。
+#
+# 两阶段：第一阶段装依赖并构建，第二阶段只拷产物 —— standalone 自带一份
+# 裁剪过的 node_modules，不需要把整个开发依赖带进运行镜像。
+#
+# 生产是**同源**部署（Caddy 按路径分流 /v1 /qa /health 到 API），
+# 所以这个进程只负责渲染页面，不做任何 API 代理。
+
+FROM node:22-slim AS builder
+WORKDIR /app
+
+RUN corepack enable
+
+# 先只拷依赖清单 —— 源码变了但依赖没变时，这一层能命中缓存
+COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY apps/web/ ./
+RUN pnpm build
+
+
+FROM node:22-slim AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+# standalone 把 server.js 与运行期需要的那部分 node_modules 一起吐出来；
+# static 与 public 不在里面，要单独拷（Next 的已知行为，漏了就是页面没样式）
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# 不用 root 跑
+USER node
+
+EXPOSE 3000
+CMD ["node", "server.js"]
