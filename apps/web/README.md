@@ -192,21 +192,20 @@ GET /v1/counts?brand_id=34&run_id=27   → 35 / 21，与不带 run_id 时一致
 身份只有一条通道：**会话 Cookie**。`X-API-Key` 是机器凭证，权限等同超管，
 **绝不打进前端包**（API.md §1）。
 
-**CSRF token 从响应体拿，不是读 Cookie。** 跨域部署下读不到 ——
-`geo_csrf` 是 `geo-api.xg22.top` 的 host-only Cookie，前端在 `geo.xg22.top`。
-`login` 与 `me` 的响应体都带 `csrf_token`，存**内存**（别进 localStorage）。
+**CSRF token 从响应体拿。** `login` 与 `me` 的响应体都带 `csrf_token`，
+存**内存**（别进 localStorage）。同源之后 `document.cookie` 也读得到 `geo_csrf`，
+但仍走响应体 —— 不依赖 Cookie 作用域，将来变拓扑不用改前端。
 
 ```ts
 // 所有写操作无条件带 CSRF 头，不给「先不带以后再加」留口子
 fetch(url, {
   method: 'POST',
-  credentials: 'include',                        // 跨站不带这个就没有身份
+  credentials: 'include',                        // 同源下是默认行为，写明让意图清楚
   headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json' },
 })
 ```
 
-> ⚠️ **开发期走 rewrites 代理会掩盖这件事**：那时 Cookie 落在 localhost，
-> `document.cookie` 读得到。照老办法写会在本地验证通过、上生产全线 403。
+`credentials: 'include'` 同源下是默认行为，写明只是让意图清楚。
 
 后端 `CSRF_PROTECTION_ENABLED` 当前是 `false`，不带头也能写。
 前端在真浏览器里验通之后后端会打开开关，**那之后没带头的写操作全部 403**。
@@ -231,12 +230,9 @@ pnpm lint     # tsc --noEmit
 pnpm build
 ```
 
-开发期取数走 `next.config.ts` 里的 rewrites 代理到 `geo-api.xg22.top`，
-浏览器眼里是同源。后端 `set_cookie` 不带 `domain`（host-only），
-所以 Set-Cookie 会落到 localhost 名下，不会因域名不匹配被丢。**零后端改动。**
-
-替代方案是直连 API 域名，但要把 `http://localhost:3000` 加进 VPS 上的
-`CORS_ALLOW_ORIGINS`——改 env 得上 VPS。
+开发期取数走 `next.config.ts` 里的 rewrites 代理到 `geo.xg22.top`。
+本机 `localhost:3000` 和线上不是同一个 Origin，代理让浏览器眼里全是同源，
+**和生产行为一致**（生产是 Caddy 按路径分流，也是同源）。
 
 ---
 
@@ -245,25 +241,32 @@ pnpm build
 **Node 运行时**（`output: 'standalone'`），不是静态导出。
 `pnpm build` 产出 `.next/standalone/server.js`，起这个进程即可。
 
-换来的是**真实路由**（`/tasks/[id]` 不必用 `generateStaticParams` 预枚举 id）。
-代价是 VPS 上多一个常驻进程，且要改共用的 Caddyfile
-（同机还有 `fund.xg22.top` / `option.xg22.top`，改前备份，只 `reload` 不 `restart`）。
+换来两样：**真实路由**（`/tasks/[id]` 不必用 `generateStaticParams` 预枚举 id），
+以及**服务端能在渲染前拦未登录**（同源之后 Cookie 与前端同域，Next 服务器看得见）。
 
-> **原先这里还写着「服务端能在渲染前拦未登录」—— 那是错的。**
-> `geo_session` 是 `geo-api.xg22.top` 的 host-only Cookie，
-> `geo.xg22.top` 上的 Next 服务器同样看不到它。鉴权判断只能在客户端做
-> （服务端仍然守着，前端只是决定渲染什么）。
-> 要拿回服务端拦截，得让生产也走前端代理，那是另一个决定。
+> 后一条曾经不成立并被撤回过 —— 那是前后端分成两个域名的时候。
+> 2026-08-11 合并成同源之后它重新成立了。
 
-> **这一段是决定，不是现状。** 部署侧尚未实施：`deploy/` 下还没有前端的
-> Dockerfile / compose 服务，Caddy 也还没有 `geo.xg22.top` 的站点配置。
-> 动这些之前先列步骤过目。
+代价是 VPS 上多一个常驻进程。Caddyfile 已经配好（见下），不必再动。
 
-生产入口 `https://geo.xg22.top`，API 在 `https://geo-api.xg22.top`，跨站。
-三项配置必须成套，缺一项的现象是「登录了但一直 401」：
+> **还差最后一步：** `deploy/` 下还没有前端的 Dockerfile / compose 服务，
+> 所以 `/` 目前是 503 占位。Caddy 站点已经建好了（下面就是现行配置），
+> 部署 Next 进程时不用再动它。
 
-```text
-CORS_ALLOW_ORIGINS=https://geo.xg22.top
-API_COOKIE_SAMESITE=none
-API_COOKIE_SECURE=true
+**前端与 API 同源**，都在 `https://geo.xg22.top`，Caddy 按路径分流：
+
+```caddyfile
+http://geo.xg22.top, https://geo.xg22.top {
+	handle /v1/*    { reverse_proxy 127.0.0.1:8200 }
+	handle /qa/*    { reverse_proxy 127.0.0.1:8200 }
+	handle /health* { reverse_proxy 127.0.0.1:8200 }
+	handle          { reverse_proxy 127.0.0.1:3000 }   # ← B1/B2 部署 Next 后填这里
+	tls internal
+}
 ```
+
+**必须同时收 `http://` 与 `https://`**：Cloudflare 是 Flexible 模式、回源走 HTTP:80，
+只写 https 的话 Caddy 会自动 308 到 HTTPS、CF 原样返回 → 无限重定向。
+
+对应 env：`CORS_ALLOW_ORIGINS` 留空 · `API_COOKIE_SAMESITE=lax` · `API_COOKIE_SECURE=true`。
+当前 `/` 是 503 占位，等 Next 进程部署上去（B1/B2）。

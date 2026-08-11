@@ -11,31 +11,30 @@ import type { NextConfig } from 'next'
  *
  * 换成 Node 运行时得到：
  *   · 真实路由 /tasks/34/runs/128/r/29 —— 运营要把证据链接发给客户
- * （原先这里还列了「服务端能在渲染前拦未登录」—— 那条是错的：
- *   geo_session 是 geo-api.xg22.top 的 host-only Cookie，
- *   geo.xg22.top 上的 Next 服务器同样看不到。鉴权只能在客户端判断。）
+ *   · 服务端能在渲染前拦未登录 —— 2026-08-11 合并成同源之后这条**成立了**：
+ *     Cookie 与前端同域，Next 服务器看得见。（分成两个域名的那段时间里
+ *     它是不成立的，我一度把它当理由写在这儿，后来撤回过。）
  *
  * 代价（尚未实施，见 README §9）：
  *   VPS 上多一个常驻进程，且要改共用的 Caddyfile（同机还有别的项目，
  *   改前备份、只 reload 不 restart）。
  *
- * 开发期取数走下面的 rewrites 代理，浏览器眼里全是同源。
- * 后端 set_cookie 不带 domain（host-only，见 apps/api/app/api/auth.py），
- * 所以 Set-Cookie 会落到 localhost 名下，不会因域名不匹配被丢；
+ * 开发期仍走下面的 rewrites 代理：本机 localhost:3000 与线上 geo.xg22.top
+ * 不是同一个 Origin，代理让浏览器眼里全是同源，和生产行为一致。
+ * 后端 set_cookie 不带 domain（host-only），Set-Cookie 会落到 localhost 名下；
  * Cookie 带的 Secure 在 http://localhost 上浏览器也放行（localhost 算可信来源）。
- * **零后端改动** —— 相对「直连 + 把 localhost 加进 CORS_ALLOW_ORIGINS」的主要优势。
  */
-const API_ORIGIN = process.env.API_ORIGIN ?? 'https://geo-api.xg22.top'
+const API_ORIGIN = process.env.API_ORIGIN ?? 'https://geo.xg22.top'
 
-// `/qa` 是后端的运维质检页。配置类页面全部进产品前端之后它只剩运维用途，
-// 侧栏那个相对链接要拿掉（分离部署下它指向 geo.xg22.top/qa，那里没有 /qa）。
-// 代理保留：开发期偶尔要开它对数据。
+// `/qa` 是后端的运维质检页。同源之后它就在 geo.xg22.top/qa 下，
+// 侧栏那个相对链接**是通的**（分离部署那段时间里它是坏的，已不再是问题）。
+// 等配置类页面（A2-A4）做完，/qa 只剩运维用途，届时再决定要不要从侧栏拿掉。
 const PROXY_PREFIXES = ['/v1', '/qa', '/health']
 
 const nextConfig: NextConfig = {
   output: 'standalone',
   async rewrites() {
-    // 生产是跨站直连 geo-api.xg22.top（CORS + 跨站 Cookie 已配好），不走代理
+    // 生产同源（Caddy 按路径分流），不需要代理
     if (process.env.NODE_ENV === 'production') return []
     return PROXY_PREFIXES.map((prefix) => ({
       source: `${prefix}/:path*`,

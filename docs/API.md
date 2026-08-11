@@ -10,9 +10,9 @@
 
 | 项 | 值 |
 |----|-----|
-| Base URL | `https://geo-api.xg22.top`（Cloudflare → Caddy → `geo-api:8200`） |
-| 前端 Origin | `https://geo.xg22.top`（已在 CORS 白名单） |
-| 跨域 | 已开 CORS 且 `allow_credentials=true`；**fetch 必须带 `credentials: 'include'`** |
+| Base URL | `https://geo.xg22.top`（与前端**同源**，Caddy 按路径分流到 `geo-api:8200`） |
+| 前端 Origin | `https://geo.xg22.top` —— **同一个域名**，前端在 `/`、API 在 `/v1/*` |
+| 跨域 | **没有跨域**。同源，无 CORS。`fetch` 仍建议带 `credentials: 'include'`（同源下是默认行为，写明更清楚） |
 | 内容类型 | 一律 JSON（登录也是 JSON，不是表单） |
 
 **前端只用一条身份通道：会话 Cookie。** `X-API-Key` 是机器凭证（运维脚本、CI），
@@ -56,9 +56,11 @@
 
 写操作要把 token 放进 `X-CSRF-Token` 请求头。
 
-**token 从响应体拿，不要去读 Cookie。** 跨域部署下你读不到 ——
-`geo_csrf` 是 `geo-api.xg22.top` 的 host-only Cookie，而你在 `geo.xg22.top`。
-`login` 与 `me` 的响应体里都有 `csrf_token`，存内存即可（**别进 localStorage**）。
+**token 从响应体拿。** `login` 与 `me` 的响应体里都有 `csrf_token`，
+存内存即可（**别进 localStorage**）。
+
+同源之后 `document.cookie` 其实也读得到 `geo_csrf` 了，但**仍然走响应体** ——
+它不依赖 Cookie 作用域，将来若再变拓扑不用改前端。
 
 ```ts
 // 登录时拿到；刷新页面后从 GET /v1/auth/me 重新拿
@@ -68,8 +70,7 @@ fetch(url, { method: 'POST', credentials: 'include',
              headers: { 'X-CSRF-Token': csrf_token, 'Content-Type': 'application/json' } })
 ```
 
-> ⚠️ **开发期走代理会掩盖这个问题。** next rewrites 下 Cookie 落在 localhost，
-> `document.cookie` 读得到，老写法验证会通过 —— 然后一上生产全线 403。
+
 
 > 后端开关 `CSRF_PROTECTION_ENABLED` 现在是 `false`，**不带这个头也能写**。
 > 但请从第一天就带上 —— 等前端在真浏览器里验通了，后端会打开开关；
@@ -258,7 +259,7 @@ full_text.slice(first_offset, first_offset + matched_term.length) === matched_te
 `RawResponseOut.screenshot_path` **已经是 basename**，直接拼即可：
 
 ```html
-<img src="https://geo-api.xg22.top/v1/media/screenshots/deepseek_1785601999.png">
+<img src="https://geo.xg22.top/v1/media/screenshots/deepseek_1785601999.png">
 ```
 
 跨站 `<img>` 会自动带上会话 Cookie（`SameSite=None; Secure`）。
@@ -394,21 +395,21 @@ SoV(安踏) = 21 / 137 = 15.3%
 
 ```bash
 # 1. 登录（注意 -c 存 cookie）
-curl -sc /tmp/c.txt -X POST https://geo-api.xg22.top/v1/auth/login \
+curl -sc /tmp/c.txt -X POST https://geo.xg22.top/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"...","password":"..."}'
 
 # 2. 我是谁
-curl -sb /tmp/c.txt https://geo-api.xg22.top/v1/auth/me
+curl -sb /tmp/c.txt https://geo.xg22.top/v1/auth/me
 
 # 3. 总览四个数
-curl -sb /tmp/c.txt 'https://geo-api.xg22.top/v1/counts?brand_id=34'
+curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/counts?brand_id=34'
 
 # 4. 逐提问下钻（矩阵的数据源）
-curl -sb /tmp/c.txt 'https://geo-api.xg22.top/v1/counts?brand_id=34&group_by=prompt'
+curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/counts?brand_id=34&group_by=prompt'
 
 # 5. 平台可用性
-curl -sb /tmp/c.txt https://geo-api.xg22.top/v1/config/platforms
+curl -sb /tmp/c.txt https://geo.xg22.top/v1/config/platforms
 ```
 
 前端首次接通的判据：**`/v1/counts?brand_id=34` 返回 `n_valid=35`、`m_mentioned=21`**。

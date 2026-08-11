@@ -311,23 +311,49 @@ D2 之前靠「Cookie 只对 GET 有效」挡 CSRF。**会话能用于写之后�
 - 只影响**会话身份的写操作**；`X-API-Key` 不受影响（请求头本就得调用方主动设置，本来免疫）
 - `/qa` 后门 Cookie 仍**只对安全方法有效**，这条老防线保留
 
-### 5.4 分离部署（D1）：三项配置必须成套
+### 5.4 同源部署：一个域名，按路径分流
 
-前端独立部署后是**跨站**访问，三项缺一不可，缺了的现象是「登录了但一直 401」，
-无任何报错：
+前端与 API **同源**，Caddy 在 `geo.xg22.top` 上按路径分流：
 
-```bash
-CORS_ALLOW_ORIGINS=https://geo.xg22.top   # 带 Cookie 时不允许 "*"，逐个列出
-API_COOKIE_SAMESITE=none                  # 跨站请求才会带 Cookie
-API_COOKIE_SECURE=true                    # 浏览器强制：SameSite=None 必须 Secure
+```caddyfile
+http://geo.xg22.top, https://geo.xg22.top {
+	handle /v1/*    { reverse_proxy 127.0.0.1:8200 }
+	handle /qa/*    { reverse_proxy 127.0.0.1:8200 }
+	handle /health* { reverse_proxy 127.0.0.1:8200 }
+	handle          { reverse_proxy <前端进程> }
+	tls internal
+}
 ```
 
-启动时会校验这三项是否成套，不成套直接 WARNING。
+**必须同时收 `http://` 与 `https://`。** Cloudflare 是 Flexible 模式、回源走 HTTP:80；
+只写 `https://` 的话 Caddy 会对 HTTP 请求自动 308 到 HTTPS，CF 原样返给浏览器 ——
+**无限重定向，且请求根本到不了应用**。同机的 fund / option 也都是这么成双配的。
 
-- **CORS 中间件必须后加**（`main.py`）：Starlette 里后加的在外层先执行。
-  顺序反了，预检 `OPTIONS` 会先撞 `ApiKeyMiddleware` 拿到不带 CORS 头的 401 ——
-  现象是「浏览器全挂但 curl 正常」。
-- 放宽 SameSite **不引入 CSRF**：Cookie 仍只对 GET/HEAD/OPTIONS 有效。
+对应的 env：
+
+```bash
+CORS_ALLOW_ORIGINS=        # 留空 → CORS 中间件整个不启用
+API_COOKIE_SAMESITE=lax    # 同源不需要 none
+API_COOKIE_SECURE=true     # HTTPS
+```
+
+#### 为什么从两个域名合回来（D1 → 2026-08-11）
+
+D1 曾把前端拆到独立域名，根因是「前端另成产品」被理解成了「另一个 Origin」——
+**这是两件事**。跨 Origin 收的税：
+
+- CORS 三项配置必须成套，缺一项现象是「登录了但一直 401」，无任何报错
+- CORS 中间件顺序坑：现象是「浏览器全挂但 curl 正常」
+- `SameSite=None` 强制 `Secure`
+- **前端读不到 `geo_csrf`**（host-only Cookie），双提交 CSRF 根本实施不了
+- 服务端拦不了未登录（Next 同样看不到另一个域的 Cookie）
+- 证据截图 `<img src>` 只能靠跨站 Cookie
+
+而 `geo-api.xg22.top` 实际只承接了 `/qa`（7 天 24 个请求，拆开看基本是扫描器）。
+合并后上述六条一次性消失，该域名退役（DNS 记录仍在 Cloudflare，放回 block 即可恢复）。
+
+> CORS 相关代码与测试**保留**：`CORS_ALLOW_ORIGINS` 非空时仍会启用，
+> 将来真要拆分不用重写。
 
 ### 5.5 CDN 会绕过鉴权 —— 需要鉴权的响应必须禁缓存
 
@@ -518,8 +544,8 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 | 项 | 值 |
 |----|-----|
 | VPS | `96.9.213.230`（Ubuntu 24.04） |
-| API 公网入口 | `https://geo-api.xg22.top`（Cloudflare 橙云 → Caddy → `127.0.0.1:8200`） |
-| 前端公网入口 | `https://geo.xg22.top`（DNS 已就绪，**Caddy 站点待建**） |
+| 公网入口 | `https://geo.xg22.top`（Cloudflare 橙云 → Caddy 按路径分流 → `127.0.0.1:8200`）。**`geo-api.xg22.top` 已退役** |
+| 前端 | 同上域名的 `/`（Caddy 站点已建，当前是 503 占位，等 B1/B2 部署 Next 进程） |
 | Caddy | `/etc/caddy/Caddyfile`，**同机还有 fund. / option. 两个别的项目** —— 改完只 `systemctl reload caddy`，勿 restart；改前先备份 |
 | 工作树 / 裸仓 | `/opt/geo-demo` · `/opt/geo-demo.git` |
 | API | `:8200`（需 Key） |
