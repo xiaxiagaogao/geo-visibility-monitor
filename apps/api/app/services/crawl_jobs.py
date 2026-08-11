@@ -93,6 +93,7 @@ def list_jobs(
     status_filter: Optional[str] = None,
     platform: Optional[str] = None,
     prompt_id: Optional[int] = None,
+    run_id: Optional[int] = None,
     limit: int = 50,
     offset: int = 0,
 ) -> Tuple[List[CrawlJob], int]:
@@ -107,6 +108,9 @@ def list_jobs(
     if prompt_id is not None:
         q = q.where(CrawlJob.prompt_id == prompt_id)
         cq = cq.where(CrawlJob.prompt_id == prompt_id)
+    if run_id is not None:
+        q = q.where(CrawlJob.run_id == run_id)
+        cq = cq.where(CrawlJob.run_id == run_id)
     total = int(db.scalar(cq) or 0)
     items = list(db.scalars(q.offset(max(offset, 0)).limit(min(limit, 200))).all())
     return items, total

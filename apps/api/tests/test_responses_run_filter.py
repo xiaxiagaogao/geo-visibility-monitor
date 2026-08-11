@@ -34,11 +34,11 @@ def test_run_id_is_authorized_before_use():
     assert "assert_run_visible" in src, "run_id 必须过 assert_run_visible"
 
 
-def test_run_id_counts_as_a_narrowing_condition():
+def test_run_id_counts_as_a_narrowing_condition(fake_db):
     """带了 run_id 就不该再退回「收敛到全部可见品牌」——
     run 已经把范围钉死在一个任务上了，再叠一层只会多两个 join。"""
     scope = responses_api._resolve_scope(
-        _FakeDb(scalars=[7, 34], brand_workspace=1),
+        fake_db(brand_workspace=1),
         CLIENT,
         prompt_id=None,
         brand_id=None,
@@ -47,10 +47,10 @@ def test_run_id_counts_as_a_narrowing_condition():
     assert scope is None
 
 
-def test_client_cannot_borrow_another_workspaces_run():
+def test_client_cannot_borrow_another_workspaces_run(fake_db):
     """**这条是这个参数真正的风险。** run_id 看起来无害，
     不校验的话客户改一个数字就能列出别家的样本。"""
-    db = _FakeDb(scalars=[7, 34], brand_workspace=2)  # run→task→brand 落在别家
+    db = fake_db(brand_workspace=2)  # run→task→brand 落在别家
     with pytest.raises(HTTPException) as e:
         responses_api._resolve_scope(
             db, CLIENT, prompt_id=None, brand_id=None, run_id=128
@@ -58,9 +58,9 @@ def test_client_cannot_borrow_another_workspaces_run():
     assert e.value.status_code == 404, "不可见一律 404，403 会泄露「这个 id 存在」"
 
 
-def test_no_condition_still_converges_client_to_own_brands():
+def test_no_condition_still_converges_client_to_own_brands(fake_db):
     """一个收敛条件都不给时，原来的兜底不能被这次改动弄丢。"""
-    db = _FakeDb(scalars=[], brand_workspace=1, brand_ids=[34, 35])
+    db = fake_db(brand_ids=[34, 35])
     assert responses_api._resolve_scope(
         db, CLIENT, prompt_id=None, brand_id=None, run_id=None
     ) == [34, 35]
@@ -114,41 +114,3 @@ def test_count_query_takes_the_same_filters():
     )
     assert "crawl_jobs.run_id" in sql
     assert "count(" in sql
-
-
-# ---------- 测试替身 ----------
-
-
-class _FakeBrand:
-    def __init__(self, workspace_id: int) -> None:
-        self.workspace_id = workspace_id
-
-
-class _FakeDb:
-    """够 assert_run_visible / visible_brand_ids 走完的最小替身。
-
-    run→task→brand 那条链是两次 ``scalar``（Run.task_id、Task.brand_id）
-    加一次 ``get(Brand, id)``；``visible_brand_ids`` 走 ``scalars``。
-    """
-
-    def __init__(self, scalars, brand_workspace: int, brand_ids=()) -> None:
-        self._scalars = list(scalars)
-        self._brand_workspace = brand_workspace
-        self._brand_ids = list(brand_ids)
-
-    def scalar(self, *_a, **_k):
-        return self._scalars.pop(0)
-
-    def get(self, _model, _ident):
-        return _FakeBrand(self._brand_workspace)
-
-    def scalars(self, *_a, **_k):
-        return _FakeResult(self._brand_ids)
-
-
-class _FakeResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def all(self):
-        return self._rows

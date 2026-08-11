@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import (
     assert_prompt_visible,
+    assert_run_visible,
     current_principal,
     get_db,
     require_write,
@@ -36,24 +37,33 @@ def list_crawl_jobs(
     job_status: Optional[str] = Query(None, alias="status"),
     platform: Optional[str] = None,
     prompt_id: Optional[int] = None,
+    run_id: Optional[int] = Query(
+        None, description="只看这一次运行的采样（含没产出响应的失败 job）"
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, description="跳过前 N 条；与 total 配合翻页"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    # 两个参数都是「收敛到一个可见范围」，但**各自都得校验**：
+    # run_id 不校验的话，客户换个数字就能数出别家某次运行有多少采样、失败几条。
     if prompt_id is not None:
         assert_prompt_visible(db, principal, prompt_id)
-    elif visible_brand_ids(db, principal) is not None:
-        # 客户不带 prompt_id 时不能列全部任务 —— 任务本身也泄露别家在监测什么
+    if run_id is not None:
+        assert_run_visible(db, principal, run_id)
+    no_narrowing = prompt_id is None and run_id is None
+    if no_narrowing and visible_brand_ids(db, principal) is not None:
+        # 客户不带收敛条件时不能列全部任务 —— 任务本身也泄露别家在监测什么
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="prompt_id is required for your role",
+            detail="prompt_id or run_id is required for your role",
         )
     items, total = job_svc.list_jobs(
         db,
         status_filter=job_status,
         platform=platform,
         prompt_id=prompt_id,
+        run_id=run_id,
         limit=limit,
         offset=offset,
     )
