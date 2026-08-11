@@ -3,6 +3,8 @@
 import { usePathname } from 'next/navigation'
 
 import { Badge } from '@/components/ui'
+import { canWrite } from '@/lib/api/auth'
+import { useAuth } from '@/lib/auth-context'
 
 import styles from './shell.module.css'
 import { ThemeToggle } from './ThemeToggle'
@@ -22,6 +24,7 @@ const TITLES: Record<string, { title: string; sub: string }> = {
 
 export function Topbar() {
   const pathname = usePathname()
+  const { me } = useAuth()
   const meta = TITLES[pathname] ?? TITLES[`${pathname}/`] ?? { title: 'GEO 监测台', sub: '' }
 
   return (
@@ -29,10 +32,12 @@ export function Topbar() {
       <div>
         <div className={styles.filterGroup}>
           <strong style={{ fontSize: 'var(--fs-h1)' }}>{meta.title}</strong>
-          {/* 「只读」现在属实（前端还没有任何写操作），但它不是产品终态：
-              三角色里超管/运营要能发起抓取、重试、改配置（API.md §3）。
-              IA 定稿时这个徽章要么按角色渲染，要么去掉。 */}
-          <Badge tone="accent">只读</Badge>
+          {/* 曾经无条件挂「只读」，当时属实 —— 前端一个写操作都没有。
+              A5 的「新建任务」和 A6 的「立即运行」上线后它就成了假话，
+              所以改成按角色渲染：客户确实是纯只读，超管/运营不是。
+
+              **这只是标注，不是权限。** 真正的边界在服务端的 require_write。 */}
+          {canWrite(me) ? null : <Badge tone="accent">只读</Badge>}
         </div>
         <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
           {meta.sub}

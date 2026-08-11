@@ -194,6 +194,15 @@
   color: var(--danger);
 }
 
+/* 不可算：这条提问这次一条有效样本都没有（n = 0）。
+   和 .zero 必须看得出区别 —— 「算不出」不是「真的是 0」。
+   边框比 .zero 更淡：一个连结果都没有的格子不该和一个「结果是 0」的格子
+   一样醒目，否则挂零那条真结论会被一排空行稀释掉。 */
+.na {
+  border-color: var(--border);
+  opacity: 0.7;
+}
+
 .hit:hover {
   outline: 2px solid var(--text-primary);
   outline-offset: 1px;

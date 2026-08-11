@@ -13,16 +13,23 @@ export function Button({
   primary,
   onClick,
   type = 'button',
+  disabled,
 }: {
   children: ReactNode
   primary?: boolean
   onClick?: () => void
   type?: 'button' | 'submit'
+  /**
+   * 请求在飞的时候必须传 —— 只把文案改成「发起中…」挡不住第二次点击，
+   * 而「立即运行」点两次就是两个 run、两批 job、两份额度，且撤不回来。
+   */
+  disabled?: boolean
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       className={`${styles.btn} ${primary ? styles.btnPrimary : ''}`}
     >
       {children}

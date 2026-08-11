@@ -1,6 +1,7 @@
 # GEO 监测台 · 前端
 
-> **状态：已部署在 https://geo.xg22.top，登录打通（A1 完成）。** 页面层待建（A5 起）。
+> **状态：已部署在 https://geo.xg22.top。** 任务列表 / 新建 / 详情（A5·A6）都在了，
+> 下一步是证据页与客户首页分流（A7·A8）。进度表见 §10。
 > 接口契约看 [`docs/API.md`](../../docs/API.md)（唯一权威，本文不重复字段）。
 > 后端职责看 [`docs/BACKEND.md`](../../docs/BACKEND.md)。
 
@@ -14,14 +15,15 @@
 src/
   styles/tokens.css      设计 token（浅色为主 + 深色可切，色阶跑过对比度验证器）
   components/ui/         Panel Badge Kpi* Table Tabs EmptyState Degraded ErrorState Skeleton
-  components/charts/     EmphasisBars（手写 SVG/CSS，不引图表库）
+  components/charts/     EmphasisBars · HitMatrix（手写 SVG/CSS，不引图表库）
+  components/runs/       RunSwitcher · RunNowButton · GapList（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText
-  lib/l3/                rates.ts · gaps.ts + 29 个测试（纯函数，不碰 fetch/React）
-  lib/api/               client.ts（唯一取数出口）· auth.ts + 18 个测试
+  lib/l3/                rates · gaps · matrix · run-status + 58 个测试（不碰 fetch/React）
+  lib/api/               client.ts（唯一取数出口）· auth · brands · tasks · counts + 18 个测试
   lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
   lib/types.ts           照 API 契约定的类型
-  app/(dashboard)/       登录闸门就位，内容还是占位页
+  app/(dashboard)/       /tasks · /tasks/new · /tasks/[id] · /tasks/[id]/runs/[runId]
   app/login/             已打通
 ```
 
@@ -292,9 +294,19 @@ http://geo.xg22.top, https://geo.xg22.top {
 | C1 CSRF 开关 | ✅ 生产 `true` |
 | B1/B2 前端上线 | ✅ `geo-web` 容器 + Caddy handle |
 | **A5 任务列表 + 新建任务** | ✅ 含第一个真实写操作 |
-| **A6 任务详情 `/tasks/[id]`** | ⬜ **下一步**，版式见 §2.3 |
+| **A6 任务详情 `/tasks/[id]`** | ✅ 版式见 §2.3；「样本列表」tab 除外，见下 |
 | A2/A3/A4 品牌 / 提问词 / 用户管理 | ⬜ 只依赖已有接口，刻意排在后面 |
-| A7 证据页 · A8 客户首页分流 | ⬜ 依赖 A6 |
+| A7 证据页 · A8 客户首页分流 | ⬜ **下一步**，A6 已经不挡了 |
+
+**A6 里唯一没做的是「样本列表」tab**，页面上是降级态、写清了原因：
+`/v1/responses` 与 `/v1/crawl-jobs` **都没有 `run_id` 过滤**，
+照现在的接口列出来的是这个品牌历史所有运行的样本，不是这一次的。
+（`crawl_jobs.run_id` 这一列是有的，两个 list 端点没暴露成查询参数而已。）
+
+顺带记一笔矩阵：格里**只显示 `m/n`，不显示 `#N`**。设计稿那一档要的是
+「该品牌在这几次采样里的中位出场顺位」，那是个分布，而 counts 只给得出
+`m_first` 这一个计数 —— 拿它反推名次是编数据。设计稿允许省掉 `#`，
+所以这不是缺陷，是「绝不伪造名次」的落地。
 
 ### 视觉来源
 
@@ -325,7 +337,7 @@ cd apps/web && pnpm test && pnpm lint && pnpm build   # 本机只做这三件
 ```text
 task 27「安踏监测集」· brand 34 安踏 + 7 个竞品 · run 27
 counts?brand_id=34&run_id=27  →  n_valid 35 · m_mentioned 21 · head 15
-首位提及率 #1×6 → 6/21 = 28.6%      （position_rank 已落库，不再是降级态）
+首位提及率 #1×6 → 6/21 = 28.6%      （counts 的 m_first，2026-08-11 补的）
 另有 brand 1 土巴兔：本品 0 提及、6 个竞品有命中 —— 零状态的真实用例
 ```
 

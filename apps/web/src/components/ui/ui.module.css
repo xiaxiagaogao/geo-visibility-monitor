@@ -18,6 +18,15 @@
   color: var(--text-primary);
 }
 
+/* 请求在飞时的样子。hover 也要一并压掉 —— 一个还会响应 hover 的按钮
+   看起来仍然可点，用户会接着点第二下。 */
+.btn:disabled,
+.btn:disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+
 .btnPrimary {
   background: var(--accent);
   border-color: var(--accent);
