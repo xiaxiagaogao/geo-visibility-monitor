@@ -35,6 +35,8 @@ import { buildMatrix, gapInputsFromMatrix } from '@/lib/l3/matrix'
 import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
 import type { BarDatum, CountsResponse, Run, RunDetail, Task } from '@/lib/types'
 
+import { SamplesPanel } from './SamplesPanel'
+
 /**
  * 任务详情（A6）。版式见 `apps/web/README.md` §2.3。
  *
@@ -491,7 +493,9 @@ function RunReport({ brandId, runId }: { brandId: number; runId: number }) {
         <Tabs
           items={[
             { id: 'matrix', label: '命中矩阵', count: rows.length },
-            { id: 'samples', label: '样本列表' },
+            // 计数用**总响应数**而不是 n_valid：样本表把不可用的那些也列出来
+            // （标着「不进分母」），tab 上的数字必须和表里的行数对得上
+            { id: 'samples', label: '样本列表', count: den.n_total_responses },
           ]}
           active={tab}
           onChange={setTab}
@@ -499,16 +503,7 @@ function RunReport({ brandId, runId }: { brandId: number; runId: number }) {
         {tab === 'matrix' ? (
           <HitMatrix rows={rows} columns={columns} />
         ) : (
-          <EmptyState>
-            <strong style={{ color: 'var(--text-secondary)' }}>样本列表这一轮没做</strong>
-            <span>
-              不是没采到数据 —— 这次运行有 {den.n_valid} 条有效样本。
-              是取不到：<span className={ui.numeric}>/v1/responses</span> 与{' '}
-              <span className={ui.numeric}>/v1/crawl-jobs</span> 都
-              <strong>没有 run_id 过滤</strong>，
-              照现在的接口列出来的是这个品牌历史所有运行的样本，不是这一次的。
-            </span>
-          </EmptyState>
+          <SamplesPanel runId={runId} ownBrandId={brandId} />
         )}
       </Panel>
     </div>
