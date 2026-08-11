@@ -26,6 +26,18 @@ export interface BrandMentionCounts {
   m_head: number
   m_middle: number
   m_tail: number
+  /**
+   * `position_rank == 1` 的样本数 —— 首位提及率的分子。
+   *
+   * **可选是刻意的，不是偷懒。** 开发期 `next.config.ts` 的 rewrites 把取数
+   * 代理到线上，所以本机跑的前端吃的是**已部署**的后端 —— 这个字段是新加的，
+   * 后端没上线之前它就是 `undefined`。声明成必填只会让类型撒谎，
+   * 页面照样拿到 undefined，然后 `undefined / 21` 算出 `NaN%` 显示出去。
+   *
+   * 拿不到时该走降级态，不是当 0 —— `0/21 = 0.0%` 是「一次都没排第一」，
+   * 而真相是「这个数还取不到」，两者是完全不同的结论。
+   */
+  m_first?: number
 }
 
 /**
@@ -175,6 +187,49 @@ export interface Task {
  * 部分成功意味着分母少了一截，所有比率会静默偏高。
  */
 export type RunStatus = 'empty' | 'pending' | 'running' | 'success' | 'partial' | 'failed'
+
+/**
+ * `apps/api/app/schemas/task.py :: RunOut`
+ *
+ * `status` 是**每次请求现算的**（`derive_run_status`），runs 表里没有这一列 ——
+ * 所以拿到手的 run 对象不能长期缓存当真值，跑着的 run 要重取才会变。
+ */
+export interface Run {
+  id: number
+  task_id: number
+  platforms: string[]
+  note: string | null
+  created_at: string
+  status: RunStatus
+  n_jobs: number
+}
+
+/**
+ * `apps/api/app/schemas/task.py :: RunPromptOut`
+ *
+ * **快照，不是实时查的。** 带 `prompt_text` 是因为提问词正文可改 ——
+ * 有它就不必再打 `/v1/prompts` 关联行标题，也不会被后来的改名改写历史。
+ */
+export interface RunPrompt {
+  prompt_id: number
+  prompt_text: string
+}
+
+/**
+ * `apps/api/app/schemas/task.py :: RunCompetitorOut`
+ *
+ * 带 `brand_name` 同理：竞品被删之后，「当时拿它比过」这个事实仍应留着。
+ */
+export interface RunCompetitor {
+  competitor_brand_id: number
+  brand_name: string
+}
+
+/** `apps/api/app/schemas/task.py :: RunDetailOut` = RunOut + 两份快照 */
+export interface RunDetail extends Run {
+  prompts: RunPrompt[]
+  competitors: RunCompetitor[]
+}
 
 /**
  * 图表视图模型 —— 一根 emphasis 横条要的全部数据。
