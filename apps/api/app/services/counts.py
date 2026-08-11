@@ -62,6 +62,7 @@ def _empty_brand_counts(brand_id: int) -> Dict[str, int]:
         "m_head": 0,
         "m_middle": 0,
         "m_tail": 0,
+        "m_first": 0,
     }
 
 
@@ -202,6 +203,11 @@ def _accumulate_mention(bc: Dict[str, int], m: Mention) -> None:
         bc["m_middle"] += 1
     elif pb == "tail":
         bc["m_tail"] += 1
+    # 出场顺位第一。**必须是 `== 1` 而不是真值判断** —— rank 是 1-based，
+    # 但 citation_only 与未命中都是 None，`if m.position_rank:` 看着等价，
+    # 将来 rank 若改成 0-based 就会静默把第一名漏掉。
+    if m.position_rank == 1:
+        bc["m_first"] += 1
 
 
 def _bucket_key(resp: RawResponse, group_by: str, prompt_id_by_job: Dict[int, int]) -> str:

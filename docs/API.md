@@ -132,7 +132,8 @@ fetch(url, { method: 'POST', credentials: 'include',
   },
   "brand":       { "brand_id": 34, "m_mentioned": 21, "m_body": 21,
                    "m_citation_only": 0, "m_none": 14,
-                   "m_head": 15, "m_middle": 5, "m_tail": 1 },
+                   "m_head": 15, "m_middle": 5, "m_tail": 1,
+                   "m_first": 6 },        // ← position_rank == 1 的样本数
   "competitors": [ /* 同结构 × N */ ],
   "series":      [ /* group_by ≠ none 时：{ key, denominator, brand, competitors } */ ]
 }
@@ -144,10 +145,15 @@ fetch(url, { method: 'POST', credentials: 'include',
 
 ```ts
 提及率      = m_mentioned / n_valid
+首位提及率  = m_first / m_mentioned        // 分母是「被提及的样本」，不是 n_valid
 头部占比    = m_head / m_mentioned
 SoV         = m_本品 / (m_本品 + Σ m_竞品)
 分母为 0 → 显示「—」，不要显示 0%
 ```
+
+**`m_first` 不是「首推率」。** 它数的是 `position_rank == 1`，即「在被监测品牌里
+最先出现」的位置事实（口径见 §7.1）。叫成「首推」是拿措辞夸大结论 ——
+我们不知道 AI 推没推荐它，只知道它先被提到。
 
 ### 4.2 四个必须记住的坑
 
@@ -359,6 +365,7 @@ failed   全部失败
 | `is_recommended` 恒 `False`，counts 无 `m_recommended` | 推荐率 | 算不出，不要做这个指标 |
 | **`citations` 全库 0 行** | 引用分析整页 | **这页现在做不了**。根因是抓取时从未开联网搜索，不是解析 bug；要做需先开联网 + 重抓（会破坏现有基线可比性） |
 | 只有 DeepSeek 一个平台 | 多平台对比 | 维度留着，可用性读 `/v1/config/platforms` |
+| counts 无**顺位分布**（只有 `m_first` 这一个计数） | 命中矩阵格里的 `#N`（该品牌在这几次采样里的中位出场顺位） | 矩阵格**只显示 `m/n`，不显示 `#`**。设计稿本来就允许省掉它 —— 拿 `m_first` 反推名次是编数据 |
 
 > **降级态 ≠ 空态。** 「没采到数据」和「这个维度后端还没算」要用不同文案，
 > 否则用户会以为采集出了问题。
