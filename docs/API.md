@@ -99,8 +99,8 @@ fetch(url, { method: 'POST', credentials: 'include',
 | 用户管理 `/v1/users` | ✓ | ✗ | ✗ |
 
 **客户是纯只读**，且**列表接口会被自动收敛**到他的 workspace ——
-前端不必也不应该自己加过滤。唯一例外：`/v1/crawl-jobs` 对客户**必须传 `prompt_id`**，
-否则 400（任务列表本身会泄露别家在监测什么）。
+前端不必也不应该自己加过滤。唯一例外：`/v1/crawl-jobs` 对客户
+**必须传 `prompt_id` 或 `run_id`**，否则 400（任务列表本身会泄露别家在监测什么）。
 
 ---
 
@@ -221,7 +221,8 @@ SoV         = m_本品 / (m_本品 + Σ m_竞品)
 
 ### `GET /v1/responses`
 
-参数：`platform` · `prompt_id` · `brand_id` · `answer_status` · `limit`(≤200) · **`offset`**
+参数：`platform` · `prompt_id` · `brand_id` · **`run_id`** · `answer_status` ·
+`limit`(≤200) · **`offset`**
 
 ```jsonc
 { "items": [RawResponseOut], "total": 50 }   // total 是过滤后全量，不受分页影响
@@ -231,8 +232,32 @@ SoV         = m_本品 / (m_本品 + Σ m_竞品)
 `screenshot_path?` · `raw_json?` · `latency_ms?` · `answer_status?` ·
 `annotator_version?` · `created_at` · `citations[]` · `mentions[]`
 
-> ⚠️ **每一行都带完整 `full_text`。** 矩阵渲染时别一次拉全量，
-> 只在点开某个格子时按 `prompt_id` 拉。
+> ⚠️ **每一行都带完整 `full_text`**，外加 `raw_json`（里面往往还有一份同样的正文）。
+> **列表场景一律用下面的 `/v1/responses/summary`**；这个端点留给「要看某一条的全文」。
+
+**`run_id` 的口径与 §8.5.2 的快照一致**：`?run_id=128` 列的就是这一次运行的样本，
+不带它列的是该品牌历史所有运行混在一起的。任务详情页的样本列表必须带它 ——
+理由和 KPI 必须带 `run_id` 是同一条。客户也能用这个参数（不属于自己的 run 一律 404）。
+
+### `GET /v1/responses/summary` ← **列表页用这个**
+
+参数与 `GET /v1/responses` **逐字一致**（含 `run_id`），换端点不必换查询拼装。
+
+```jsonc
+{ "items": [RawResponseSummaryOut], "total": 35 }
+```
+
+`RawResponseSummaryOut`：`id` · `job_id` · `platform` · `prompt_text` ·
+**`text_preview`**（正文前 160 字）· **`text_length`**（正文总字数）·
+`screenshot_path?` · `latency_ms?` · `answer_status?` · `annotator_version?` ·
+`created_at` · `mentions[]`
+
+**没有 `full_text`，也没有 `raw_json`** —— 不是「有时没有」，是这个模型里就没这两个字段，
+所以类型上可以放心当它们不存在。要全文走 `GET /v1/responses/{id}`。
+截断发生在数据库那侧（`substr`），大列根本不过网。
+
+`text_length > text_preview.length` 就是「这条被截断了」—— 拿它做「查看全文」的入口判断，
+别去数 preview 的字数。
 
 ### `MentionOut` —— 逐品牌的 L1 标注
 
@@ -280,13 +305,20 @@ full_text.slice(first_offset, first_offset + matched_term.length) === matched_te
 
 ### `GET /v1/crawl-jobs`
 
-参数：`status` · `platform` · `prompt_id` · `limit`(≤200) · **`offset`**
+参数：`status` · `platform` · `prompt_id` · **`run_id`** · `limit`(≤200) · **`offset`**
 
 `CrawlJobOut`：`id` · `prompt_id` · `platform` · `status` ·
 **`sample_index`**（同一 prompt 的第几次采样）· `error_message?` ·
 `started_at?` · `finished_at?` · `created_at` · **`response_id?`**（可直接下钻）
 
 `status`：`pending` → `running` → `success` / `failed`
+
+> 客户**必须传 `prompt_id` 或 `run_id`**，否则 400（见 §3）。两个都不属于自己时 404。
+
+**失败的采样只在这里看得见。** 失败的 job 没产出 `RawResponse`，
+所以它在 `/v1/responses` 里根本不出现 —— 想知道「这次运行还有几条没回来」，
+用 `?run_id=128&status=failed` 取 `total`。
+`partial` 状态的 run 上，这个数就是分母少掉的那一截。
 
 ### `POST /v1/crawl-jobs`（仅超管/运营）
 
@@ -420,6 +452,12 @@ curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/counts?brand_id=34&group_by=prompt'
 
 # 5. 平台可用性
 curl -sb /tmp/c.txt https://geo.xg22.top/v1/config/platforms
+
+# 6. 某次运行的样本列表（轻量投影，响应里不该出现 full_text / raw_json）
+curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/responses/summary?run_id=27&limit=5'
+
+# 7. 这次运行还有几条没回来（失败 job 不产出 response，只在这里看得见）
+curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/crawl-jobs?run_id=27&status=failed&limit=1'
 ```
 
 前端首次接通的判据：**`/v1/counts?brand_id=34` 返回 `n_valid=35`、`m_mentioned=21`**。
