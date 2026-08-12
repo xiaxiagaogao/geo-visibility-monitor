@@ -185,8 +185,8 @@ function BasicPanel({
 
   return (
     <Panel title="基本信息">
-      <div className={styles.formGrid}>
-        <label className={styles.field}>
+      <div className={ui.formGrid}>
+        <label className={ui.field}>
           <span className={ui.fieldLabel}>品牌名</span>
           <input
             className={ui.input}
@@ -196,7 +196,7 @@ function BasicPanel({
             maxLength={200}
           />
         </label>
-        <label className={styles.field}>
+        <label className={ui.field}>
           <span className={ui.fieldLabel}>英文名</span>
           <input
             className={ui.input}
@@ -205,7 +205,7 @@ function BasicPanel({
             disabled={!writable || busy}
           />
         </label>
-        <label className={styles.field}>
+        <label className={ui.field}>
           <span className={ui.fieldLabel}>行业</span>
           <input
             className={ui.input}
@@ -217,7 +217,7 @@ function BasicPanel({
 
         {/* workspace_id 只读展示，不给编辑框 —— 后端 BrandUpdate 里根本没有
             这个字段，做个输入框在这儿只会让人以为改得动 */}
-        <div className={styles.field}>
+        <div className={ui.field}>
           <span className={ui.fieldLabel}>workspace_id</span>
           <div className={ui.numeric} style={{ fontSize: 'var(--fs-body)' }}>
             {brand.workspace_id}

@@ -452,3 +452,29 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ═══ 表单栅格（品牌 / 用户等配置页共用）═══
+   放这里而不是各页面自己的 module：同一个东西有两份定义，迟早只改一边。 */
+.formGrid {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+/* 删除前的警告。用 danger 是因为这些删除真的会改写历史数据 ——
+   和「立即运行」那种 warning 的语气必须分开 */
+.deleteWarn {
+  margin-top: 6px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--bg-surface));
+  background: color-mix(in srgb, var(--danger) 7%, var(--bg-surface));
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-secondary);
+}

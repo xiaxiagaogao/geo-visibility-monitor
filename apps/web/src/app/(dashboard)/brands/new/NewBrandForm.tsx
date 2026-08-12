@@ -54,8 +54,8 @@ export function NewBrandForm() {
   return (
     <form onSubmit={onSubmit}>
       <Panel title="新建品牌" subtitle="别名决定 L1 能不能认出它；竞品建完之后在详情页配">
-        <div className={styles.formGrid}>
-          <label className={styles.field}>
+        <div className={ui.formGrid}>
+          <label className={ui.field}>
             <span className={ui.fieldLabel}>品牌名</span>
             <input
               className={ui.input}
@@ -68,7 +68,7 @@ export function NewBrandForm() {
             />
           </label>
 
-          <label className={styles.field}>
+          <label className={ui.field}>
             <span className={ui.fieldLabel}>英文名（可选）</span>
             <input
               className={ui.input}
@@ -79,7 +79,7 @@ export function NewBrandForm() {
             />
           </label>
 
-          <label className={styles.field}>
+          <label className={ui.field}>
             <span className={ui.fieldLabel}>行业（可选）</span>
             <input
               className={ui.input}
@@ -90,7 +90,7 @@ export function NewBrandForm() {
             />
           </label>
 
-          <label className={styles.field}>
+          <label className={ui.field}>
             <span className={ui.fieldLabel}>workspace_id</span>
             <input
               className={ui.input}
@@ -108,7 +108,7 @@ export function NewBrandForm() {
             </span>
           </label>
 
-          <label className={styles.field}>
+          <label className={ui.field}>
             <span className={ui.fieldLabel}>别名（一行一个，可选）</span>
             <textarea
               className={styles.aliasBox}

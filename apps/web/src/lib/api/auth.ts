@@ -46,3 +46,14 @@ export async function logout(): Promise<void> {
 export function canWrite(me: Me | null): boolean {
   return me?.role === 'superadmin' || me?.role === 'operator'
 }
+
+/**
+ * 用户管理（`/v1/users/*`）只有超管能用 —— `canWrite` 在这里**不够**，
+ * 它对运营也返回 true。
+ *
+ * machine 身份权限等同超管但 `role` 是 `unknown`，所以这里判不到它 ——
+ * 无所谓：机器凭证不会走前端界面（它绝不打进前端包）。
+ */
+export function isSuperadmin(me: Me | null): boolean {
+  return me?.role === 'superadmin'
+}

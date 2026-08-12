@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 
-import { canWrite } from '@/lib/api/auth'
+import { canWrite, isSuperadmin } from '@/lib/api/auth'
 import { useAuth } from '@/lib/auth-context'
 
 import styles from './shell.module.css'
@@ -15,12 +15,15 @@ import styles from './shell.module.css'
  * 「引用分析」不会回来：citations 全库 0 行，根因是采集时从未开联网搜索，
  * 不是能补个字段解决的（API.md §9）。
  *
- * 提问词 / 用户管理（A3-A4）还没做，做完再加进来。
+ * 「用户管理」只对超管显示 —— 它是**唯一**一个连读都要超管的入口
+ * （`/v1/users/*` 挂 require_superadmin），运营看到了也点不动。
  */
 const NAV = [
   { href: '/tasks', label: '检测任务', icon: LayersIcon },
   { href: '/brands', label: '品牌', icon: GridIcon },
 ]
+
+const ADMIN_NAV = [{ href: '/users', label: '用户管理', icon: MessageIcon }]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -51,7 +54,7 @@ export function Sidebar() {
       </div>
 
       <nav className={styles.nav}>
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {[...NAV, ...(isSuperadmin(me) ? ADMIN_NAV : [])].map(({ href, label, icon: Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
             <Link
@@ -85,16 +88,17 @@ export function Sidebar() {
         ) : null}
       </nav>
 
-      {/* /qa 只剩运维用途 —— 配置类页面（A2-A4）做完之后它就该从这里拿掉。
-          超管/运营建品牌、管提问词、发起抓取都在产品前端里做（API.md §3）。 */}
+      {/* A2-A4 做完之后，建品牌 / 管提问词 / 管用户 / 发起抓取都在产品前端里了。
+          /qa 还留着，是因为它另有产品前端不覆盖的运维动作（重标注、job 重试、
+          触发 worker）。要不要彻底下掉是产品决定，不是「顺手清理」—— 所以
+          先留着并按角色藏起来，没有替代品之前拿掉它等于让运维没手可用。 */}
       <div className={styles.sideFoot}>数据口径 L2 counts</div>
     </aside>
   )
 }
 
 /* ── 图标：16px 线性，stroke 跟随 currentColor ──
-   AlertIcon / LinkIcon / MessageIcon 暂时没人用 ——
-   留着给 A3-A4（提问词 / 用户管理）的侧栏入口，别当死代码删。 */
+   AlertIcon / LinkIcon 暂时没人用，留着给以后的入口，别当死代码删。 */
 
 function Icon({ children }: { children: ReactNode }) {
   return (

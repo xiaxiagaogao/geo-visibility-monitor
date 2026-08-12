@@ -191,7 +191,7 @@ function PromptRow({
           </div>
         ) : null}
         {armed ? (
-          <div className={styles.deleteWarn} role="alert">
+          <div className={ui.deleteWarn} role="alert">
             <strong style={{ color: 'var(--danger)' }}>删除会改写历史，不只是「以后不问」。</strong>
             它的全部采样、回答与标注会一起删掉，用过这条提问的<strong>历史运行</strong>
             分母会少一截，总提及率当场变。

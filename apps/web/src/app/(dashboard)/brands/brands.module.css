@@ -123,16 +123,6 @@
   margin: 0 0 var(--sp-3);
 }
 
-.formGrid {
-  display: grid;
-  gap: 16px;
-  max-width: 520px;
-}
-
-.field {
-  display: grid;
-  gap: 6px;
-}
 
 /* ═══ 提问词 ═══ */
 .groupHead {
@@ -187,18 +177,6 @@
   flex: none;
 }
 
-/* 删除前的警告。用 danger 是因为它真的会改写历史数据 ——
-   和「立即运行」那条 warning 的语气必须分开 */
-.deleteWarn {
-  margin-top: 6px;
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-sm);
-  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--bg-surface));
-  background: color-mix(in srgb, var(--danger) 7%, var(--bg-surface));
-  font-size: var(--fs-xs);
-  line-height: 1.7;
-  color: var(--text-secondary);
-}
 
 .addRow {
   display: flex;
