@@ -1,7 +1,8 @@
 # GEO 监测台 · 前端
 
-> **状态：已部署在 https://geo.xg22.top。** 任务列表 / 新建 / 详情（A5·A6）都在了，
-> 下一步是证据页与客户首页分流（A7·A8）。进度表见 §10。
+> **状态：已部署在 https://geo.xg22.top。A1–A8 主线已闭合** ——
+> 登录 · 任务列表 · 新建 · 任务详情 · 证据页 · 首页分流都在了。
+> 下一步是配置页（A2/A3/A4，纯 CRUD）。进度表见 §10。
 > 接口契约看 [`docs/API.md`](../../docs/API.md)（唯一权威，本文不重复字段）。
 > 后端职责看 [`docs/BACKEND.md`](../../docs/BACKEND.md)。
 
@@ -19,7 +20,8 @@ src/
   components/runs/       RunSwitcher · RunNowButton · GapList · SampleTable（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText（按 first_offset 切片，不自己搜正文）
-  lib/l3/                rates gaps matrix samples evidence run-status + 82 个测试（不碰 fetch/React）
+  lib/l3/                rates gaps matrix samples evidence home run-status
+                         + 89 个测试（纯函数，不碰 fetch/React）
   lib/api/               client.ts（唯一取数出口）· auth · brands · tasks · counts ·
                          responses · crawl-jobs + 18 个测试
   lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
@@ -28,8 +30,9 @@ src/
   app/login/             已打通
 ```
 
-**已有取数：** `lib/api/`（请求层 + auth）与 `lib/auth-context.tsx`。
-**还没有的：** 状态管理、任何业务页面的取数。
+**取数一律走 `lib/api/`**，没有第二个出口；派生一律走 `lib/l3/`，组件只吃 props。
+**刻意还没有的：** 状态管理库 —— 每个页面自己 `useEffect` 取数就够，
+没有跨页共享的服务端状态，引一个 store 只会多一层要同步的东西。
 
 之前有一套围绕**单个**品牌构建的五页看板，已整体移除——根因不是页面质量，是前提错了：
 `OWN_BRAND_ID` 是模块级常量，派生数据的七个 selector 全是零参数函数，而后端从第一天起
@@ -131,7 +134,8 @@ lib/api/      不许算比率
 lib/l3/       不许碰 fetch 和 React
 ```
 
-三层各自可单独读懂、单独测。`lib/l3` 的 29 个测试就是这条边界的产物。
+三层各自可单独读懂、单独测。`lib/l3` 的 89 个测试就是这条边界的产物 ——
+它们不需要浏览器、不需要 mock fetch，因为那一层压根碰不到这两样。
 
 ---
 
@@ -297,8 +301,11 @@ http://geo.xg22.top, https://geo.xg22.top {
 | **A5 任务列表 + 新建任务** | ✅ 含第一个真实写操作 |
 | **A6 任务详情 `/tasks/[id]`** | ✅ 版式见 §2.3，**含「样本列表」tab** |
 | **A7 证据页 `/tasks/[id]/runs/[runId]/r/[rid]`** | ✅ 高亮走 L1 的 `first_offset`，带不变量自检 |
-| A2/A3/A4 品牌 / 提问词 / 用户管理 | ⬜ 只依赖已有接口，刻意排在后面 |
-| A8 客户首页分流 | ⬜ **下一步**，只差 `/v1/runs/latest` 一个端点 |
+| **A8 客户首页分流** | ✅ `/` 按角色落点，判定在 `lib/l3/home` |
+| A2/A3/A4 品牌 / 提问词 / 用户管理 | ⬜ **下一步**，只依赖已有接口，纯 CRUD |
+
+**A1–A8 主线到此闭合。** 剩下的是配置页（A2/A3/A4），刻意排在最后 ——
+它们只依赖已有接口、随时能做，且做它们不会暴露 IA 有没有问题。
 
 **「样本列表」tab 的降级态已经拆掉。** A6 上线时它是降级态，原因是
 `/v1/responses` 与 `/v1/crawl-jobs` 都没有 `run_id` 过滤（列那一列是有的，

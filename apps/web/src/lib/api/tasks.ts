@@ -73,6 +73,23 @@ export async function getRun(runId: number): Promise<RunDetail> {
 }
 
 /**
+ * **我能看到的**最新一次运行 —— 客户首页分流用。
+ *
+ * 「我能看到的」是服务端按 principal 收敛的，不是全局最新：客户拿到的一定是
+ * 自己 workspace 里的。所以前端不必也不应该自己加过滤。
+ *
+ * **一次运行都没有时是 404**，不是空对象 —— 调用方必须显式处理这一支，
+ * 否则新客户第一次登录会卡在一个永远转不完的「正在进入…」。
+ *
+ * 为什么不用 `/v1/tasks` 取第一条代替：那个列表按 task 的 `created_at` 排序，
+ * 不是按最近一次运行。客户有两个任务、而新建的那个还没跑过时，
+ * 拿列表第一条会把他送进一个空页面。
+ */
+export async function getLatestRun(): Promise<RunDetail> {
+  return apiFetch<RunDetail>('/v1/runs/latest')
+}
+
+/**
  * 发起一次运行。仅超管/运营。
  *
  * **返回的是 `RunOut` 而不是详情**，且此刻 job 全是 `pending` ——

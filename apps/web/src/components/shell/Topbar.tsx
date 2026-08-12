@@ -17,7 +17,9 @@ import { ThemeToggle } from './ThemeToggle'
  * 届时要么让页面自己往上报，要么改成 context。别再往这张表里堆。
  */
 const TITLES: Record<string, { title: string; sub: string }> = {
-  '/': { title: '总览', sub: '' },
+  // `/` 自己不渲染内容，只按角色分流（A8）。写「总览」会闪一下一个
+  // 并不存在的页面名 —— 那个单品牌总览看板早随旧 IA 删了。
+  '/': { title: 'GEO 监测台', sub: '正在按角色进入…' },
   '/tasks': { title: '检测任务', sub: '每个任务盯一个品牌 · 一次执行叫一个 run' },
   '/tasks/new': { title: '新建任务', sub: '' },
 }

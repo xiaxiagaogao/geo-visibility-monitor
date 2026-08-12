@@ -4,6 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 
+import { canWrite } from '@/lib/api/auth'
+import { useAuth } from '@/lib/auth-context'
+
 import styles from './shell.module.css'
 
 /**
@@ -20,6 +23,7 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { me } = useAuth()
 
   return (
     <aside className={styles.sidebar}>
@@ -61,13 +65,23 @@ export function Sidebar() {
           )
         })}
 
-        <div className={styles.navSep} />
+        {/* 运维质检对**客户不可见**。/qa 是运维后门，不是产品功能 ——
+            给客户露一个「运维」入口，轻则让他以为那是他该用的东西，
+            重则让他觉得自己看的这套系统还在调试。
 
-        {/* 不重做 B7 QA，链过去就行 */}
-        <a className={styles.navItem} href="/qa" target="_blank" rel="noreferrer">
-          <ToolIcon />
-          运维质检 ↗
-        </a>
+            这和按角色隐藏写操作按钮不是一回事：那种隐藏只是体验，
+            真边界在服务端。这里隐藏的是**产品边界** —— 客户买的是监测报告，
+            不是我们的运维台。 */}
+        {canWrite(me) ? (
+          <>
+            <div className={styles.navSep} />
+            {/* 不重做 B7 QA，链过去就行 */}
+            <a className={styles.navItem} href="/qa" target="_blank" rel="noreferrer">
+              <ToolIcon />
+              运维质检 ↗
+            </a>
+          </>
+        ) : null}
       </nav>
 
       {/* /qa 只剩运维用途 —— 配置类页面（A2-A4）做完之后它就该从这里拿掉。
