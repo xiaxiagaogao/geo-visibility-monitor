@@ -98,6 +98,16 @@ export interface Mention {
   position_bucket: 'head' | 'middle' | 'tail' | null
   position_rank: number | null
   evidence_snippet: string | null
+  /**
+   * 首次命中在 `full_text` 里的字符下标。`citation_only` 时为 null（正文没出现）。
+   *
+   * 和 `matched_term` 一起满足一条**可自检的不变量**（API.md §7.1）：
+   * `full_text.slice(first_offset, first_offset + matched_term.length) === matched_term`
+   * 后端在全库 179 条命中上验过 179/179。前端 assert 它，错位会立刻暴露。
+   */
+  first_offset: number | null
+  /** 实际命中的别名（保留原文大小写）—— 用于展示「靠哪个别名命中的」 */
+  matched_term: string | null
 }
 
 /** apps/api/app/schemas/crawl.py :: CitationOut */

@@ -14,6 +14,10 @@ const mention = (brandId: number, over: Partial<Mention> = {}): Mention => ({
   position_bucket: 'head',
   position_rank: 1,
   evidence_snippet: '……安踏的性价比……',
+  // A7 起 MentionOut 多了这两个字段（高亮要用），后端一直会给，
+  // 所以类型上是必填 —— 替身补齐即可
+  first_offset: 0,
+  matched_term: '安踏',
   ...over,
 })
 

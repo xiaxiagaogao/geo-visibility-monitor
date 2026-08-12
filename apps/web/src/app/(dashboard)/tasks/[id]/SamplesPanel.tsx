@@ -28,7 +28,16 @@ const PAGE_SIZE = 20
  * 每翻一页两路都重取：failed 数在 run 还没跑完时会变，
  * 而这一路是 `limit=1` 的计数请求，便宜到不值得为它做缓存。
  */
-export function SamplesPanel({ runId, ownBrandId }: { runId: number; ownBrandId: number }) {
+export function SamplesPanel({
+  runId,
+  ownBrandId,
+  taskId,
+}: {
+  runId: number
+  ownBrandId: number
+  /** 只用来拼证据页链接 —— 这一页的数字都来自 runId */
+  taskId: number
+}) {
   const [samples, setSamples] = useState<RawResponseSummary[] | null>(null)
   const [total, setTotal] = useState(0)
   const [failed, setFailed] = useState(0)
@@ -103,14 +112,7 @@ export function SamplesPanel({ runId, ownBrandId }: { runId: number; ownBrandId:
         </PanelNote>
       ) : null}
 
-      <SampleTable samples={samples} ownBrandId={ownBrandId} />
-
-      {/* 证据页（A7）还没做，所以行点不进去。这句写出来是为了让
-          「点不动」看起来像未完成，而不是像坏了 */}
-      <PanelNote>
-        单条证据页还没做，所以行暂时点不进去。要看全文用样本 id 调
-        <span className="mono"> /v1/responses/&#123;id&#125;</span>。
-      </PanelNote>
+      <SampleTable samples={samples} ownBrandId={ownBrandId} taskId={taskId} runId={runId} />
 
       <div className={runs.pager}>
         <span className={runs.pagerInfo}>{label}</span>

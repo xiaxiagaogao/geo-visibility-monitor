@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { Badge, Degraded, Table, ui, type BadgeTone } from '@/components/ui'
 import { isPreviewTruncated, ownHit, type SampleHitKind } from '@/lib/l3/samples'
 import type { RawResponseSummary } from '@/lib/types'
@@ -37,17 +39,21 @@ const HIT_TONE: Record<SampleHitKind, BadgeTone> = {
 /**
  * 某次运行的样本表。只吃 props，不 fetch（取数在 SamplesPanel）。
  *
- * **行暂时点不进去**：证据页 `/tasks/[id]/runs/[runId]/r/[rid]`（A7）还没做，
- * 给一个必然 404 的链接比不给链接更糟。所以第一列给出样本 id ——
- * 运营至少能拿这个数字对话、也能直接调 `/v1/responses/{id}` 看全文。
+ * 第一列的样本 id 链到证据页 `/tasks/[id]/runs/[runId]/r/[rid]`（A7）。
+ * **链的是 id 这一列，不是整行**：整行可点的话，选中一段预览文字
+ * 松开鼠标就会跳走 —— 而这张表里的预览正是用来扫读的。
  */
 export function SampleTable({
   samples,
   ownBrandId,
+  taskId,
+  runId,
 }: {
   samples: RawResponseSummary[]
   /** 本品 —— 命中必须按 brand_id 关联，不许拿 mentions[0] */
   ownBrandId: number
+  taskId: number
+  runId: number
 }) {
   return (
     <Table>
@@ -67,7 +73,11 @@ export function SampleTable({
           const status = s.answer_status ?? ''
           return (
             <tr key={s.id}>
-              <td className={ui.numeric}>#{s.id}</td>
+              <td className={ui.numeric}>
+                <Link href={`/tasks/${taskId}/runs/${runId}/r/${s.id}`} className={ui.rowLink}>
+                  #{s.id}
+                </Link>
+              </td>
 
               <td>
                 <div className={styles.samplePrompt}>{s.prompt_text}</div>

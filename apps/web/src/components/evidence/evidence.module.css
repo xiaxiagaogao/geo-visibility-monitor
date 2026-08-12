@@ -1,0 +1,100 @@
+/* ═══ L0 全文 ═══ */
+.fullText {
+  font-size: var(--fs-body);
+  line-height: 1.9;
+  color: var(--text-primary);
+  /* 后端存的是纯文本，换行是内容的一部分 —— 不保留的话整段会挤成一坨 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  background: var(--bg-subtle);
+  border-radius: var(--r-sm);
+}
+
+/* 竞品命中：统一一种底色。八个品牌不需要八种颜色 ——
+   读者只关心「我在哪」，给每个竞品配色只会让主角淹掉 */
+.mark {
+  background: color-mix(in srgb, var(--text-tertiary) 26%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 1px 2px;
+}
+
+/* 本品命中：主色。和竞品的区别必须靠底色**加**字重，
+   不能只靠颜色 —— 色觉障碍下两者会糊成一样 */
+.markOwn {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 2px;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.legend {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* ═══ 提问 ═══ */
+.prompt {
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ═══ 出场顺序 ═══ */
+.order {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.orderSep {
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
+}
+
+/* ═══ 不变量对不上的告警 ═══ */
+.mismatch {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--bg-surface));
+  background: color-mix(in srgb, var(--danger) 7%, var(--bg-surface));
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.mismatchRow {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+
+/* ═══ 截图 ═══ */
+.shot {
+  max-width: 100%;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}

@@ -5,6 +5,15 @@ export interface Highlight {
   offset: number
   /** 实际匹配到的字面（别名可能与品牌名不同，比如「361°」之于「361度」） */
   matchedTerm: string
+  /**
+   * 这一处单独的样式，不给就用 `markClassName`。
+   *
+   * 有它才能把本品和竞品染成两种底色。**没有做成 `own?: boolean`** ——
+   * 这个组件不该知道「本品」是什么，那是调用方的领域概念。
+   */
+  className?: string
+  /** 悬停提示，通常是「哪个品牌 · 靠哪个别名命中的」 */
+  title?: string
 }
 
 /**
@@ -50,7 +59,7 @@ export function HighlightedText({
     }
     const end = h.offset + h.matchedTerm.length
     parts.push(
-      <mark key={`h${i}`} className={markClassName}>
+      <mark key={`h${i}`} className={h.className ?? markClassName} title={h.title}>
         {text.slice(h.offset, end)}
       </mark>,
     )

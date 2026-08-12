@@ -163,7 +163,12 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
           </EmptyState>
         </Panel>
       ) : (
-        <RunReport key={activeRunId} brandId={task.brand_id} runId={activeRunId} />
+        <RunReport
+          key={activeRunId}
+          taskId={taskId}
+          brandId={task.brand_id}
+          runId={activeRunId}
+        />
       )}
     </div>
   )
@@ -289,7 +294,16 @@ function TaskHeader({
 
 /* ══════ 某一次运行的全部内容 ══════ */
 
-function RunReport({ brandId, runId }: { brandId: number; runId: number }) {
+function RunReport({
+  taskId,
+  brandId,
+  runId,
+}: {
+  /** 只用来拼证据页链接；这一页的每个数字都来自 runId */
+  taskId: number
+  brandId: number
+  runId: number
+}) {
   const [run, setRun] = useState<RunDetail | null>(null)
   const [overall, setOverall] = useState<CountsResponse | null>(null)
   const [byPrompt, setByPrompt] = useState<CountsResponse | null>(null)
@@ -503,7 +517,7 @@ function RunReport({ brandId, runId }: { brandId: number; runId: number }) {
         {tab === 'matrix' ? (
           <HitMatrix rows={rows} columns={columns} />
         ) : (
-          <SamplesPanel runId={runId} ownBrandId={brandId} />
+          <SamplesPanel runId={runId} ownBrandId={brandId} taskId={taskId} />
         )}
       </Panel>
     </div>

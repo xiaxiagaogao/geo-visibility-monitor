@@ -18,13 +18,13 @@ src/
   components/charts/     EmphasisBars · HitMatrix（手写 SVG/CSS，不引图表库）
   components/runs/       RunSwitcher · RunNowButton · GapList · SampleTable（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
-  components/evidence/   HighlightedText
-  lib/l3/                rates · gaps · matrix · run-status · samples + 68 个测试（不碰 fetch/React）
+  components/evidence/   HighlightedText（按 first_offset 切片，不自己搜正文）
+  lib/l3/                rates gaps matrix samples evidence run-status + 82 个测试（不碰 fetch/React）
   lib/api/               client.ts（唯一取数出口）· auth · brands · tasks · counts ·
                          responses · crawl-jobs + 18 个测试
   lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
   lib/types.ts           照 API 契约定的类型
-  app/(dashboard)/       /tasks · /tasks/new · /tasks/[id] · /tasks/[id]/runs/[runId]
+  app/(dashboard)/       /tasks · /tasks/new · /tasks/[id] · …/runs/[runId] · …/r/[rid]
   app/login/             已打通
 ```
 
@@ -296,8 +296,9 @@ http://geo.xg22.top, https://geo.xg22.top {
 | B1/B2 前端上线 | ✅ `geo-web` 容器 + Caddy handle |
 | **A5 任务列表 + 新建任务** | ✅ 含第一个真实写操作 |
 | **A6 任务详情 `/tasks/[id]`** | ✅ 版式见 §2.3，**含「样本列表」tab** |
+| **A7 证据页 `/tasks/[id]/runs/[runId]/r/[rid]`** | ✅ 高亮走 L1 的 `first_offset`，带不变量自检 |
 | A2/A3/A4 品牌 / 提问词 / 用户管理 | ⬜ 只依赖已有接口，刻意排在后面 |
-| A7 证据页 · A8 客户首页分流 | ⬜ **下一步**，A6 已经不挡了 |
+| A8 客户首页分流 | ⬜ **下一步**，只差 `/v1/runs/latest` 一个端点 |
 
 **「样本列表」tab 的降级态已经拆掉。** A6 上线时它是降级态，原因是
 `/v1/responses` 与 `/v1/crawl-jobs` 都没有 `run_id` 过滤（列那一列是有的，
@@ -317,8 +318,26 @@ http://geo.xg22.top, https://geo.xg22.top {
 「这次运行还有几条没回来」只能另打一次 `/v1/crawl-jobs?run_id=&status=failed`
 取 `total`。不数这一次的话，一个 partial 的 run 看起来和完整跑完的一模一样。
 
-行**暂时点不进去**：证据页（A7）还没做，给一个必然 404 的链接比不给更糟。
-面板下方写明了原因，让它看起来像未完成而不是像坏了。
+行里的**样本 id 链到证据页**。链 id 那一列而不是整行：整行可点的话，
+选中一段预览文字松开鼠标就会跳走 —— 而那段预览正是用来扫读的。
+
+### 证据页那条不变量（A7 的全部重点）
+
+```
+full_text.slice(first_offset, first_offset + matched_term.length) === matched_term
+```
+
+高亮位置**只来自 L1 标注**，渲染前再验一次这条不变量（`lib/l3/evidence.ts`，14 个测试）。
+对不上的那一处**不画**，改成页面上一条红色告警，写明标注说什么、原文实际是什么。
+
+**不做 `indexOf` 兜底。** 拿 `matched_term` 自己去正文里找，等于在前端重造一套
+匹配逻辑（大小写折叠、别名优先级都在后端），口径当场分叉；更糟的是找到的那处
+很可能不是 L1 数的那处，而页面看起来完全正常 —— 用户会拿一段错的原文去跟客户
+解释结论。静默画错比空着糟得多。
+
+`runId` 在证据页**只用来生成返回链接，不参与任何数字**：样本由 `rid` 唯一确定，
+而 `/v1/responses/{id}` 并不回传它属于哪个 run。所以 URL 里的 run 就算对不上，
+也不会出现「按错的 run 报数」——最多是竞品名取不到、显示成 `#id` 的可见降级。
 
 顺带记一笔矩阵：格里**只显示 `m/n`，不显示 `#N`**。设计稿那一档要的是
 「该品牌在这几次采样里的中位出场顺位」，那是个分布，而 counts 只给得出
