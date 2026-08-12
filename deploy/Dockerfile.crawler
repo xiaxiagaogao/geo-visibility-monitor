@@ -9,6 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 COPY packages/metrics /app/packages/metrics
 COPY apps/api /app/apps/api
+# 部署后检查（L2 浏览器冒烟）跑在这个容器里 —— Playwright 与三个浏览器内核
+# 本来就为抓取装好了，冒烟复用它们，不必再起一套环境。
+COPY scripts /app/scripts
 
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -e /app/packages/metrics \
