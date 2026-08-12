@@ -1,0 +1,135 @@
+/* ═══ 别名编辑 ═══ */
+.aliasBox {
+  width: 100%;
+  min-height: 132px;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  line-height: 1.8;
+  resize: vertical;
+}
+
+.aliasBox:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ═══ 竞品选择 ═══ */
+.pickGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px var(--sp-3);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-app);
+}
+
+.pickItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  padding: 3px 4px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+}
+
+.pickItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* 已选中的顺序条 —— 竞品顺序就是矩阵的列顺序，必须看得见 */
+.orderStrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+  min-height: 28px;
+}
+
+.orderChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 6px 0 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.orderNum {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--text-tertiary);
+}
+
+.chipX {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm);
+  line-height: 1;
+}
+
+.chipX:hover {
+  color: var(--danger);
+}
+
+/* ═══ 保存条 ═══ */
+.saveBar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-3);
+}
+
+.dirty {
+  font-size: var(--fs-xs);
+  color: var(--warning);
+}
+
+.saved {
+  font-size: var(--fs-xs);
+  color: var(--success);
+}
+
+/* ═══ 危险区 ═══ */
+.dangerZone {
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--bg-surface));
+  background: color-mix(in srgb, var(--danger) 5%, var(--bg-surface));
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.dangerText {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0 0 var(--sp-3);
+}
+
+.formGrid {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}

@@ -1,8 +1,8 @@
 # GEO 监测台 · 前端
 
-> **状态：已部署在 https://geo.xg22.top。A1–A8 主线已闭合** ——
-> 登录 · 任务列表 · 新建 · 任务详情 · 证据页 · 首页分流都在了。
-> 下一步是配置页（A2/A3/A4，纯 CRUD）。进度表见 §10。
+> **状态：已部署在 https://geo.xg22.top。A1–A8 主线已闭合**，配置页在补 ——
+> 登录 · 任务 · 任务详情 · 证据页 · 首页分流 · 品牌管理都在了。
+> 下一步是提问词（A3）与用户管理（A4）。进度表见 §10。
 > 接口契约看 [`docs/API.md`](../../docs/API.md)（唯一权威，本文不重复字段）。
 > 后端职责看 [`docs/BACKEND.md`](../../docs/BACKEND.md)。
 
@@ -20,13 +20,14 @@ src/
   components/runs/       RunSwitcher · RunNowButton · GapList · SampleTable（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText（按 first_offset 切片，不自己搜正文）
-  lib/l3/                rates gaps matrix samples evidence home run-status
-                         + 89 个测试（纯函数，不碰 fetch/React）
+  lib/l3/                rates gaps matrix samples evidence brands home run-status
+                         + 109 个测试（纯函数，不碰 fetch/React）
   lib/api/               client.ts（唯一取数出口）· auth · brands · tasks · counts ·
                          responses · crawl-jobs + 18 个测试
   lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
   lib/types.ts           照 API 契约定的类型
   app/(dashboard)/       /tasks · /tasks/new · /tasks/[id] · …/runs/[runId] · …/r/[rid]
+                         /brands · /brands/new · /brands/[id]
   app/login/             已打通
 ```
 
@@ -75,6 +76,7 @@ Task「命名的监测定义」── 平台 · 采样数 · 提问集选择
 /tasks/[id]/runs/[runId]                 指定某次运行
 /tasks/[id]/runs/[runId]/r/[rid]         单条回答证据
 /brands                                  品牌列表
+/brands/new                              新建品牌（workspace_id 建完不可改）
 /brands/[id]                             品牌详情：别名 / 竞品 / 提问词
 /users                                   用户管理（仅超管）
 
@@ -134,7 +136,7 @@ lib/api/      不许算比率
 lib/l3/       不许碰 fetch 和 React
 ```
 
-三层各自可单独读懂、单独测。`lib/l3` 的 89 个测试就是这条边界的产物 ——
+三层各自可单独读懂、单独测。`lib/l3` 的 109 个测试就是这条边界的产物 ——
 它们不需要浏览器、不需要 mock fetch，因为那一层压根碰不到这两样。
 
 ---

@@ -15,10 +15,11 @@ import styles from './shell.module.css'
  * 「引用分析」不会回来：citations 全库 0 行，根因是采集时从未开联网搜索，
  * 不是能补个字段解决的（API.md §9）。
  *
- * 品牌 / 提问词 / 用户管理（A2-A4）还没做，做完再加进来。
+ * 提问词 / 用户管理（A3-A4）还没做，做完再加进来。
  */
 const NAV = [
   { href: '/tasks', label: '检测任务', icon: LayersIcon },
+  { href: '/brands', label: '品牌', icon: GridIcon },
 ]
 
 export function Sidebar() {
@@ -92,8 +93,8 @@ export function Sidebar() {
 }
 
 /* ── 图标：16px 线性，stroke 跟随 currentColor ──
-   GridIcon / AlertIcon / LinkIcon / MessageIcon 暂时没人用 ——
-   留着给 A2-A4（品牌 / 提问词 / 用户管理）的侧栏入口，别当死代码删。 */
+   AlertIcon / LinkIcon / MessageIcon 暂时没人用 ——
+   留着给 A3-A4（提问词 / 用户管理）的侧栏入口，别当死代码删。 */
 
 function Icon({ children }: { children: ReactNode }) {
   return (
