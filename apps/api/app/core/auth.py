@@ -42,6 +42,14 @@ CSRF_HEADER_NAME = "x-csrf-token"
 
 SESSION_TTL = timedelta(days=7)  # 固定 7 天，不滑动续期
 
+#: 密码最短长度。
+#:
+#: **放这里是因为原先有两份**：``api/users.py`` 和 ``scripts/create_user.py``
+#: 各写了一个 12，谁也不知道对方存在。两份约束迟早只改一边 —— 那时
+#: API 收得下的密码，脚本会拒绝（或者反过来），而两边都不会报错，
+#: 只是行为对不上。这类常量必须只有一个定义处。
+MIN_PASSWORD_LEN = 8
+
 _hasher = PasswordHasher()
 
 

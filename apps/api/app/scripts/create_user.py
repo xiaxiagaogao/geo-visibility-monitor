@@ -17,11 +17,9 @@ import sys
 
 from sqlalchemy import select
 
-from app.core.auth import ROLE_CLIENT, ROLES, hash_password
+from app.core.auth import MIN_PASSWORD_LEN, ROLE_CLIENT, ROLES, hash_password
 from app.core.db import SessionLocal
 from app.models import User
-
-MIN_PASSWORD_LEN = 12
 
 
 def main() -> int:

@@ -10,13 +10,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import get_db, require_superadmin
-from app.core.auth import ROLE_CLIENT, ROLES, hash_password, revoke_all_sessions
+from app.core.auth import (
+    MIN_PASSWORD_LEN,
+    ROLE_CLIENT,
+    ROLES,
+    hash_password,
+    revoke_all_sessions,
+)
 from app.core.security import Principal
 from app.models import User
 
 router = APIRouter(prefix="/v1/users", tags=["users"])
-
-MIN_PASSWORD_LEN = 12
 
 
 class UserOut(BaseModel):
