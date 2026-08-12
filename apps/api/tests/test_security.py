@@ -71,11 +71,21 @@ def build_app() -> FastAPI:
     return app
 
 
+#: TestClient 默认 base_url 是 **http**://testserver，而生产
+#: `API_COOKIE_SECURE=true` 下发的是 Secure Cookie —— Secure Cookie 不在 http 上
+#: 回传，于是 `test_login_sets_cookie_and_grants_qa` 在 VPS 上必挂 401，
+#: 本机（没设那个 env）却过。
+#:
+#: 改成 https 而不是把 `API_COOKIE_SECURE` 钉成 false：钉成 false 只是让用例
+#: 绕开生产配置，https 才是**生产的形状**，而且两种配置下都成立。
+BASE_URL = "https://testserver"
+
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("API_KEY", KEY)
     get_settings.cache_clear()
-    yield TestClient(build_app())
+    yield TestClient(build_app(), base_url=BASE_URL)
     get_settings.cache_clear()
 
 
@@ -83,7 +93,7 @@ def client(monkeypatch):
 def open_client(monkeypatch):
     monkeypatch.setenv("API_KEY", "")
     get_settings.cache_clear()
-    yield TestClient(build_app())
+    yield TestClient(build_app(), base_url=BASE_URL)
     get_settings.cache_clear()
 
 

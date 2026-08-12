@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 import { Badge } from '@/components/ui'
 import { canWrite } from '@/lib/api/auth'
@@ -26,7 +27,25 @@ const TITLES: Record<string, { title: string; sub: string }> = {
 
 export function Topbar() {
   const pathname = usePathname()
-  const { me } = useAuth()
+  const { me, logout } = useAuth()
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState(false)
+
+  async function onLogout() {
+    setLoggingOut(true)
+    setLogoutError(false)
+    try {
+      // 成功后 AuthProvider 把 status 置为 anonymous，
+      // DashboardShell 的 useRequireAuth 会送去登录页 —— 这里不必自己跳。
+      await logout()
+    } catch {
+      // **失败时绝不本地清状态。** 服务端会话没撤销就显示「已退出」，
+      // 是这个界面能撒的最危险的谎：用户以为在公共机器上安全登出了，
+      // 而那张会话 Cookie 还活着。
+      setLogoutError(true)
+      setLoggingOut(false)
+    }
+  }
   const meta = TITLES[pathname] ?? TITLES[`${pathname}/`] ?? { title: 'GEO 监测台', sub: '' }
 
   return (
@@ -52,7 +71,31 @@ export function Topbar() {
           接 API 后应取最新一条 response 的 created_at；在那之前不放，
           因为一个写死的时间戳会让人以为数据是新的。 */}
 
-      <button className={styles.iconBtn} aria-label="刷新" title="刷新">
+      {me?.email ? (
+        <div className={styles.userBox}>
+          <span className={styles.userEmail} title={me.email}>
+            {me.email}
+          </span>
+          <button
+            className={styles.linkBtn}
+            onClick={onLogout}
+            disabled={loggingOut}
+            title={logoutError ? '退出失败，请重试' : undefined}
+          >
+            {logoutError ? '退出失败，重试' : loggingOut ? '退出中…' : '退出账户'}
+          </button>
+        </div>
+      ) : null}
+
+      {/* 整页重载，不是 router.refresh()：这个应用的数据全在客户端 useEffect 里取，
+          refresh 只会重跑服务端组件，页面上的数字一个都不会变 —— 那样这颗按钮
+          就还是假的，只是从「什么都不做」变成「看起来做了什么」。 */}
+      <button
+        className={styles.iconBtn}
+        aria-label="刷新"
+        title="刷新"
+        onClick={() => window.location.reload()}
+      >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 12a9 9 0 1 1-2.6-6.4" />
           <path d="M21 4v5h-5" />

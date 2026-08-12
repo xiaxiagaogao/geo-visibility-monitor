@@ -620,7 +620,6 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 | **L1 白名单仍缺情感** | `sentiment` / `is_recommended` 恒空（§3.3）；`/v1/counts` 无 `m_recommended` | 前端要情感、推荐率时 |
 | `verify_l2.py` 误报 | 改过 `competitor_links` 后，残留的旧 mention 行会让 SQL 侧多出品牌分组，比对报 FAIL | 调整竞品集合后 |
 | **引用分析做不了** | citations 全库 0 行；根因是从未开联网搜索（§7.0），不是解析 bug | 前端要做引用页时 |
-| **`test_security.py` 有一条在生产配置下必挂** | `test_login_sets_cookie_and_grants_qa` 断言 `POST /qa/login` 后 `GET /qa` 得 200，但 TestClient 走 `http://testserver`，而生产 `API_COOKIE_SECURE=true`（D1 起）→ Secure cookie 不在 http 上回传 → 401。本机（未设该 env）通过，VPS 上必挂。**不是回归**，是测试硬编码了「cookie 在 http 上能回传」这个假设 | 每次在 VPS 上跑全套时 |
 | id=6 残留会话 URL | `raw_json` 里有一条 DeepSeek 会话 URL，违反「不落库会话 URL」（§7）。旧 `chrome_bridge` 路径遗留，一条 UPDATE 可清 | 随时可清 |
 
 ---

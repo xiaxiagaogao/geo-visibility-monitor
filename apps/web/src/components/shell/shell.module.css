@@ -276,3 +276,42 @@
     display: none;
   }
 }
+
+/* ═══ 当前身份 + 退出 ═══ */
+.userBox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-right: var(--sp-2);
+  border-right: 1px solid var(--border);
+  margin-right: var(--sp-1);
+}
+
+/* 邮箱可能很长，压到一行并截断 —— 它是「我是谁」的确认，不是要读的内容 */
+.userEmail {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.linkBtn:hover {
+  text-decoration: underline;
+}
+
+.linkBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
+}

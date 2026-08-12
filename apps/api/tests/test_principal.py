@@ -43,6 +43,13 @@ def build_app() -> FastAPI:
 @pytest.fixture(autouse=True)
 def _key(monkeypatch):
     monkeypatch.setenv("API_KEY", KEY)
+    # **CSRF 开关也要钉死。** 不钉的话这一组会继承运行环境的值：
+    # 本机没设 → 走代码默认 false → 全过；VPS 容器里 CSRF_PROTECTION_ENABLED=true
+    # → 所有不带头的会话写操作 403，于是三条和 CSRF 毫无关系的用例
+    # （两条 test_role_capabilities + 一条 csrf 关时的用例）一起挂。
+    #
+    # 测试不该依赖环境变量来决定自己断言的行为。要它开的用例用 `csrf_on`。
+    monkeypatch.setenv("CSRF_PROTECTION_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -211,8 +218,16 @@ def csrf_on(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_csrf_off_by_default_so_frontend_can_catch_up(as_user):
-    """默认关 —— 前端未适配前开了会让所有会话写操作 403。"""
+def test_csrf_off_lets_session_write_through(as_user):
+    """关闭时：只有 Cookie 也能写。
+
+    原名叫 `test_csrf_off_by_default_so_frontend_can_catch_up` —— 那个名字
+    断言的是「产品当前默认关」，而 C1（2026-08-11）已经在生产打开了。
+    名字描述会变的部署状态，用例就会在状态变化时变成一句假话。
+    这里改成只描述它真正验的那件事：开关关 → 放行。
+
+    代码层的默认值仍是 False（`Settings.csrf_protection_enabled`），
+    但那是配置项的默认，不是「产品现在是什么状态」。"""
     as_user("operator")
     c = TestClient(build_app())
     c.cookies.set(SESSION_COOKIE_NAME, "valid-session")
