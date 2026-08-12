@@ -36,6 +36,8 @@ import {
 } from '@/lib/l3/brands'
 import type { Brand } from '@/lib/types'
 
+import { PromptsPanel } from './PromptsPanel'
+
 import styles from '../brands.module.css'
 
 /**
@@ -132,15 +134,7 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
         onSaved={reload}
       />
 
-      <Panel title="提问词" subtitle="这个品牌被拿去问 AI 的那些问题">
-        <EmptyState>
-          <strong style={{ color: 'var(--text-secondary)' }}>提问词管理还没做（A3）</strong>
-          <span>
-            接口是现成的（<span className={ui.numeric}>/v1/prompts?brand_id=</span>），
-            只是这个界面还没建。发起运行时会冻结当时启用中的提问词进快照。
-          </span>
-        </EmptyState>
-      </Panel>
+      <PromptsPanel brandId={brand.id} writable={writable} />
 
       {writable ? <DangerPanel brand={brand} taskCount={taskCount} /> : null}
     </div>

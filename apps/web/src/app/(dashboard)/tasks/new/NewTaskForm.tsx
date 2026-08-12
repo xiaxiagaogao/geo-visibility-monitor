@@ -191,7 +191,7 @@ export function NewTaskForm() {
       </Panel>
 
       <PanelNote>
-        建任务**不会**立刻开始抓取。要跑得进任务详情点「立即运行」——
+        建任务<strong>不会</strong>立刻开始抓取。要跑得进任务详情点「立即运行」——
         那一步才会真的建 job、消耗额度。
       </PanelNote>
     </form>

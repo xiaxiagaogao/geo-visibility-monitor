@@ -133,3 +133,79 @@
   display: grid;
   gap: 6px;
 }
+
+/* ═══ 提问词 ═══ */
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  font-weight: 500;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-1);
+}
+
+.groupCount {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  opacity: 0.8;
+}
+
+.promptRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.promptRow:last-child {
+  border-bottom: none;
+}
+
+/* 停用的压暗但**不隐藏** —— 用户得看得见它还在，
+   否则会以为被删了，然后再建一条重复的 */
+.promptOff .promptText {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-strong);
+}
+
+.promptText {
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.promptActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* 删除前的警告。用 danger 是因为它真的会改写历史数据 ——
+   和「立即运行」那条 warning 的语气必须分开 */
+.deleteWarn {
+  margin-top: 6px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--bg-surface));
+  background: color-mix(in srgb, var(--danger) 7%, var(--bg-surface));
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
