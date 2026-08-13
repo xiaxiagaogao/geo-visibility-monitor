@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { HitMatrix, type MatrixColumn } from '@/components/charts/HitMatrix'
 import { EmphasisBars } from '@/components/charts/EmphasisBars'
+import { ExportGapsButton } from '@/components/runs/ExportGapsButton'
 import { GapList } from '@/components/runs/GapList'
 import { RunNowButton } from '@/components/runs/RunNowButton'
 import { RunSwitcher } from '@/components/runs/RunSwitcher'
@@ -31,6 +32,7 @@ import { fetchRunCounts } from '@/lib/api/counts'
 import { getRun, getTask, listRuns, startRun } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
 import { findGaps } from '@/lib/l3/gaps'
+import { gapCsvFileName, gapCsvRows } from '@/lib/l3/gap-export'
 import { buildMatrix, gapInputsFromMatrix } from '@/lib/l3/matrix'
 import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
 import type { BarDatum, CountsResponse, Run, RunDetail, Task } from '@/lib/types'
@@ -209,6 +211,7 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
           brandId={task.brand_id}
           runId={activeRunId}
           refreshKey={reloadKey}
+          taskName={task.name}
         />
       )}
     </div>
@@ -356,11 +359,14 @@ function RunReport({
   brandId,
   runId,
   refreshKey,
+  taskName,
 }: {
   /** 只用来拼证据页链接；这一页的每个数字都来自 runId */
   taskId: number
   brandId: number
   runId: number
+  /** 只用来拼导出文件名 —— 上下文全靠文件名承载 */
+  taskName: string
   /** 变化即重取 —— 让上层的手动刷新与自动轮询也能带动报告体里的数字 */
   refreshKey: number
 }) {
@@ -554,6 +560,14 @@ function RunReport({
       <Panel
         title="覆盖缺口"
         subtitle="本品缺席或明显落后、而竞品在场的提问。右侧数字是失分量：竞品合计比本品多拿的提及次数"
+        right={
+          // 这是这个产品唯一可直接执行的产出 —— 在此之前只能截图发给推流团队
+          <ExportGapsButton
+            rows={gapCsvRows({ gaps, promptText, brandName: brandNames })}
+            fileName={gapCsvFileName(taskName, run.id, run.created_at)}
+            disabled={gaps.length === 0}
+          />
+        }
       >
         <GapList
           gaps={gaps}

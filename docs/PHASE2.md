@@ -63,7 +63,10 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-01** | 端到端冒烟测试 | ✅ 两层：`apps/api/tests/test_data_invariants.py`（真实数据不变量，9 条）+ `scripts/smoke/browser_smoke.py`（浏览器只读路径，9 步） |
 | **P2-02** | 任务编辑入口 | ✅ `app/(dashboard)/tasks/[id]/TaskEditPanel.tsx` |
 | **P2-03** | 运行中自动刷新 | ✅ 6 秒轮询，只在有 run 未跑完时开，页面不可见时暂停 |
-| **P2-04** | 缺口清单导出 | ⬜ **下一步** |
+| **P2-04** | 缺口清单导出 CSV | ✅ `lib/l3/csv.ts` + `lib/l3/gap-export.ts` + `components/runs/ExportGapsButton.tsx` |
+
+**第一梯队做完了。** 下一步是第二梯队的 **P2-05（定多平台口径）**——
+那是个决策，不是编码，定不下来 P2-06 写完前端也接不上。
 
 #### P2-01 的收成：冒烟第一次跑就抓到一个已上线的 bug
 
@@ -190,7 +193,7 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 
 | ID | 任务 | 说明 |
 |---|---|---|
-| P2-04 | **缺口清单导出 CSV** | 它是这个产品**唯一可直接执行的产出**，现在只能截图发给推流团队。成本极低 |
+| P2-04 | **缺口清单导出 CSV** | ✅ **前端生成，不加后端端点** —— 缺口判级（`findGaps`）只在前端存在，后端没有 gap 这个概念，加端点就要把判级重写一遍。四个坑各有用例：公式注入（安全）· UTF-8 BOM（否则 Excel 中文乱码）· RFC 4180 转义 · **`m/n` 拆成两列**（Excel 会把 `3/5` 转成「3月5日」） |
 | P2-31 | **跨 run 趋势图** | `apps/web/README.md` §5 写着「等跑出三次以上再加」。现在有 run 27 与 run 54 **两次**了 —— 第三次之后就该做。这是 Run 快照设计的收成：比的是**表现变化**，不是口径变化 |
 
 ---
