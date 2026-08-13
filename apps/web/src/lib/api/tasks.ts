@@ -72,6 +72,27 @@ export async function getRun(runId: number): Promise<RunDetail> {
   return apiFetch<RunDetail>(`/v1/runs/${runId}`)
 }
 
+export interface TaskUpdateInput {
+  name?: string
+  platforms?: string[]
+  samples?: number
+  is_active?: boolean
+}
+
+/**
+ * 改任务。**不含 `brand_id`** —— 后端 `TaskUpdate` 里就没有这个字段，
+ * 任务过不了户（API.md §8.5）。
+ *
+ * 改 `platforms` / `samples` **只影响以后的运行**：每次 run 都有自己的
+ * platforms 快照，历史那些不会被改写。
+ *
+ * `is_active=false` 之后**发起运行会被拒**（400）—— 这是 2026-08-12 补的，
+ * 在那之前停用只是个徽章。
+ */
+export async function updateTask(taskId: number, input: TaskUpdateInput): Promise<Task> {
+  return apiFetch<Task>(`/v1/tasks/${taskId}`, { method: 'PATCH', body: input })
+}
+
 /**
  * **我能看到的**最新一次运行 —— 客户首页分流用。
  *

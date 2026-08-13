@@ -36,6 +36,7 @@ import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
 import type { BarDatum, CountsResponse, Run, RunDetail, Task } from '@/lib/types'
 
 import { SamplesPanel } from './SamplesPanel'
+import { TaskEditPanel } from './TaskEditPanel'
 
 /**
  * 任务详情（A6）。版式见 `apps/web/README.md` §2.3。
@@ -60,6 +61,32 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
   const [reloadKey, setReloadKey] = useState(0)
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
+  const [editing, setEditing] = useState(false)
+
+  // 这个任务有没有一次运行还没跑完。轮询只在这时候开。
+  const inFlight = (runList ?? []).some(
+    (r) => r.status === 'pending' || r.status === 'running',
+  )
+
+  // **跑着的时候自动刷新（P2-03）。**
+  //
+  // 之前只能手点「刷新」——刚发起完盯着一个 pending 页面反复点，
+  // 是这个页面最明显的一个窟窿。
+  //
+  // 三条约束：
+  //   · **只在有 run 没跑完时开。** 跑完就停，不做无意义的轮询。
+  //   · **页面不可见时不轮询**（切走的标签页、锁屏）。否则一个开着不管的
+  //     标签页会整夜按秒打接口，而没有任何人在看。
+  //   · 间隔 6 秒 —— 抓取本身以十秒计，再快只是徒增负载。
+  useEffect(() => {
+    if (!inFlight) return
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      reload()
+    }
+    const timer = setInterval(tick, 6000)
+    return () => clearInterval(timer)
+  }, [inFlight, reload])
 
   useEffect(() => {
     let alive = true
@@ -127,6 +154,8 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
         runList={runList}
         activeRunId={activeRunId}
         canRun={canWrite(me)}
+        onEdit={() => setEditing((v) => !v)}
+        editing={editing}
         onSwitch={(id) => router.push(`/tasks/${taskId}/runs/${id}`)}
         onStarted={(run) => {
           reload()
@@ -134,6 +163,17 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
         }}
         onRefresh={reload}
       />
+
+      {editing ? (
+        <TaskEditPanel
+          task={task}
+          onSaved={() => {
+            setEditing(false)
+            reload()
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      ) : null}
 
       {runIdIsForeign ? (
         <Panel>
@@ -168,6 +208,7 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
           taskId={taskId}
           brandId={task.brand_id}
           runId={activeRunId}
+          refreshKey={reloadKey}
         />
       )}
     </div>
@@ -182,6 +223,8 @@ function TaskHeader({
   runList,
   activeRunId,
   canRun,
+  onEdit,
+  editing,
   onSwitch,
   onStarted,
   onRefresh,
@@ -191,6 +234,8 @@ function TaskHeader({
   runList: Run[]
   activeRunId: number | null
   canRun: boolean
+  onEdit: () => void
+  editing: boolean
   onSwitch: (runId: number) => void
   onStarted: (run: Run) => void
   onRefresh: () => void
@@ -209,6 +254,10 @@ function TaskHeader({
   // 按钮就又亮了，于是同一批提问被两个 run 同时抓 ——
   // 两份互相看不见的数据，谁也说不清哪份是准的。
   const taskInFlight = runList.some((r) => r.status === 'pending' || r.status === 'running')
+
+  // 停用的任务发起运行会被后端拒（400）。前端先拦，并把理由说出来 ——
+  // 给一个点了必然失败的按钮比没有更糟。
+  const inactive = !task.is_active
 
   async function confirmStart() {
     setBusy(true)
@@ -255,8 +304,15 @@ function TaskHeader({
             <RunSwitcher runs={runList} currentRunId={active.id} onChange={onSwitch} />
           ) : null}
           <Button onClick={onRefresh}>刷新</Button>
+          {canRun ? (
+            <Button onClick={onEdit}>{editing ? '收起编辑' : '编辑'}</Button>
+          ) : null}
           {/* 按钮灰掉必须给理由。一个没解释的灰按钮，用户只会当它坏了 */}
-          {canRun && taskInFlight ? (
+          {canRun && inactive ? (
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+              任务已停用
+            </span>
+          ) : canRun && taskInFlight ? (
             <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
               有一次运行还没跑完
             </span>
@@ -270,7 +326,7 @@ function TaskHeader({
               onConfirm={confirmStart}
               busy={busy}
               lastJobCount={runList[0]?.n_jobs}
-              disabled={taskInFlight}
+              disabled={taskInFlight || inactive}
             />
           ) : null}
         </div>
@@ -279,7 +335,8 @@ function TaskHeader({
       {viewingInFlight ? (
         <PanelNote>
           这次运行还在进行中（{runStatusLabel(active?.status ?? null)}），
-          此时的数字是<strong>跑到一半</strong>的数字，分母还会涨。点「刷新」看进度。
+          此时的数字是<strong>跑到一半</strong>的数字，分母还会涨。
+          页面每 6 秒自动刷新一次（切走标签页时暂停）。
         </PanelNote>
       ) : null}
 
@@ -298,11 +355,14 @@ function RunReport({
   taskId,
   brandId,
   runId,
+  refreshKey,
 }: {
   /** 只用来拼证据页链接；这一页的每个数字都来自 runId */
   taskId: number
   brandId: number
   runId: number
+  /** 变化即重取 —— 让上层的手动刷新与自动轮询也能带动报告体里的数字 */
+  refreshKey: number
 }) {
   const [run, setRun] = useState<RunDetail | null>(null)
   const [overall, setOverall] = useState<CountsResponse | null>(null)
@@ -334,7 +394,7 @@ function RunReport({
     return () => {
       alive = false
     }
-  }, [brandId, runId, attempt])
+  }, [brandId, runId, attempt, refreshKey])
 
   const rows = useMemo(() => {
     if (!run || !byPrompt) return []

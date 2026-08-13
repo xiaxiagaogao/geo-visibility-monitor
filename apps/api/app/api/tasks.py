@@ -191,6 +191,19 @@ def start_run(
     task = db.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+    # 停用的任务不许发起运行。
+    #
+    # 在此之前这里不检查 is_active，于是「已停用」只是列表里的一个徽章 ——
+    # 而 create_run **是**按 Prompt.is_active 过滤提问词的。同一个字段名在两处
+    # 一处当真、一处装饰，是那种没人会当场发现的不一致。
+    #
+    # 前端从没有停用任务的入口，所以这条几乎不可能改变现有行为；
+    # 但 A6 的任务编辑把入口做出来了，不补这一条就等于在界面上写一句假话。
+    if not task.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="task is inactive; enable it before starting a run",
+        )
     run = task_svc.create_run(db, task)
     return RunOut(**_run_out(db, run))
 
