@@ -39,6 +39,22 @@ TIMEOUT_MS = int(os.environ.get("SMOKE_TIMEOUT_MS", "20000"))
 
 steps: List[str] = []
 console_errors: List[str] = []
+http_failures: List[str] = []
+
+#: 预期之内的失败响应，**必须精确到 URL**。
+#:
+#: `AuthProvider` 挂载时拉一次 `/v1/auth/me` 判断「我是谁」——在登录页
+#: （还没登录）和退出之后，它**本来就该返回 401**（API.md §2.2：401 = 未登录），
+#: 前端也正确地把它当成 anonymous 处理。但浏览器对任何 4xx 都会往控制台记一条
+#: `Failed to load resource`，哪怕应用处理得完全正确。
+#:
+#: **不能因此把 401 全部忽略**：中途掉 401 是真 bug（会话断了）。
+#: 所以这里按「URL + 状态码」成对放行，放行范围小到不会盖住真问题。
+EXPECTED_FAILURES = [("/v1/auth/me", 401)]
+
+
+def _is_expected(url: str, status: int) -> bool:
+    return any(path in url and status == code for path, code in EXPECTED_FAILURES)
 
 
 def step(msg: str) -> None:
@@ -64,12 +80,24 @@ def run() -> int:
         page = ctx.new_page()
         page.set_default_timeout(TIMEOUT_MS)
 
-        # console 里的 error 单独收着 —— 页面「看起来正常」但控制台在报错，
-        # 是最容易在人工点检里漏掉的一类
+        # 盯 HTTP 响应而不是 console 文本：`Failed to load resource` 那类
+        # console 消息拿不到可靠的 URL，而没有 URL 就没法区分
+        # 「预期内的 /v1/auth/me 401」和「中途会话掉了」。
+        page.on(
+            "response",
+            lambda r: http_failures.append(f"{r.status} {r.url}")
+            if r.status >= 400 and not _is_expected(r.url, r.status)
+            else None,
+        )
+
+        # console 里的 error 另收 —— 页面「看起来正常」但控制台在报错，
+        # 是最容易在人工点检里漏掉的一类。
+        # 但 `Failed to load resource` 排除掉：它是上面那个 response 钩子的
+        # 重复报告，且不带 URL，留着只会制造分不清来源的噪音。
         page.on(
             "console",
             lambda m: console_errors.append(f"{m.type}: {m.text}")
-            if m.type == "error"
+            if m.type == "error" and "Failed to load resource" not in m.text
             else None,
         )
 
@@ -82,11 +110,18 @@ def run() -> int:
             ctx.close()
             browser.close()
 
+    problems = []
+    if http_failures:
+        problems.append(
+            f"{len(http_failures)} 个请求失败：\n  " + "\n  ".join(http_failures[:10])
+        )
     if console_errors:
-        raise SmokeFailed(
+        problems.append(
             f"控制台有 {len(console_errors)} 条 error：\n  "
             + "\n  ".join(console_errors[:10])
         )
+    if problems:
+        raise SmokeFailed("\n".join(problems))
     return 0
 
 
