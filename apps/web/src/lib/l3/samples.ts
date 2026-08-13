@@ -14,6 +14,8 @@
  */
 import type { Mention, RawResponseSummary } from '../types'
 
+import { codePointLength } from './text'
+
 export type SampleHitKind = 'body' | 'citationOnly' | 'none' | 'unannotated'
 
 export interface SampleHit {
@@ -59,9 +61,16 @@ export function isValidSample(sample: RawResponseSummary): boolean {
   return sample.answer_status === 'ok'
 }
 
-/** 正文被截断了没有 —— `text_preview` 只有前 160 字。 */
+/**
+ * 正文被截断了没有 —— `text_preview` 只有前 160 字。
+ *
+ * **两边都按码点比。** `text_length` 是 Postgres `length()` 给的字符数（码点），
+ * 而 JS 的 `.length` 是 UTF-16 单元 —— 预览里有 emoji 时后者会偏大，
+ * 于是「其实被截断了」会被判成没截断，省略号就漏掉了。
+ * 和证据页高亮错位是同一个根因（见 `lib/l3/text.ts`）。
+ */
 export function isPreviewTruncated(sample: RawResponseSummary): boolean {
-  return sample.text_length > sample.text_preview.length
+  return sample.text_length > codePointLength(sample.text_preview)
 }
 
 /**

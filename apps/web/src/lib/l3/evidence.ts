@@ -3,9 +3,14 @@
  *
  * 这一层存在的唯一理由是**那条可自检的不变量**（API.md §7.1）：
  *
- *   full_text.slice(first_offset, first_offset + matched_term.length) === matched_term
+ *   按**码点**切 full_text[first_offset : first_offset + len(matched_term)] === matched_term
  *
- * 后端在全库 179 条命中上验过 179/179。前端在渲染前再验一次，
+ * ⚠️ 这条**不能**写成 `full_text.slice(...)` —— API.md 原来就是那么写的，
+ * 而那个写法在 JS 里是错的：`slice` 按 UTF-16 单元，offset 却是 Python 的
+ * 码点索引。正文里有一个 emoji，它就开始错位。（文档已同步更正。）
+ *
+ * 后端在全库 179 条命中上验过 179/179 —— 那是 Python 侧的验证，成立；
+ * 错的是「前端可以照抄这个表达式」这个假设。前端在渲染前再验一次，
  * 因为一旦它不成立，页面**不会报错**，只会把底色画在错误的字上 ——
  * 而这个产品的全部可信度就建立在「UI 上标出来的就是 L1 数过的那一处」。
  * 静默画错比空着糟得多：用户会拿一段错的原文去跟客户解释结论。
@@ -19,6 +24,8 @@
  * 纯函数，不碰 fetch 与 React。
  */
 import type { Mention } from '../types'
+
+import { codePointLength, toCodePoints } from './text'
 
 export interface EvidenceHighlight {
   brandId: number
@@ -59,6 +66,8 @@ export function buildHighlights(
 ): EvidenceHighlights {
   const highlights: EvidenceHighlight[] = []
   const mismatches: EvidenceMismatch[] = []
+  // 切一次，循环里复用。**按码点，不是 UTF-16 单元** —— 见 toCodePoints 的注释
+  const cp = toCodePoints(fullText)
 
   for (const m of mentions) {
     if (!m.mentioned) continue
@@ -66,8 +75,8 @@ export function buildHighlights(
     // 而 0 是正文第一个字 —— 最容易漏、也最难发现的那一档。
     if (m.first_offset === null || m.matched_term === null) continue
 
-    const end = m.first_offset + m.matched_term.length
-    const actual = fullText.slice(m.first_offset, end)
+    const end = m.first_offset + codePointLength(m.matched_term)
+    const actual = cp.slice(m.first_offset, end).join('')
 
     if (actual !== m.matched_term) {
       mismatches.push({

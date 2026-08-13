@@ -68,6 +68,40 @@ describe('buildHighlights 不变量自检', () => {
   })
 })
 
+describe('buildHighlights 与 emoji —— offset 是码点不是 UTF-16 单元', () => {
+  // 部署后冒烟在生产数据上抓到的真实 bug：响应 73 有 4 个 emoji，
+  // 810 码点 / 814 UTF-16 单元，于是 JS 的 slice 把 'Nike' 切成了 '如Nik'。
+  // 两边都没错，是跨语言的索引口径没对齐。
+
+  it('正文含 emoji 时仍能对上 —— 这是回归用例', () => {
+    // 🏃 在 Python 里算 1 个码点，在 JS 里算 2 个 UTF-16 单元
+    const text = '跑步🏃推荐安踏和耐克。'
+    // 按码点数：跑(0)步(1)🏃(2)推(3)荐(4)安(5)踏(6)
+    const { highlights, mismatches } = buildHighlights(text, [body(OWN, 5, '安踏')], OWN)
+    expect(mismatches).toHaveLength(0)
+    expect(highlights).toHaveLength(1)
+  })
+
+  it('多个 emoji 累积错位也要能对上', () => {
+    const text = '🏋️🤸🏃💡安踏'
+    // ZWJ / 变体选择符也各算一个码点 —— 所以不能靠数「几个 emoji」推 offset，
+    // 只能按 Array.from 的结果数
+    const offset = Array.from(text).indexOf('安')
+    const { highlights, mismatches } = buildHighlights(text, [body(OWN, offset, '安踏')], OWN)
+    expect(mismatches).toHaveLength(0)
+    expect(highlights[0].offset).toBe(offset)
+  })
+
+  it('用 UTF-16 单元当 offset 会被判成对不上 —— 不许静默放行', () => {
+    // 如果哪天有人把后端改成落 UTF-16 偏移而没同步前端，这条会红
+    const text = '跑步🏃推荐安踏'
+    const utf16Offset = text.indexOf('安踏') // 6，比码点索引 5 多 1
+    const { highlights, mismatches } = buildHighlights(text, [body(OWN, utf16Offset, '安踏')], OWN)
+    expect(highlights).toHaveLength(0)
+    expect(mismatches).toHaveLength(1)
+  })
+})
+
 describe('buildHighlights 哪些该跳过（不是错误）', () => {
   it('没被提及的品牌跳过', () => {
     const m = mention({ brand_id: 41, mentioned: false, mention_type: 'none' })

@@ -1,5 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 
+import { codePointLength, toCodePoints } from '@/lib/l3/text'
+
 export interface Highlight {
   /** 命中在 full_text 里的字符下标 */
   offset: number
@@ -52,20 +54,25 @@ export function HighlightedText({
   const parts: ReactNode[] = []
   let cursor = 0
 
+  // **按码点切，不是 UTF-16 单元。** offset 来自后端（Python 的码点索引），
+  // 用 String.slice 会在正文含 emoji 时错位 —— 一个 🏃 在 Python 里算 1、
+  // 在 JS 里算 2。共用 lib/l3/text 的那两个函数，不在这儿再写一份。
+  const cp = toCodePoints(text)
+
   for (const [i, h] of sorted.entries()) {
     if (h.offset < cursor) continue // 重叠命中：以先出现的为准
     if (h.offset > cursor) {
-      parts.push(<Fragment key={`t${i}`}>{text.slice(cursor, h.offset)}</Fragment>)
+      parts.push(<Fragment key={`t${i}`}>{cp.slice(cursor, h.offset).join('')}</Fragment>)
     }
-    const end = h.offset + h.matchedTerm.length
+    const end = h.offset + codePointLength(h.matchedTerm)
     parts.push(
       <mark key={`h${i}`} className={h.className ?? markClassName} title={h.title}>
-        {text.slice(h.offset, end)}
+        {cp.slice(h.offset, end).join('')}
       </mark>,
     )
     cursor = end
   }
-  if (cursor < text.length) parts.push(<Fragment key="tail">{text.slice(cursor)}</Fragment>)
+  if (cursor < cp.length) parts.push(<Fragment key="tail">{cp.slice(cursor).join('')}</Fragment>)
 
   return <div className={className}>{parts}</div>
 }

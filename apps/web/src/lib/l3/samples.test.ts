@@ -95,6 +95,23 @@ describe('isValidSample', () => {
   })
 })
 
+describe('isPreviewTruncated 与 emoji', () => {
+  it('预览含 emoji 时仍能判出被截断 —— 两边都按码点比', () => {
+    // text_length 是 Postgres length()（码点）；JS 的 .length 是 UTF-16 单元。
+    // 预览 5 个码点里有 2 个 emoji → JS .length 是 7，
+    // 拿 6 > 7 比会把「被截断了」判成没截断，省略号就漏了
+    expect(
+      isPreviewTruncated(sample({ text_preview: '跑步🏃💡好', text_length: 6 })),
+    ).toBe(true)
+  })
+
+  it('正好没截断时不误报', () => {
+    expect(
+      isPreviewTruncated(sample({ text_preview: '跑步🏃💡好', text_length: 5 })),
+    ).toBe(false)
+  })
+})
+
 describe('isPreviewTruncated', () => {
   it('总长大于预览长度才算截断', () => {
     expect(isPreviewTruncated(sample({ text_preview: 'abc', text_length: 3 }))).toBe(false)

@@ -273,12 +273,30 @@ SoV         = m_本品 / (m_本品 + Σ m_竞品)
 
 ### 7.1 高亮：一条可自检的不变量
 
-```
-full_text.slice(first_offset, first_offset + matched_term.length) === matched_term
+**`first_offset` 是「码点」索引，不是 JS 的 UTF-16 单元索引。**
+
+```python
+# Python（后端口径，成立）
+full_text[first_offset : first_offset + len(matched_term)] == matched_term
 ```
 
-`first_offset` 非空时**必然成立**（后端在全库 179 条命中上验过 179/179）。
-前端可以拿它 assert 一下，错位会立刻暴露。
+```ts
+// JS：**不能**直接用 String.slice —— 它按 UTF-16 单元切，
+// 一个 🏃 在 Python 里算 1、在 JS 里算 2，正文有一个 emoji 就开始错位
+const cp = Array.from(full_text)               // 按码点拆
+cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') === matched_term
+```
+
+> **这里原来写的是 `full_text.slice(...)`，那个写法在 JS 里是错的。**
+> 后端在全库 179 条上验过 179/179 —— 那是 Python 侧的验证，成立；
+> 错的是「前端可以照抄这个表达式」这个假设。
+>
+> 2026-08-12 由部署后冒烟在生产数据上抓到：某条回答含 4 个 emoji
+> （810 码点 / 814 UTF-16 单元），`Nike` 被切成了 `如Nik`。前端的自检
+> 拦住了它（对不上就不画、改报告警），所以没有画错，但含 emoji 的回答
+> 一律没有高亮。修法见 `apps/web/src/lib/l3/evidence.ts`。
+
+`first_offset` 非空时这条**必然成立**。前端应当 assert 它，错位会立刻暴露。
 
 **禁止**自己拿 `matched_term` 去 `full_text` 里 `indexOf` —— 会和 L1 标注口径分叉
 （大小写折叠、别名优先级规则都在后端）。
