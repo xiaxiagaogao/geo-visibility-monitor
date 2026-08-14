@@ -24,15 +24,30 @@ cd "$TARGET/deploy"
 echo "docker compose up postgres api web..."
 docker compose up -d --build postgres api web
 
-# crawler holds Playwright code; rebuild if container already exists
+# crawler 装的是 Playwright 那套代码，容器已存在就跟着重建。
+#
+# ⚠️ VPS 上这台是【冷备，平时停着】（scripts/crawl-node/README.md「冷备切换」）。
+# 采集在大陆家宽节点上跑，两台并行会让一次 run 的样本混着新加坡和大陆两个出口，
+# 而数据里没有字段记录某条样本是哪台采的，混了事后分不开。
+# 所以：原本停着的，重建完必须还停着（`create` 不 `up`）；
+# 但也不能只 build 不重建容器 —— 那样将来 `docker start` 起来的还是旧代码。
 if docker ps -a --format '{{.Names}}' | grep -qx geo-crawler; then
-  echo "docker compose rebuild crawler..."
-  docker compose --profile crawl up -d --build crawler
-  # storage_state lives on volume /data; re-seed only if missing
-  if [ -f deepseek_storage.json ]; then
-    if ! docker exec geo-crawler test -f /data/deepseek_storage.json 2>/dev/null; then
-      echo "seed deepseek_storage.json into crawler volume"
-      docker cp deepseek_storage.json geo-crawler:/data/deepseek_storage.json || true
+  if [ "$(docker inspect -f '{{.State.Running}}' geo-crawler 2>/dev/null || echo false)" = "true" ]; then
+    echo "docker compose rebuild crawler（原本在跑，保持运行）..."
+    docker compose --profile crawl up -d --build crawler
+    # storage_state 在 volume /data 上；缺了才补
+    if [ -f deepseek_storage.json ]; then
+      if ! docker exec geo-crawler test -f /data/deepseek_storage.json 2>/dev/null; then
+        echo "seed deepseek_storage.json into crawler volume"
+        docker cp deepseek_storage.json geo-crawler:/data/deepseek_storage.json || true
+      fi
+    fi
+  else
+    echo "docker compose recreate crawler（冷备，重建后保持停止）..."
+    docker compose --profile crawl create --build crawler
+    if [ "$(docker inspect -f '{{.State.Running}}' geo-crawler 2>/dev/null || echo false)" = "true" ]; then
+      echo "!! 冷备被起来了，停回去 —— 不能和大陆节点并行采集"
+      docker stop geo-crawler
     fi
   fi
 fi

@@ -615,6 +615,11 @@ git push vps main
 ssh -i $PEM $VPS 'cp /opt/geo-demo.git/hooks/post-receive.prev /opt/geo-demo.git/hooks/post-receive'
 ```
 
+**正文里那段 crawler 是有意不启动的。** VPS 上的 `geo-crawler` 是冷备（§10.1 第 3 条），
+以前每次部署都会把它 `up` 起来 —— 和大陆节点并行采集，样本混着两个出口而没有任何
+字段能事后分开。现在按容器原本的状态走：在跑的 `up`，停着的用 `create` 重建后
+**仍然停着**（重建是必要的，否则将来 `docker start` 起来的是旧代码）。
+
 ```bash
 # 一次性：配置 push 远端
 export GIT_SSH_COMMAND='ssh -i <pem> -o IdentitiesOnly=yes'   # pem 需 chmod 400
