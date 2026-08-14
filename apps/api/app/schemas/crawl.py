@@ -27,6 +27,17 @@ class CrawlJobOut(BaseModel):
     status: str
     sample_index: int
     error_message: Optional[str] = None
+    #: P2-08 失败分类：``timeout`` / ``rate_limited`` / ``login_required`` /
+    #: ``platform_unavailable`` / ``parse_error`` / ``worker_died`` / ``unknown``。
+    #: **``null`` 表示「还没失败过」**，不表示「失败了但没认出来」——
+    #: 后者是 ``unknown``，两者的排查方向完全不同
+    failure_kind: Optional[str] = None
+    #: P2-16 已消耗的尝试次数。``attempt > 1 且 status='success'``
+    #: 就是「重试之后成功的」
+    attempt: Optional[int] = None
+    #: P2-16 下次可被领取的时刻。**有值且在未来 = 正在退避等重试**。
+    #: 退避中的 job 状态仍是 ``pending``，靠这个字段才能和「还没轮到」分开
+    next_attempt_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     created_at: datetime
