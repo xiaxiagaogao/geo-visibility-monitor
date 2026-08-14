@@ -229,6 +229,33 @@ def test_null_next_attempt_at_means_claimable(db, make_job):
     assert job.id in [j.id for j in claim_pending_jobs(db, limit=50)]
 
 
+def test_manual_retry_resets_the_attempt_counter(db, make_job, retry_on):
+    """人点重试意味着他做了判断（换了 storage_state、限流过去了）。
+    不清零的话，一条已耗尽次数的 job 手动重排后立刻又不享受自动重试 ——
+    按钮只生效一半。"""
+    from app.services.crawl_jobs import fail_job, retry_job
+    from app.services.failure_kinds import TIMEOUT
+
+    retry_on()
+    job = make_job(status="running", attempt=2)
+    fail_job(db, job, TIMEOUT_EXC)
+    db.refresh(job)
+    assert job.status == "failed" and job.attempt == 3  # 已耗尽
+
+    requeued = retry_job(db, job.id)
+
+    assert requeued.status == "pending"
+    assert not requeued.attempt          # None 或 0，一律按 0 读
+    assert requeued.failure_kind is None
+    assert requeued.next_attempt_at is None  # 手动重排要的是「现在就排」
+
+    # 归零之后自动重试重新生效：再失败一次仍会被排队，而不是直接终态
+    fail_job(db, requeued, TIMEOUT_EXC)
+    db.refresh(requeued)
+    assert requeued.status == "pending"
+    assert requeued.attempt == 1
+
+
 def test_claim_clears_failure_state_but_keeps_attempt(db, make_job):
     """`attempt` 是累计的 —— claim 时清掉就等于重试上限形同虚设。"""
     from app.services.crawl_jobs import claim_pending_jobs

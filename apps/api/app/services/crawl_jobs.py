@@ -134,6 +134,13 @@ def retry_job(db: Session, job_id: int) -> CrawlJob:
     job.error_message = None
     job.started_at = None
     job.finished_at = None
+    # **手动 retry 把自动重试的计数清零，是有意的。** 人点这个按钮意味着他做了
+    # 判断（换了 storage_state、平台恢复了、限流过去了）；不清零的话一条已经耗尽
+    # 次数的 job 被手动重排后立刻又不享受自动重试，等于按钮只生效一半。
+    # `next_attempt_at` 也清 —— 手动重排要的是「现在就排」，不是「接着等退避」
+    job.attempt = None
+    job.failure_kind = None
+    job.next_attempt_at = None
     db.commit()
     db.refresh(job)
     return job
