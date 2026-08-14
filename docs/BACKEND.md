@@ -606,13 +606,23 @@ checkout，后面 `docker compose up` 和全部健康检查**被静默跳过，�
 
 ```bash
 PEM=~/Desktop/pem/SG-DC1.pem; VPS=root@100.64.240.17     # 走 tailnet
-ssh -i $PEM $VPS 'cp -p /opt/geo-demo.git/hooks/post-receive /root/post-receive.working.bak'
+ssh -i $PEM $VPS 'cp -p /opt/geo-demo.git/hooks/post-receive /root/post-receive.stub-known-good-$(date +%F).bak'
 scp -i $PEM deploy/post-receive.hook $VPS:/opt/geo-demo.git/hooks/post-receive
 ssh -i $PEM $VPS 'chmod +x /opt/geo-demo.git/hooks/post-receive'
 git push vps main
+```
 
-# 存根坏了 = 之后所有部署都完蛋。手动恢复（不需要 git revert）：
-ssh -i $PEM $VPS 'cp /opt/geo-demo.git/hooks/post-receive.prev /opt/geo-demo.git/hooks/post-receive'
+**存根坏了 = 之后所有部署都完蛋**，所以恢复手段不能依赖 push（`PHASE2` §6 规矩 1）。
+VPS `/root` 下常备副本，直接 `cp` 回去，不需要 `git revert`：
+
+| 文件 | 是什么 |
+|------|--------|
+| `/root/post-receive.stub-known-good-2026-08-14.bak` | 当前存根的已知可用副本，**首选恢复目标** |
+| `/root/post-receive.OLD-monolith-2026-08-14.bak` | 拆分之前那个单文件 hook。⚠️ 它自带本节说的覆盖自己那个 bug，只在需要整体退回旧结构时才用 |
+| `$GIT_DIR/hooks/post-receive.prev` | 正文自动装新存根时留下的上一版（存根没变化时不生成） |
+
+```bash
+ssh -i $PEM $VPS 'cp /root/post-receive.stub-known-good-2026-08-14.bak /opt/geo-demo.git/hooks/post-receive'
 ```
 
 **正文里那段 crawler 是有意不启动的。** VPS 上的 `geo-crawler` 是冷备（§10.1 第 3 条），
