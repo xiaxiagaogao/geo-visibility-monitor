@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@/components/ui'
+import { Button, ui } from '@/components/ui'
 
 import styles from './runs.module.css'
 
@@ -22,6 +22,8 @@ export function RunNowButton({
   onArm,
   onCancel,
   onConfirm,
+  note,
+  onNoteChange,
   busy,
   /** 上一次运行建了多少个 job —— 给用户一个量级参照，没有历史就不显示 */
   lastJobCount,
@@ -31,6 +33,9 @@ export function RunNowButton({
   onArm: () => void
   onCancel: () => void
   onConfirm: () => void
+  /** 这一次的口径说明，会写进 `run.note` */
+  note: string
+  onNoteChange: (v: string) => void
   busy?: boolean
   lastJobCount?: number
   disabled?: boolean
@@ -51,6 +56,18 @@ export function RunNowButton({
             报一个算出来的精确数字反而是在编。量级参照够用了。 */}
         {lastJobCount ? `（上次建了 ${lastJobCount} 个）` : ''}。发起后无法取消。
       </span>
+      {/* 口径说明写在这里而不是事后补：发起的这一刻才是最清楚
+          「这次和上次有什么不一样」的时候。留空也完全正常 —— 大多数运行
+          就是常规的一次，没什么可说的。 */}
+      <input
+        className={ui.input}
+        value={note}
+        onChange={(e) => onNoteChange(e.target.value)}
+        placeholder="口径说明（可选）：这次和以往有什么不同？"
+        maxLength={500}
+        disabled={busy}
+        style={{ minWidth: 260, flex: 1 }}
+      />
       <Button primary onClick={onConfirm} disabled={busy || disabled}>
         {busy ? '发起中…' : '确认发起'}
       </Button>

@@ -41,6 +41,21 @@ class TaskListOut(BaseModel):
     total: int
 
 
+class RunCreate(BaseModel):
+    """发起一次运行时可带的口径说明。
+
+    **为什么需要它**：`run.note` 是「这一次的口径和别的不一样」的唯一落点
+    （比如「采集出口已迁至大陆」「本次未采集截图」），而在此之前**没有任何
+    接口能写它** —— `/v1/runs/{id}` 只有 GET。于是 2026-08-14 迁移采集出口
+    那次，基线断点就没记上。
+
+    **在发起时带，而不是事后 PATCH**：那一刻才是最清楚这次口径的时候；
+    事后补要么忘、要么补的是回忆。
+    """
+
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 class RunPromptOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

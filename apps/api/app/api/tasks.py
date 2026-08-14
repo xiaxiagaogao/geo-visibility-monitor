@@ -18,6 +18,7 @@ from app.api.deps import (
 from app.core.security import Principal
 from app.models import Run, Task
 from app.schemas.task import (
+    RunCreate,
     RunDetailOut,
     RunListOut,
     RunOut,
@@ -184,6 +185,9 @@ def list_runs(
 )
 def start_run(
     task_id: int,
+    # **body 可选**：老调用方（前端、脚本）不带 body 照样能发起，
+    # 加这个字段不该让任何现有调用变成 422
+    body: Optional[RunCreate] = None,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_write),
 ):
@@ -204,7 +208,7 @@ def start_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="task is inactive; enable it before starting a run",
         )
-    run = task_svc.create_run(db, task)
+    run = task_svc.create_run(db, task, note=body.note if body else None)
     return RunOut(**_run_out(db, run))
 
 

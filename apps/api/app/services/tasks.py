@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -47,14 +47,16 @@ def derive_run_status(counts: Dict[str, int]) -> str:
     return "partial"
 
 
-def create_run(db: Session, task: Task) -> Run:
+def create_run(db: Session, task: Task, note: Optional[str] = None) -> Run:
     """发起一次运行。
 
     **顺序不能反：先冻结口径，再建 job。** 反过来的话，两步之间任何一次
     配置修改都会让 job 用新口径跑、快照记旧口径 —— 而这种错不会报错，
     只会让某次 run 的数字对不上它自己的快照。
     """
-    run = Run(task_id=task.id, platforms=list(task.platforms or []))
+    # note 在这里写死，而不是建完再 UPDATE —— 发起与口径说明是同一件事，
+    # 分两步就会出现「run 建好了但 note 还没写」的中间态
+    run = Run(task_id=task.id, platforms=list(task.platforms or []), note=note or None)
     db.add(run)
     db.flush()  # 拿 run.id
 

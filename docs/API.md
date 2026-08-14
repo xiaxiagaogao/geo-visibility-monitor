@@ -362,7 +362,7 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 | GET / POST | `/v1/tasks` | 列表按 workspace 自动收敛；建任务仅超管/运营 |
 | GET / PATCH | `/v1/tasks/{id}` | PATCH **不含 `brand_id`** —— 任务过不了户 |
 | GET | `/v1/tasks/{id}/runs` | 该任务的执行历史 |
-| POST | `/v1/tasks/{id}/runs` | 发起一次运行，仅超管/运营 |
+| POST | `/v1/tasks/{id}/runs` | 发起一次运行，仅超管/运营。**body 可选**：`{ "note": "…" }` 记这一次的口径说明 |
 | GET | `/v1/runs/latest` | **我能看到的最新一次运行**。客户首页分流用；一次都没有时 404 |
 | GET | `/v1/runs/{id}` | 带口径快照 |
 
@@ -373,6 +373,19 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 
 `RunDetailOut` = `RunOut` + **`prompts[]`**（`prompt_id` + `prompt_text`）
 + **`competitors[]`**（`competitor_brand_id` + `brand_name`）
+
+**`run.note` 怎么写进去**：只能在 `POST /v1/tasks/{id}/runs` 时带，
+**没有事后修改的接口**（`/v1/runs/{id}` 只有 GET）。
+
+```jsonc
+POST /v1/tasks/27/runs
+{ "note": "采集出口已迁至大陆；本次未采集截图" }   // body 整个可选，不带也行
+```
+
+口径说明写在发起那一刻，是因为**那时才最清楚这次和以往有什么不同**；
+事后补要么忘、要么补的是回忆。它是「这一次的口径和别的不一样」的唯一落点 ——
+换了采集出口、关了截图、换了标注器版本，都该写在这儿，
+否则趋势图上那个跳变以后没人解释得了。
 
 ### 8.5.1 `status` 是算出来的，不是存的
 

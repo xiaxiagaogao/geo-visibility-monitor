@@ -118,7 +118,16 @@ export async function getLatestRun(): Promise<RunDetail> {
  * 想要快照得再打一次 `getRun`。
  *
  * 这一步是真的建 job、真的消耗额度，和「建任务」不是一回事。
+ *
+ * `note` 是**这一次的口径说明** —— `run.note` 是「这次和别的不一样」的唯一落点
+ * （「采集出口已迁至大陆」「本次未采集截图」）。**在发起时带，而不是事后补**：
+ * 那一刻才是最清楚这次口径的时候。
  */
-export async function startRun(taskId: number): Promise<Run> {
-  return apiFetch<Run>(`/v1/tasks/${taskId}/runs`, { method: 'POST' })
+export async function startRun(taskId: number, note?: string): Promise<Run> {
+  const trimmed = note?.trim()
+  return apiFetch<Run>(`/v1/tasks/${taskId}/runs`, {
+    method: 'POST',
+    // 没填就不发 body —— 后端的 body 是可选的，发一个 {note: null} 只是噪音
+    body: trimmed ? { note: trimmed } : undefined,
+  })
 }

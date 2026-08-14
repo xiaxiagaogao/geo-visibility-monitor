@@ -245,6 +245,7 @@ function TaskHeader({
 }) {
   const [armed, setArmed] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
   const [startError, setStartError] = useState<string | null>(null)
 
   const active = runList.find((r) => r.id === activeRunId)
@@ -266,8 +267,9 @@ function TaskHeader({
     setBusy(true)
     setStartError(null)
     try {
-      const run = await startRun(task.id)
+      const run = await startRun(task.id, note)
       setArmed(false)
+      setNote('')
       onStarted(run)
     } catch (e) {
       // 403 **不跳登录页** —— 用户是登着的，跳了会陷入死循环。
@@ -327,6 +329,8 @@ function TaskHeader({
               onArm={() => setArmed(true)}
               onCancel={() => setArmed(false)}
               onConfirm={confirmStart}
+              note={note}
+              onNoteChange={setNote}
               busy={busy}
               lastJobCount={runList[0]?.n_jobs}
               disabled={taskInFlight || inactive}
