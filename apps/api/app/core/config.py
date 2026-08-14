@@ -51,6 +51,19 @@ class Settings(BaseSettings):
     # running 超过这个时长视为「worker 死了没来得及收尾」，回收成 failed。
     # 要大于 crawl_timeout_ms + process_job 的硬上限（+45s），留足余量。
     crawl_stuck_job_sec: int = 600
+
+    # P2-16 自动退避重试。**默认关**：先只跑失败分类，在真实 run 上确认
+    # timeout 认得准，再打开重试 —— 调试时不能有两个变量同时在动。
+    # 这个开关同时是回滚手段：出事改环境变量重启即可，不必 git revert。
+    crawl_auto_retry_enabled: bool = False
+    # 首次 + 最多重试 (max-1) 次。耗尽后终态 failed，永不自动重排
+    crawl_max_attempts: int = 3
+    # 退避曲线 min(base * 2**(n-1), max)：30s → 60s → …，封顶 300s
+    crawl_retry_base_sec: float = 30.0
+    crawl_retry_max_sec: float = 300.0
+    # ±20% 抖动。同一批 job 被同一次限流打中会同时失败、同时到期、同时再撞，
+    # 抖开的成本近乎为零。置 0 可让退避完全确定（测试用）
+    crawl_retry_jitter: float = 0.2
     playwright_headless: bool = True
     deepseek_storage_state: str = ""
     deepseek_user_data_dir: str = ""
