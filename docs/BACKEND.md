@@ -554,8 +554,32 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 | API | `:8200`（需 Key） |
 | 库 | `127.0.0.1:5433`（**勿改 0.0.0.0**；默认口令 `geo/geo` 是弱口令，对外前必须改） |
 | 日志 | `/var/log/geo-demo-deploy.log` |
-| 容器 | `geo-api` · `geo-web` · `geo-crawler` · `geo-postgres` |
+| 容器 | `geo-api` · `geo-web` · `geo-postgres` · `geo-crawler`（**冷备，平时停着**，见 §10.1） |
+| tailnet | `sg-dc1` = `100.64.240.17`。postgres 经 `tailscale serve --tcp 5433` 只暴露给 tailnet，**不改 compose 的绑定** |
 | 勿碰 | `:8100` sillytavern · `:8090` fund-dashboard · 现有 nginx |
+
+### 10.1 采集在别的机器上（2026-08-14 起）
+
+**`crawler` 不在 VPS 跑了。** 出口 IP 会影响 AI 的回答（已在真实数据上验证：
+run 215 vs run 27/54），而 VPS 在新加坡、服务对象是大陆用户、待接的三个平台
+（豆包 · 千问 · Kimi）全是大陆服务。所以 crawler 单独跑在一台**大陆家宽**的
+节点上，`api` / `web` / `postgres` 仍在 VPS。
+
+| | |
+|---|---|
+| 部署 / 自检 | `scripts/crawl-node/deploy.sh`（不含凭证，全走环境变量） |
+| 约束与切换 | `scripts/crawl-node/README.md` —— **改任何东西之前先读它** |
+| 链路 | 采集节点 ──tailnet──▶ `100.64.240.17:5433` |
+
+四条最容易出事的：
+
+1. **crawler 容器绝对不能走代理。** 走了出口就变成代理的落地，
+   数据照样采得到、只是全部来自错误的地理位置，**没有任何地方会报错**。
+   `deploy.sh verify` 有一条硬检查：容器出口 ≠ 代理出口。
+2. **镜像从 VPS 经 tailnet 传，不在节点上从 mcr 拉**（90 分钟 vs 66 秒）。
+3. **VPS 上的 `geo-crawler` 是冷备，只能接替不能并行** ——
+   并行会让一次 run 的样本混着两个出口，而数据里没有字段记录是哪台采的。
+4. **截图当前是关闭的**（节点写的截图 VPS 读不到，留着只会 404）。
 
 ```bash
 # 一次性：配置 push 远端
