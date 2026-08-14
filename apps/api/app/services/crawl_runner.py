@@ -17,7 +17,7 @@ from app.providers.deepseek_web import DeepSeekLoginRequired
 from app.providers.fake import FakeProvider
 from app.providers.registry import ProviderContext, build_real_provider
 from app.services.annotate import annotate_response
-from app.services.crawl_jobs import claim_pending_jobs, reclaim_stuck_jobs
+from app.services.crawl_jobs import claim_pending_jobs, fail_job, reclaim_stuck_jobs
 
 logger = logging.getLogger("geo.crawl_runner")
 
@@ -113,10 +113,7 @@ def _persist_result(db: Session, job: CrawlJob, prompt: Prompt, result: CrawlRes
 def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
     prompt = db.get(Prompt, job.prompt_id)
     if not prompt:
-        job.status = "failed"
-        job.error_message = "prompt missing"
-        job.finished_at = _utcnow()
-        db.commit()
+        fail_job(db, job, "prompt missing")
         return None
 
     try:
@@ -132,18 +129,13 @@ def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
                 raise RuntimeError(f"crawl timed out after {timeout_sec}s")
         return _persist_result(db, job, prompt, result)
     except DeepSeekLoginRequired as exc:
-        job.status = "failed"
-        job.error_message = str(exc)[:500]
-        job.finished_at = _utcnow()
-        db.commit()
-        logger.warning("job %s login required", job.id)
+        # 单独接住只为了不打印整条 traceback —— 登录墙不是异常情况，是凭证过期，
+        # 该看的是 failure_kind 而不是栈。收尾逻辑与下面完全一致
+        fail_job(db, job, exc)
         return None
     except Exception as exc:
-        job.status = "failed"
-        job.error_message = str(exc)[:500]
-        job.finished_at = _utcnow()
-        db.commit()
         logger.exception("job %s failed", job.id)
+        fail_job(db, job, exc)
         return None
 
 

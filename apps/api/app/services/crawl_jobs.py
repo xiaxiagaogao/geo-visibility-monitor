@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -11,6 +12,9 @@ from app.core.config import get_settings
 from app.models import CrawlJob, Prompt, RawResponse
 from app.providers import registry
 from app.schemas.crawl import CrawlJobCreate
+from app.services.failure_kinds import WORKER_DIED, classify_failure
+
+logger = logging.getLogger("geo.crawl_jobs")
 
 
 def _utcnow() -> datetime:
@@ -134,6 +138,35 @@ def retry_job(db: Session, job_id: int) -> CrawlJob:
     return job
 
 
+def fail_job(
+    db: Session,
+    job: CrawlJob,
+    reason: Union[BaseException, str],
+    *,
+    kind: Optional[str] = None,
+) -> CrawlJob:
+    """把一条 job 收成 ``failed``，并记下失败分类（P2-08）。
+
+    **收拢这个函数是为 P2-34 铺路。** 失败处理原先内联在 ``process_job`` 的三个
+    ``except`` 分支里；将来 crawler 不碰数据库、改走
+    ``POST /v1/worker/jobs/{id}/fail``，那个端点要的是同一套逻辑。
+    现在不收拢，到时候就是两份会分叉的实现。
+
+    ``kind`` 显式传入时不再分类 —— 调用方比消息文本更清楚发生了什么
+    （``reclaim_stuck_jobs`` 就是这种情况：它手里那句话是自己写的）。
+    """
+    message = reason if isinstance(reason, str) else str(reason)
+    job.failure_kind = kind or classify_failure(reason)
+    job.status = "failed"
+    job.error_message = message[:500]
+    job.finished_at = _utcnow()
+    db.commit()
+    # kind=unknown 是要盯的信号：分类没认出来的失败**不会自动重试**，
+    # 而它可能正是下一个该提上来的模式。`grep kind=unknown` 就能捞
+    logger.warning("job %s failed kind=%s msg=%s", job.id, job.failure_kind, message[:200])
+    return job
+
+
 def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
     """把僵死在 running 的 job 收成 failed。
 
@@ -143,6 +176,10 @@ def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
 
     收成 failed 而不是直接回 pending：反复把容器搞崩的任务不该自动无限重排，
     留给人看一眼再决定（/v1/crawl-jobs/{id}/retry）。
+
+    **P2-16 之后这条判断仍然成立**，落点变成 ``failure_kind=worker_died``
+    不在 ``RETRYABLE_KINDS`` 里 —— 自动重试会让「容器被 OOM / 家宽断电 /
+    正在重新部署」这类环境问题不被发现。
     """
     cutoff = _utcnow() - timedelta(seconds=older_than_sec)
     stuck = list(
@@ -159,6 +196,7 @@ def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
     for job in stuck:
         job.status = "failed"
         job.finished_at = _utcnow()
+        job.failure_kind = WORKER_DIED
         job.error_message = (
             f"reclaimed: stuck in running for over {older_than_sec}s "
             "(worker likely died mid-crawl)"
