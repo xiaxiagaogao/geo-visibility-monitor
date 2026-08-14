@@ -511,6 +511,37 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 > **存量污染不可回填。** 早期样本的 L0 被旧清洗规则改写过、且丢了首块，
 > 重跑 L1 也补不回来 —— 要干净数据只能重抓。安踏那 35 条是修复后抓的，是干净的。
 
+### 7.2 失败分类与自动退避重试（2026-08-14 起）
+
+采集出口迁到大陆家宽之后，**每次 run 开头一两条会被限流**
+（`Page.goto: Timeout 120000ms exceeded`），之后就顺。
+
+| 组件 | 位置 |
+|---|---|
+| 分类规则 | `app/services/failure_kinds.py`（纯函数） |
+| 退避曲线与决策 | `app/services/retry_policy.py`（纯函数） |
+| 落库 | `app/services/crawl_jobs.fail_job()` · `claim_pending_jobs()` |
+
+**只有 `timeout` 与 `rate_limited` 会自动重试。** 取值表见 `API.md` §8.0.1。
+`unknown` 刻意不重试 —— 自动重试一个没认出来的失败，是用 3 倍时间撞同一堵墙，
+还会把原始信号淹掉（最后留在 `error_message` 里的是第 3 次的报错）。
+
+四条需要记住的机制：
+
+1. **退避落库，不在进程里 sleep。** sleep 会串起整批（`run_once` 是串行循环），
+   而且 job 留在 `running` 会被 `CRAWL_STUCK_JOB_SEC` 的僵死回收收成 failed，
+   两套机制打架。落库之后退避中的 job 回 `pending`，claim 跳过它去领下一条。
+2. **claim 的条件是** `status='pending' AND (next_attempt_at IS NULL OR <= now)`。
+   `NULL` = 立刻可领 —— 迁移前的旧行、**冷备那台旧代码 crawler 建的行**都是 NULL。
+3. **claim 清 `error_message` / `failure_kind` / `next_attempt_at`，不清 `attempt`。**
+   清了重试上限就形同虚设。
+4. **限流是全局现象，per-job 退避只是缓解。** 现在观察到的是「头一两条」，
+   所以 per-job 够用。**如果哪天变成大面积限流，要的是全局降速/熔断，
+   不是把 `CRAWL_MAX_ATTEMPTS` 往上堆** —— 后者只会让一次 run 变得极慢。
+
+分类不认识的失败会打 `kind=unknown` 的 WARNING 日志，
+`grep kind=unknown` 就能捞出「下一个该提上来的模式」。
+
 ---
 
 ## 8. 前后端契约（后端保证）
@@ -579,6 +610,8 @@ run 215 vs run 27/54），而 VPS 在新加坡、服务对象是大陆用户、�
 2. **镜像从 VPS 经 tailnet 传，不在节点上从 mcr 拉**（90 分钟 vs 66 秒）。
 3. **VPS 上的 `geo-crawler` 是冷备，只能接替不能并行** ——
    并行会让一次 run 的样本混着两个出口，而数据里没有字段记录是哪台采的。
+   2026-08-14 起 `post-receive.hook` 会在部署后把它**停回原状**；在那之前
+   每推一次代码都会把冷备静默拉起来（`docker ps -a` 连停止的容器一起匹配）。
 4. **截图当前是关闭的**（节点写的截图 VPS 读不到，留着只会 404）。
 
 ### 10.2 部署 hook 是两个文件（2026-08-14 起）
@@ -677,7 +710,10 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
   geo-api python -m pytest tests/ -q
 ```
 
-**环境变量要点：** `DATABASE_URL` · `API_KEY` · `CRAWL_MODE=real` · `FAKE_WORKER_ENABLED=false`（真抓）· `DEEPSEEK_STORAGE_STATE` · `SCREENSHOT_DIR` · `CRAWL_STUCK_JOB_SEC`（僵死回收）。
+**环境变量要点：** `DATABASE_URL` · `API_KEY` · `CRAWL_MODE=real` · `FAKE_WORKER_ENABLED=false`（真抓）· `DEEPSEEK_STORAGE_STATE` · `SCREENSHOT_DIR` · `CRAWL_STUCK_JOB_SEC`（僵死回收）· `CRAWL_AUTO_RETRY_ENABLED`（自动退避重试，**默认 false**）· `CRAWL_MAX_ATTEMPTS` / `CRAWL_RETRY_BASE_SEC` / `CRAWL_RETRY_MAX_SEC` / `CRAWL_RETRY_JITTER`（§7.2）。
+
+> `CRAWL_AUTO_RETRY_ENABLED` **同时是回滚手段**：出事改环境变量重启 crawler 即可回到
+> 「只分类不重试」，不必 `git revert` 重新 build（PHASE2 §6 规矩 1）。
 
 **故障：** 401→Key；pending 不动→crawler/日志；登录墙→storage_state；截图脏→是否 clean-render 镜像；counts 怪→fake/status/别名。
 

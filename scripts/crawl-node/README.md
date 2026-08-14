@@ -35,6 +35,12 @@ export GEO_DB_URL='postgresql+psycopg://USER:PASS@100.64.240.17:5433/geo'
 
 脚本**不含任何凭证**，全从环境变量来，缺了直接报错退出。
 
+自动退避重试（P2-16）默认关。观察一轮确认分类没问题后再打开：
+
+```bash
+GEO_AUTO_RETRY=true ./deploy.sh start     # 回滚 = 去掉这个变量重跑 start
+```
+
 ## 四条不能改的，改之前先读这里
 
 ### 1. 容器绝对不能走代理
@@ -103,11 +109,21 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 **启用冷备时必须意识到：从那一刻起采集出口换回了新加坡**，
 那段数据与前后不可比。
 
+### 部署曾经会把冷备静默拉起来（2026-08-14 已修）
+
+`post-receive.hook` 里那句 `docker ps -a | grep -qx geo-crawler` **连已停止的
+容器一起匹配**，于是每推一次代码，`compose up -d` 就把冷备启用一次 ——
+而没有任何地方会报错。P2-35 那次部署实际让它跑了 4 小时，
+只是碰巧那段时间没人发起 run 才没污染数据。
+
+现在 hook 会先记下容器原本是不是 running，rebuild 之后停回原状。
+**照样 rebuild 是有意的**：冷备要的是「真要切过去时代码是最新的」。
+
 ## 已知问题
 
 | | |
 |---|---|
-| **冷启动被限流** | 一次 run 开头的头一两条常见 `Page.goto` 120 秒超时，之后就顺。现在只能手动 `POST /v1/crawl-jobs/{id}/retry`。自动退避重试是 `PHASE2` P2-16 |
+| **冷启动被限流** | 一次 run 开头的头一两条常见 `Page.goto` 120 秒超时，之后就顺。**P2-16 已做**：这类失败分类成 `timeout`，自动退避重排（30s → 60s，最多 3 次）。开关 `CRAWL_AUTO_RETRY_ENABLED`，见 `BACKEND.md` §7.2。手动 `POST /v1/crawl-jobs/{id}/retry` 仍然可用，且会把计数清零 |
 | **家宽 IP 是动态的** | tailscale 自己能重连；但风控与 `storage_state` 会不会受影响，没验过 |
 | **节点不是独占的** | 我们这台还跑着别的服务。任何 `pkill` / `pgrep` **都要按精确 PID** —— 模式匹配会误伤 |
 | **`storage_state` 会过期** | 过期的表现是**一批 job 全 failed**，和「平台没接」「网络问题」的排查方向完全不同。`PHASE2` P2-07 要做可观测性 |

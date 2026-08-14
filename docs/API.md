@@ -327,9 +327,38 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 
 `CrawlJobOut`：`id` · `prompt_id` · `platform` · `status` ·
 **`sample_index`**（同一 prompt 的第几次采样）· `error_message?` ·
+**`failure_kind?`** · **`attempt?`** · **`next_attempt_at?`** ·
 `started_at?` · `finished_at?` · `created_at` · **`response_id?`**（可直接下钻）
 
 `status`：`pending` → `running` → `success` / `failed`
+
+#### 8.0.1 失败分类 `failure_kind`
+
+| 值 | 含义 | 自动重试 |
+|---|---|---|
+| `timeout` | 超时（冷启动被限流最常见的表现） | ✅ |
+| `rate_limited` | 明确的限流信号（429 / 「访问过于频繁」） | ✅ |
+| `login_required` | `storage_state` 过期，要人去换 | ❌ |
+| `platform_unavailable` | Provider 没实现 | ❌ |
+| `parse_error` | 拿到页面了但抽不出答案（DOM 可能变了） | ❌ |
+| `worker_died` | 僵死回收收的，worker 中途没了 | ❌ |
+| `unknown` | 没认出来 | ❌ |
+
+**`null` 表示「还没失败过」，不表示「失败了但没认出来」** ——
+后者是 `unknown`。两者的排查方向完全不同，别在前端把它们显示成同一个词。
+
+#### 8.0.2 退避中的 job 状态仍是 `pending`
+
+自动重试（P2-16）不新增状态值。一条正在等退避的 job 是 `pending` +
+`next_attempt_at` 在未来；一条还没轮到的 job 是 `pending` + `next_attempt_at`
+为 `null`。**要区分只能看这个字段**，`status` 上它们一模一样。
+
+这直接影响 run 状态：重试期间那次 run 是 `running` / `pending`，
+**不是 `partial`** —— 还没定论。所以自动刷新会多转一会儿
+（默认曲线 30s → 60s，最多约 90 秒）。
+
+`attempt` 是已消耗的尝试次数。**`attempt > 1` 且 `status='success'`
+就是「重试之后成功的」** —— 没有另一张表记重试历史，这个组合就是全部信号。
 
 > 客户**必须传 `prompt_id` 或 `run_id`**，否则 400（见 §3）。两个都不属于自己时 404。
 
@@ -349,6 +378,11 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 ### `POST /v1/crawl-jobs/{id}/retry`
 
 `failed` / `success` / `running` 都可重排（`running` 是为了救僵死任务）。
+
+**它同时把自动重试的计数清零**（`attempt` / `failure_kind` / `next_attempt_at`）。
+人点这个按钮意味着他做了判断 —— 换了 `storage_state`、限流过去了 ——
+所以重试预算重新给。不清零的话，一条已耗尽次数的 job 手动重排后再失败一次
+就直接终态，按钮只生效一半。
 
 ---
 

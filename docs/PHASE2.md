@@ -120,10 +120,10 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-32** | 采集出口对照实验 | ✅ **已完成**，结论见 §3「零」 |
 | **P2-33** | crawler 迁至家里云（**临时**） | ✅ `scripts/crawl-node/`（部署脚本 + 约束文档）· `BACKEND.md` §10.1 |
 | **P2-35** | `POST /v1/tasks/{id}/runs` 接受 `note` | ✅ 后端 + 前端确认框里的输入框 |
-| **P2-16** | 自动退避重试 | **提前了**，理由见下 |
+| **P2-16** | 自动退避重试 | ✅ `services/retry_policy.py` + `crawl_jobs.fail_job()`。**默认关**，先只跑分类，见 §3「一」 |
 | **P2-06a** | 接豆包 | P2-33 · P2-35 · P2-16 |
 | **P2-34** | crawler 改 HTTP worker（**正式**） | P2-06a |
-| **P2-08** | 失败原因分类 | 与 P2-34 一起做 |
+| **P2-08** | 失败原因分类 | **后端已落**（`services/failure_kinds.py`），前端展示留给 P2-09 |
 | **P2-36** | 记录采集节点 | 与 P2-34 一起做 |
 | **P2-07** | 登录态健康度 | P2-06a |
 | **P2-09** | 前端多平台改造 | P2-05 · P2-06a |
@@ -207,6 +207,7 @@ crawler:  volumes: [crawl_data:/data]
 | **代理：build 走，run 绝不走** | 家里云上 mihomo 在 7890。走代理出口变成香港 `42.200.231.233`，直连才是 `36.157.231.164`（长沙移动）。**crawler 容器不设任何 proxy 环境变量** |
 | **postgres 不改绑定** | 仍只绑 `127.0.0.1:5433`，靠 `tailscale serve --tcp 5433` 暴露给 tailnet。公网已验证连不上。**别为了省事改成 `0.0.0.0`** |
 | **家里云不是空闲机器** | 上面跑着 tradepod（带 API key）· mihomo · jellyfin · qbittorrent。**任何 `pkill`/`pgrep` 都要按精确 PID**，模式匹配会误伤 |
+| **部署会把冷备静默拉起来**（2026-08-14 发现并修） | `post-receive.hook` 里 `docker ps -a` **连已停止的容器一起匹配**，于是每推一次代码 `compose up -d` 就把 VPS 那台冷备 crawler 启用一次，而没有任何地方会报错。P2-35 那次部署实际让它跑了 4 小时（碰巧没人发起 run 才没污染）。已修成「记下原状态 → rebuild → 停回去」。**教训是通用的：靠一条手动 `docker stop` 维持的纪律，会被自动化流程无声撤销** |
 
 #### 领取的原子性：已核实，比文档写的好
 
@@ -248,8 +249,30 @@ select(CrawlJob).where(status == "pending").with_for_update(skip_locked=True)
 |---|---|---|
 | P2-06a/b/c | **接豆包 → 千问 → Kimi** | `providers/` 下只有 `deepseek_web.py` 与 `fake.py`。**一个一个来**，每个写 Provider + `registry.py` 加一行。最终 4 个平台。**都要在迁移之后做**（§1.1） |
 | P2-07 | **登录态健康度** | `storage_state` 会过期，过期表现为一批 job 全红。至少要能看到「上次成功抓取距今多久」。多一个平台就多一份会悄悄过期的凭证 |
-| P2-08 | **失败原因分类** | `failed` 现在是一个笼统状态。「登录态过期 / 超时 / 被限流 / 解析失败」排查方向完全不同，要分开 |
-| P2-16 | **自动退避重试** | `POST /v1/crawl-jobs/{id}/retry` 有，但没有自动重试。**P2-32 之后从「不挡路」升级成「挡路」**：冷启动限流是常态，不做的话每次 run 都会莫名丢掉头几条，而那会污染豆包的调试 |
+| P2-08 | **失败原因分类** | ✅ **后端已落**：`services/failure_kinds.py` 七类 + `crawl_jobs.failure_kind` 列 + `CrawlJobOut` 出口。取值表见 `API.md` §8.0.1。**前端展示没做** —— 留给 P2-09，它会重排样本表版式，现在做要返工 |
+| P2-16 | **自动退避重试** | ✅ `services/retry_policy.py`（曲线与决策，纯函数）+ `crawl_jobs.fail_job()`（落库）+ `claim_pending_jobs` 的时间闸门。只重试 `timeout` / `rate_limited`；耗尽后终态 failed。**`CRAWL_AUTO_RETRY_ENABLED` 默认 false**，见下 |
+
+#### P2-16 / P2-08 分两次上线，第二段还没做
+
+**代码已经全在 main 上，但 `CRAWL_AUTO_RETRY_ENABLED` 还是 `false`。**
+这是有意的：
+
+1. **先只带分类上线**，跑一次真实 run，`grep kind=unknown` 看分类认得准不准 ——
+   尤其是限流那条到底归成了 `timeout` 还是落进 `unknown`。
+2. 确认之后再把开关打开，那才是 P2-16 真正生效。
+
+理由和「迁移排在接平台之前」是同一条：**调试时不能有两个变量同时在动**。
+分类和重试一起开，出问题时分不清是分类归错了还是退避写坏了。
+
+> **run 215 那两条失败的原文已经不可考** —— 它们被手动 retry 成功了，
+> 而 `claim_pending_jobs` 会清空 `error_message`；采集节点容器也重启过，
+> 日志只剩一行。所以分类的消息模式是照**现行代码里的真实字符串**写的，
+> Playwright 那条走的是异常类型（已在采集节点容器里核过形状），不靠字符串。
+> 第一步观察那一轮的价值就在这里：拿到真实样本再决定要不要调模式。
+
+**开关打开的动作**：在采集节点上给 crawler 容器加 `CRAWL_AUTO_RETRY_ENABLED=true`
+重启即可（`scripts/crawl-node/deploy.sh`）。回滚就是把它改回 `false`——
+**不需要 git revert**（§6 规矩 1）。
 
 ### 二、指标缺口（都是「前端算不出」类）
 

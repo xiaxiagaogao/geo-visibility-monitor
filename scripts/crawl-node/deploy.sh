@@ -23,6 +23,10 @@ VPS_KEY=${GEO_VPS_KEY:?需要 GEO_VPS_KEY}
 # 数据库串走 tailnet。**VPS 上的 postgres 仍只绑 127.0.0.1**，
 # 由 `tailscale serve --tcp 5433 tcp://127.0.0.1:5433` 暴露给 tailnet（见 README）
 DB_URL=${GEO_DB_URL:?需要 GEO_DB_URL，例如 postgresql+psycopg://user:pass@100.64.240.17:5433/geo}
+# P2-16 自动退避重试。**默认 false**：先只跑失败分类，在真实 run 上确认
+# timeout 认得准（`grep kind=unknown`），再 `GEO_AUTO_RETRY=true ./deploy.sh start`。
+# 回滚就是改回 false 重跑 start —— 不必 git revert（PHASE2 §6 规矩 1）
+AUTO_RETRY=${GEO_AUTO_RETRY:-false}
 
 IMAGE=deploy-crawler:latest
 NODE_DATA=/opt/geo-crawl-data
@@ -68,6 +72,7 @@ do_start() {
       -e CRAWL_TIMEOUT_MS=120000 \
       -e DEEPSEEK_STORAGE_STATE=/data/deepseek_storage.json \
       -e SCREENSHOT_DIR= \
+      -e CRAWL_AUTO_RETRY_ENABLED='$AUTO_RETRY' \
       -e FAKE_WORKER_INTERVAL_SEC=5 \
       -e FAKE_WORKER_BATCH_SIZE=1 \
       -v $NODE_DATA:/data:rw,Z \
