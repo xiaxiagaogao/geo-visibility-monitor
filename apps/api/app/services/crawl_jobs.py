@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple, Union
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -13,6 +13,7 @@ from app.models import CrawlJob, Prompt, RawResponse
 from app.providers import registry
 from app.schemas.crawl import CrawlJobCreate
 from app.services.failure_kinds import WORKER_DIED, classify_failure
+from app.services.retry_policy import plan_next_attempt
 
 logger = logging.getLogger("geo.crawl_jobs")
 
@@ -155,15 +156,45 @@ def fail_job(
     ``kind`` 显式传入时不再分类 —— 调用方比消息文本更清楚发生了什么
     （``reclaim_stuck_jobs`` 就是这种情况：它手里那句话是自己写的）。
     """
+    settings = get_settings()
     message = reason if isinstance(reason, str) else str(reason)
-    job.failure_kind = kind or classify_failure(reason)
+    kind = kind or classify_failure(reason)
+    attempt = (job.attempt or 0) + 1  # 旧行与冷备旧 crawler 写的行都是 NULL，按 0 读
+    now = _utcnow()
+    retry_at = plan_next_attempt(kind=kind, attempt=attempt, settings=settings, now=now)
+
+    job.attempt = attempt
+    job.failure_kind = kind
+
+    if retry_at is not None:
+        # 退避：回 pending 等到点再被领。**不留在 running** —— 留着会被僵死回收
+        # 当成「worker 死了」收成 failed，而那条路径写的 error_message
+        # 会把真正的失败原因盖掉。started_at / finished_at 一并清掉，与 retry_job 一致
+        job.status = "pending"
+        job.started_at = None
+        job.finished_at = None
+        job.next_attempt_at = retry_at
+        job.error_message = message[:500]
+        db.commit()
+        logger.warning(
+            "job %s attempt %s/%s kind=%s → 退避到 %s · msg=%s",
+            job.id, attempt, settings.crawl_max_attempts, kind,
+            retry_at.isoformat(), message[:200],
+        )
+        return job
+
+    # 终态。重试耗尽 / 这类失败不该重试 / 开关没开，都落这里
+    if attempt > 1:
+        # 只在真重试过时才加前缀 —— 一次就失败的 job 加「attempt 1/3」是噪声
+        message = f"attempt {attempt}/{settings.crawl_max_attempts} · {kind}: {message}"
     job.status = "failed"
+    job.finished_at = now
+    job.next_attempt_at = None
     job.error_message = message[:500]
-    job.finished_at = _utcnow()
     db.commit()
     # kind=unknown 是要盯的信号：分类没认出来的失败**不会自动重试**，
     # 而它可能正是下一个该提上来的模式。`grep kind=unknown` 就能捞
-    logger.warning("job %s failed kind=%s msg=%s", job.id, job.failure_kind, message[:200])
+    logger.warning("job %s failed kind=%s attempt=%s msg=%s", job.id, kind, attempt, message[:200])
     return job
 
 
@@ -206,21 +237,38 @@ def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
 
 
 def claim_pending_jobs(db: Session, limit: int) -> List[CrawlJob]:
-    """Claim pending jobs by marking running (simple, single-worker safe enough for demo)."""
+    """领一批 pending 的 job，标成 running。
+
+    ``FOR UPDATE SKIP LOCKED`` **本来就是多 worker 安全的** —— 两个 worker
+    同时领不会领到同一条。（这个 docstring 原先写「single-worker safe enough
+    for demo」，低估了实现。）
+
+    **``next_attempt_at`` 是 P2-16 的退避闸门**：正在退避的 job 状态也是
+    ``pending``，靠这个时刻把它挡在门外。``NULL`` 视为立刻可领 ——
+    迁移前的旧行、以及冷备那台旧代码 crawler 建的行，都是 NULL。
+    """
+    now = _utcnow()
     jobs = list(
         db.scalars(
             select(CrawlJob)
-            .where(CrawlJob.status == "pending")
+            .where(
+                CrawlJob.status == "pending",
+                or_(CrawlJob.next_attempt_at.is_(None), CrawlJob.next_attempt_at <= now),
+            )
             .order_by(CrawlJob.id.asc())
             .limit(limit)
             .with_for_update(skip_locked=True)
         ).all()
     )
-    now = _utcnow()
     for job in jobs:
         job.status = "running"
         job.started_at = now
+        # 三个字段一起清：它们描述的是「这条 job 当前为什么是失败的」，
+        # 一旦重新开跑就都过期了。**`attempt` 刻意不清** ——
+        # 它是累计的尝试次数，清了重试上限就形同虚设
         job.error_message = None
+        job.failure_kind = None
+        job.next_attempt_at = None
     if jobs:
         db.commit()
         for job in jobs:
