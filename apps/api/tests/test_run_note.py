@@ -49,8 +49,12 @@ def test_note_written_at_creation_not_patched_after():
     「run 已存在但口径说明还没写」的状态 —— 而发起与口径说明本来就是同一件事。
     """
     src = inspect.getsource(task_svc.create_run)
-    ctor = src[src.index("Run("):src.index(")", src.index("Run("))]
-    assert "note=" in ctor, "note 要在 Run(...) 构造里传，不是建完再赋值"
+    # 取「= Run(」那一行整句。别用 index(")") 找闭括号 —— 构造里嵌着
+    # list(...)，第一个 ")" 是那个 list 的，会把 note= 切掉（这条用例最早
+    # 就是这么写错的，挂在 CI 上才发现）。
+    ctor_line = next(l for l in src.splitlines() if "= Run(" in l)
+    assert "note=" in ctor_line, "note 要在 Run(...) 构造里传，不是建完再赋值"
+    assert "run.note =" not in src, "不许建完再补 note —— 那会留下一个没有口径说明的中间态"
 
 
 def test_route_passes_note_through():
