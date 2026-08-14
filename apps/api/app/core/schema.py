@@ -126,6 +126,24 @@ _MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_crawl_jobs_run ON crawl_jobs(run_id);
         """,
     ),
+    (
+        "007_crawl_retry",
+        """
+        -- P2-16 自动退避重试 + P2-08 失败分类。
+
+        -- 三列**全可空，这是有意的**：VPS 上那台 geo-crawler 是冷备，跑的是旧代码，
+        -- 它 claim / fail 时根本不会碰这三列。可空 + 「next_attempt_at IS NULL = 立刻可领」
+        -- 让它照常工作，只是不享受自动重试 —— 降级，不是损坏（PHASE2 §6 规矩 2）。
+        ALTER TABLE crawl_jobs ADD COLUMN IF NOT EXISTS attempt INT;
+        ALTER TABLE crawl_jobs ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+        ALTER TABLE crawl_jobs ADD COLUMN IF NOT EXISTS failure_kind TEXT;
+
+        -- claim 的条件从 status='pending' 变成
+        --   status='pending' AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+        CREATE INDEX IF NOT EXISTS idx_crawl_jobs_claim
+            ON crawl_jobs(status, next_attempt_at);
+        """,
+    ),
 ]
 
 

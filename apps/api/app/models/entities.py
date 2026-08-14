@@ -102,6 +102,15 @@ class CrawlJob(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    #: P2-08 失败分类（``services/failure_kinds.py`` 的取值）。**不做成数据库枚举**——
+    #: 分类规则会随着接新平台长出新值，枚举意味着每加一类就要一次迁移
+    failure_kind: Mapped[Optional[str]] = mapped_column(Text)
+    #: P2-16 已消耗的尝试次数。可空：迁移前的行与冷备旧 crawler 写的行都是 NULL，一律按 0 读
+    attempt: Mapped[Optional[int]] = mapped_column(Integer)
+    #: P2-16 **NULL = 立刻可领**；未来时刻 = 正在退避等待重试。
+    #: 退避中的 job 状态仍是 ``pending``——不新增状态值，否则 ``derive_run_status``、
+    #: ``/v1/crawl-jobs?status=`` 的调用方、前端样本表口径都要跟着改
+    next_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
