@@ -1,11 +1,27 @@
 #!/bin/bash
+# 装在 $GIT_DIR/hooks/post-receive 的【存根】—— 只做 checkout，然后 exec 出去。
+#
+# 为什么要拆成两个文件：bash 是按字节偏移边读边执行脚本的。这个文件以前把整套
+# 部署步骤都写在自己身上，中间还有一句 "refresh hook from repo"，用 cp 覆盖了
+# **正在被执行的这个文件**。新旧长度一不同，剩下的部分就会从错的偏移继续读 ——
+# 轻则静默跳过后面整段部署（看着像成功了），重则执行半行垃圾。
+#
+# 现在真正的步骤在 deploy/deploy.sh：它在 checkout 阶段就已经整份写完，之后才被
+# exec 进去执行，"正在跑的文件"和"被改写的文件"永远不是同一个。
+#
+# 这个存根故意保持极小且很少变动。deploy.sh 会在检测到差异时装上新版本，
+# 但**对下一次 push 才生效**；旧的会留在同目录 post-receive.prev。
+# 详见 docs/BACKEND.md §10.2。
 set -euo pipefail
+
 TARGET=/opt/geo-demo
 GIT_DIR=/opt/geo-demo.git
 LOG=/var/log/geo-demo-deploy.log
+LOCK=/var/lock/geo-demo-deploy.lock
+
 exec >>"$LOG" 2>&1
 echo "======== $(date -Is) ========"
-export GIT_DIR
+export GIT_DIR TARGET
 
 deploy=0
 while read -r oldrev newrev refname; do
@@ -20,59 +36,21 @@ if [ "$deploy" -ne 1 ]; then
   exit 0
 fi
 
+# 串行化。并发 push 会在上一轮 deploy.sh 跑到一半时把它 checkout 覆盖掉 ——
+# 那就是上面那个 bug 换个地方复发。fd 9 会被 exec 继承，锁一直持有到部署结束。
+exec 9>"$LOCK"
+if ! flock -w 900 9; then
+  echo "!! 等锁 900s 超时，上一轮部署还没结束 —— 本次不部署"
+  exit 1
+fi
+
 mkdir -p "$TARGET"
 git --work-tree="$TARGET" --git-dir="$GIT_DIR" checkout -f main
 echo "checked out $(git --git-dir="$GIT_DIR" rev-parse --short main)"
 
-# refresh hook from repo if present
-if [ -f "$TARGET/deploy/post-receive.hook" ]; then
-  cp "$TARGET/deploy/post-receive.hook" "$GIT_DIR/hooks/post-receive"
-  chmod +x "$GIT_DIR/hooks/post-receive"
+if [ ! -x "$TARGET/deploy/deploy.sh" ]; then
+  echo "!! $TARGET/deploy/deploy.sh 不存在或没有执行位 —— 本次不部署"
+  exit 1
 fi
 
-cd "$TARGET/deploy"
-echo "docker compose up postgres api web..."
-docker compose up -d --build postgres api web
-
-# crawler holds Playwright code; rebuild if container already exists
-if docker ps -a --format '{{.Names}}' | grep -qx geo-crawler; then
-  echo "docker compose rebuild crawler..."
-  docker compose --profile crawl up -d --build crawler
-  # storage_state lives on volume /data; re-seed only if missing
-  if [ -f deepseek_storage.json ]; then
-    if ! docker exec geo-crawler test -f /data/deepseek_storage.json 2>/dev/null; then
-      echo "seed deepseek_storage.json into crawler volume"
-      docker cp deepseek_storage.json geo-crawler:/data/deepseek_storage.json || true
-    fi
-  fi
-fi
-for i in $(seq 1 90); do
-  if docker exec geo-postgres pg_isready -U geo -d geo >/dev/null 2>&1; then
-    echo "postgres ready"
-    break
-  fi
-  sleep 1
-done
-for i in $(seq 1 60); do
-  if curl -sf http://127.0.0.1:8200/health >/dev/null 2>&1; then
-    echo "api ready"
-    break
-  fi
-  sleep 2
-done
-docker compose ps
-# /health 是公开探针；/health/db 与 /health/config 已需要 API_KEY，部署脚本不再探
-curl -s http://127.0.0.1:8200/health || true
-echo
-# 前端探针：Caddy 把非 /v1 /qa /health 的请求转到 3000，这里直连确认进程活着
-for i in $(seq 1 30); do
-  if curl -sf -o /dev/null http://127.0.0.1:3000/login; then
-    echo "web ready"
-    break
-  fi
-  sleep 2
-done
-if ! grep -qE '^API_KEY=.+' .env 2>/dev/null; then
-  echo "!! 警告：deploy/.env 未设置 API_KEY —— 8200 端口在公网上完全无鉴权"
-fi
-echo "deploy finished"
+exec "$TARGET/deploy/deploy.sh"

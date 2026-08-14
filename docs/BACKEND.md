@@ -530,14 +530,14 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 |------|------|
 | `apps/api` | FastAPI **和** 抓取 worker（`app.worker_main`）都在这里 |
 | `packages/metrics` | 匹配/分桶/情感等纯逻辑 + 单测 |
-| `deploy/` | compose、Dockerfile、post-receive hook、init.sql |
+| `deploy/` | compose、Dockerfile、post-receive hook（存根 + `deploy.sh` 正文，见 §10.2）、init.sql |
 
 容器：`geo-api` · `geo-crawler` · `geo-postgres`。
 **`geo-crawler` 容器跑的是 `apps/api` 的 `app.worker_main`** —— 曾经有个
 `apps/crawler/` 目录无人引用，已删除（`Dockerfile.crawler` 从来只 COPY `apps/api`）。
 
 ```text
-本机 push main → VPS post-receive（强制 checkout main + docker compose up）→ /opt/geo-demo
+本机 push main → VPS post-receive 存根（强制 checkout main）→ exec deploy/deploy.sh（docker compose up）→ /opt/geo-demo
 ```
 
 ---
@@ -580,6 +580,40 @@ run 215 vs run 27/54），而 VPS 在新加坡、服务对象是大陆用户、�
 3. **VPS 上的 `geo-crawler` 是冷备，只能接替不能并行** ——
    并行会让一次 run 的样本混着两个出口，而数据里没有字段记录是哪台采的。
 4. **截图当前是关闭的**（节点写的截图 VPS 读不到，留着只会 404）。
+
+### 10.2 部署 hook 是两个文件（2026-08-14 起）
+
+`git push vps main` 仍然**就是上线**，没有闸门（§6 / `PHASE2` §6 不变）。变的是
+hook 的结构 —— 从一个文件拆成存根 + 正文：
+
+| | |
+|---|---|
+| `deploy/post-receive.hook` | **存根**，装在 `/opt/geo-demo.git/hooks/post-receive`。只做「读 stdin 判断 ref → 抢锁 → `checkout -f main` → `exec` 正文」 |
+| `deploy/deploy.sh` | **正文**，`docker compose` 那一整套。跟着工作树走，改它不需要碰 hook |
+
+**为什么拆。** bash 是按字节偏移边读边执行脚本的。原来那一个文件里有一句
+「refresh hook from repo」，用 `cp` 覆盖了**正在被执行的自己**：新旧长度一不同，
+剩下的部分就从错的偏移继续读。已在 VPS 沙箱里复现过 —— 一次 push 只跑完了
+checkout，后面 `docker compose up` 和全部健康检查**被静默跳过，而 `git push`
+照样报成功**。这是最坏的一类失败：看着上线了，其实什么都没重建。
+
+拆开之后，「正在跑的文件」和「被改写的文件」永远不是同一个：正文在 checkout 阶段
+就整份写完，之后才被 `exec` 进去。存根里那把 `flock` 是同一件事的另一面 ——
+并发 push 会在上一轮正文跑到一半时把它 checkout 覆盖掉。
+
+**改了存根要手动装。** 正文会在检测到差异时装上新存根，但**下一次 push 才生效**，
+且旧的会留一份 `post-receive.prev`。所以改存根的那一次要先手动装再 push：
+
+```bash
+PEM=~/Desktop/pem/SG-DC1.pem; VPS=root@100.64.240.17     # 走 tailnet
+ssh -i $PEM $VPS 'cp -p /opt/geo-demo.git/hooks/post-receive /root/post-receive.working.bak'
+scp -i $PEM deploy/post-receive.hook $VPS:/opt/geo-demo.git/hooks/post-receive
+ssh -i $PEM $VPS 'chmod +x /opt/geo-demo.git/hooks/post-receive'
+git push vps main
+
+# 存根坏了 = 之后所有部署都完蛋。手动恢复（不需要 git revert）：
+ssh -i $PEM $VPS 'cp /opt/geo-demo.git/hooks/post-receive.prev /opt/geo-demo.git/hooks/post-receive'
+```
 
 ```bash
 # 一次性：配置 push 远端
