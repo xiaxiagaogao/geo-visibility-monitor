@@ -111,13 +111,16 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 
 ### 部署曾经会把冷备静默拉起来（2026-08-14 已修）
 
-`post-receive.hook` 里那句 `docker ps -a | grep -qx geo-crawler` **连已停止的
-容器一起匹配**，于是每推一次代码，`compose up -d` 就把冷备启用一次 ——
+旧判断是「容器存在就 `compose up -d`」，而 `docker ps -a | grep -qx geo-crawler`
+**连已停止的容器一起匹配** —— 于是每推一次代码，冷备就被启用一次，
 而没有任何地方会报错。P2-35 那次部署实际让它跑了 4 小时，
 只是碰巧那段时间没人发起 run 才没污染数据。
 
-现在 hook 会先记下容器原本是不是 running，rebuild 之后停回原状。
-**照样 rebuild 是有意的**：冷备要的是「真要切过去时代码是最新的」。
+现在 `deploy/deploy.sh` 按容器原本的状态分流：在跑的 `up -d --build`，
+停着的走 **`compose create --build`** —— 重建但从头到尾不启动。
+
+**照样 rebuild 是有意的**：冷备切换的动作是 `docker start`，
+只 build 不重建容器的话，那一刻起来的还是旧代码。
 
 ## 已知问题
 

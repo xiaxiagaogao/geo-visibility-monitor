@@ -207,7 +207,8 @@ crawler:  volumes: [crawl_data:/data]
 | **代理：build 走，run 绝不走** | 家里云上 mihomo 在 7890。走代理出口变成香港 `42.200.231.233`，直连才是 `36.157.231.164`（长沙移动）。**crawler 容器不设任何 proxy 环境变量** |
 | **postgres 不改绑定** | 仍只绑 `127.0.0.1:5433`，靠 `tailscale serve --tcp 5433` 暴露给 tailnet。公网已验证连不上。**别为了省事改成 `0.0.0.0`** |
 | **家里云不是空闲机器** | 上面跑着 tradepod（带 API key）· mihomo · jellyfin · qbittorrent。**任何 `pkill`/`pgrep` 都要按精确 PID**，模式匹配会误伤 |
-| **部署会把冷备静默拉起来**（2026-08-14 发现并修） | `post-receive.hook` 里 `docker ps -a` **连已停止的容器一起匹配**，于是每推一次代码 `compose up -d` 就把 VPS 那台冷备 crawler 启用一次，而没有任何地方会报错。P2-35 那次部署实际让它跑了 4 小时（碰巧没人发起 run 才没污染）。已修成「记下原状态 → rebuild → 停回去」。**教训是通用的：靠一条手动 `docker stop` 维持的纪律，会被自动化流程无声撤销** |
+| **部署会把冷备静默拉起来**（2026-08-14 发现并修） | 旧判断是「容器存在就 `compose up -d`」，而 `docker ps -a` **连已停止的容器一起匹配** —— 于是每推一次代码就把 VPS 那台冷备 crawler 启用一次，而没有任何地方会报错。P2-35 那次部署实际让它跑了 4 小时（碰巧没人发起 run 才没污染）。已修：`deploy/deploy.sh` 对停止态走 `compose create --build`（重建但不启动）。**教训是通用的：靠一条手动 `docker stop` 维持的纪律，会被自动化流程无声撤销** |
+| **部署 hook 曾在执行中改写自己**（2026-08-14 修） | 旧 hook 在 `cp` 覆盖 `$GIT_DIR/hooks/post-receive` 之后继续执行，而 bash 按字节偏移续读 —— 沙箱复现证实：**`docker compose up` 与全部健康探测整段被跳过，`git push` 照样报成功**。已拆成「存根 + `deploy/deploy.sh` 正文」，正在执行的文件永不被改写；另加 `flock` 防并发 push 在上一次跑到一半时覆盖 `deploy.sh`。见 `BACKEND.md` §10.2 |
 
 #### 领取的原子性：已核实，比文档写的好
 
