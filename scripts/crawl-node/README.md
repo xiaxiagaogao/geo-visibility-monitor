@@ -180,8 +180,12 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 
 ```bash
 # 1. 开一条到采集节点的 SOCKS 隧道
-#    ExitOnForwardFailure 不能省：-f -N 绑不上端口时照样会 fork 到后台挂着
-ssh -i "$GEO_NODE_KEY" -o ExitOnForwardFailure=yes -D 18080 -N -f "$GEO_NODE"
+#    ExitOnForwardFailure：绑不上端口就直接退，别留个没有转发的后台连接
+#    ServerAlive*        ：连接断了让 ssh 自己退，否则端口被僵死进程占着，
+#                          表现是「隧道在但不通」，重开还撞 Address already in use
+ssh -i "$GEO_NODE_KEY" -o ExitOnForwardFailure=yes \
+    -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+    -D 18080 -N -f "$GEO_NODE"
 
 # 2. 导出（脚本会在登录**之前**打印出口 IP，不是 CN 会大声警告）
 #    换平台只改 --platform，见脚本里的 PLATFORMS 表
