@@ -119,8 +119,14 @@ do_verify() {
   #    代码全在镜像里，而「镜像旧了」这件事不会有任何地方报错：容器照常起、
   #    照常采集，只是跑的是上一版。2026-08-15 就踩过一次
   #    （以为 `deploy.sh sync` 更新了代码，其实那个目录根本没被挂载）。
-  echo "  · 容器镜像 build 于 $(node "podman inspect geo-crawler --format '{{.ImageName}} {{.Created}}'" 2>/dev/null || echo '取不到')"
-  echo "    对不上就 ./deploy.sh image 重传（VPS 侧的 build 由 git push vps main 触发）"
+  #
+  #    ⚠️ 必须 inspect **容器所用的那个镜像**，不能 inspect 容器本身 ——
+  #    `podman inspect <容器>` 的 `.Created` 是**容器**的创建时间，
+  #    每次 start 都是「刚刚」，恰恰查不出唯一该查的那件事。这条也踩过。
+  local img_built
+  img_built=$(node 'i=$(podman inspect geo-crawler --format "{{.Image}}"); podman image inspect "$i" --format "{{.Created}}"' 2>/dev/null || echo "取不到")
+  echo "  · 容器所用镜像 build 于 $img_built"
+  echo "    比 VPS 上那次 build 旧就 ./deploy.sh image 重传（VPS 侧 build 由 git push vps main 触发）"
 
   [ "$ok" = 1 ] && echo "  —— 自检通过" || { echo "  —— 自检失败"; return 1; }
 }
