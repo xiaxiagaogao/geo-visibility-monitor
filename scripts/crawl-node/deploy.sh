@@ -51,13 +51,69 @@ node() { ssh -i "$NODE_KEY" -o BatchMode=yes -o ConnectTimeout=20 $SSH_KEEPALIVE
 vps()  { ssh -i "$VPS_KEY"  -o BatchMode=yes -o ConnectTimeout=20 $SSH_KEEPALIVE "$VPS"  "$@"; }
 say()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 
+# 传输用的临时目录（在 VPS 上）。收摊要在任何退出路径上都发生 ——
+# 留下的是一个对 tailnet 可见的监听 + 一个 ~1GB 的文件，两样都不该过夜。
+XFER_DIR=""
+cleanup_xfer() {
+  [ -n "$XFER_DIR" ] || return 0
+  # **按精确 PID 关。** 绝不用 pkill -f 'http.server' 之类的模式匹配 ——
+  # 两台机器上都跑着别的生产服务，误伤代价很高（README「已知问题」最后一条）
+  vps "[ -s '$XFER_DIR/serve.pid' ] && kill \$(cat '$XFER_DIR/serve.pid') 2>/dev/null; rm -rf '$XFER_DIR'" \
+    >/dev/null 2>&1 || true
+  XFER_DIR=""
+}
+trap cleanup_xfer EXIT
+
 do_image() {
   say "从 VPS 经 tailnet 传镜像"
   # **不从 mcr 拉。** 家宽拉那个 2GB 基础镜像要 90 分钟（实测 136KB/s 直连 /
   # 386KB/s 走代理），而 VPS 上本来就有构建好的镜像，经 tailnet 传只要一分钟。
   #
   # 这一步就是**唯一的代码更新路径** —— 容器只挂 /data，代码全在镜像里。
-  vps "docker save $IMAGE | gzip -1" | node "gunzip | podman load"
+  #
+  # ⚠️ **数据不能经过这台开发机。** 原先写的是
+  #     vps "docker save $IMAGE | gzip -1" | node "gunzip | podman load"
+  # 看着像 VPS 直连节点，其实两端都是**从开发机发起的 ssh** ——
+  # 数据流是 `VPS → 开发机 → 节点`，开发机是中转。2026-08-16 实测这一跳的代价：
+  #
+  #   VPS → Mac                  656 KB/s
+  #   Mac → 节点（**有线局域网**）  3 MB/s   ← 开发机自己就是瓶颈
+  #   VPS ↔ 节点（tailnet 直连）   11 MB/s
+  #
+  # 922MB 传了 35 分钟没完，且卡住时三端进程全活着、谁都不报错。
+  # 当时误判成「ssh 没保活」，加 ServerAliveInterval 并没有解决 —— 保活能救
+  # 「连接断了」，救不了「路径本来就慢」。**真正的修法是把开发机摘出数据路径。**
+  #
+  # 现在开发机只发指令：VPS 导出成临时文件 → 起一个只绑 tailnet 地址的
+  # http.server → 节点自己 curl 回来 → 无论成败都按精确 PID 收摊。
+  local vps_host=${VPS#*@}   # GEO_VPS 的 host 部分就是 tailnet IP
+  local port
+
+  vps "command -v python3 >/dev/null" || { echo "  ✗ VPS 上没有 python3"; return 1; }
+
+  # 这个 http 服务**对整个 tailnet 可见**，而 tailnet 上有别人的设备。四条约束：
+  #  ① 只绑 tailnet 地址（--bind），公网不可达
+  #  ② 目录名随机（mktemp），路径不可猜
+  #  ③ 只服务这一个临时目录，不是 /tmp
+  #  ④ 传完立刻关，不留任何持久配置（不用 tailscale serve --bg）
+  XFER_DIR=$(vps "mktemp -d /tmp/geo-xfer-XXXXXXXX")
+  port=$(( 39000 + RANDOM % 900 ))
+
+  echo "  导出：$(vps "docker save $IMAGE | gzip -1 > $XFER_DIR/img.tgz && du -m $XFER_DIR/img.tgz | cut -f1") MB"
+
+  vps "nohup python3 -m http.server $port --bind $vps_host --directory $XFER_DIR \
+         > $XFER_DIR/serve.log 2>&1 & echo \$! > $XFER_DIR/serve.pid"
+  sleep 2
+  vps "kill -0 \$(cat $XFER_DIR/serve.pid)" || {
+    echo "  ✗ http.server 没起来："; vps "cat $XFER_DIR/serve.log"; return 1; }
+
+  # `--speed-limit` 是**卡住时唯一会说话的东西**：掉到 500KB/s 以下持续 30 秒
+  # 就退出并报错。旧管道卡住时是静默挂着，只能靠人去看
+  # `du -sm /var/lib/containers/storage` 涨不涨才判断得出来
+  node "set -o pipefail; curl -sS --fail --speed-limit 500000 --speed-time 30 \
+          http://$vps_host:$port/img.tgz | gunzip | podman load"
+
+  cleanup_xfer
   echo "  VPS 侧镜像 build 于 $(vps "docker image inspect $IMAGE --format '{{.Created}}'")"
 }
 
