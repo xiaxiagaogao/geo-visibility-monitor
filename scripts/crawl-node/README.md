@@ -60,10 +60,36 @@ GEO_AUTO_RETRY=true ./deploy.sh start     # 回滚 = 去掉这个变量重跑 st
 ### 2. 镜像从 VPS 传，不从 mcr 拉
 
 家宽拉那个 2GB 的 Playwright 基础镜像：直连 136KB/s、走代理 386KB/s ——
-**要 90 分钟**。而 VPS 上本来就有构建好的镜像，`docker save` 经 tailnet 传
-**只要 66 秒**（21MB/s）。
+**要 90 分钟**。而 VPS 上本来就有构建好的镜像，`docker save | gzip -1` 出来
+922MB，经 tailnet 传只要几分钟。
 
 所以节点上**不 build**，只 `podman load`。
+
+#### ⚠️ 而且数据不能经过你的开发机
+
+`deploy.sh` 原先写的是：
+
+```bash
+vps "docker save $IMAGE | gzip -1" | node "gunzip | podman load"
+```
+
+看着像 VPS 直连节点，**其实两端都是从开发机发起的 ssh** —— 数据流是
+`VPS → 开发机 → 节点`，开发机是中转。2026-08-16 实测这一跳的代价：
+
+| 链路 | 吞吐 |
+|---|---|
+| VPS → Mac | 656 KB/s |
+| Mac → 节点（**有线局域网**） | 3 MB/s ← 开发机自己就是瓶颈 |
+| VPS ↔ 节点（tailnet 直连） | 11 MB/s |
+
+现在改成：VPS 导出成临时文件 → 起一个**只绑 tailnet 地址**的 `http.server`
+→ 节点自己 `curl` 回来 → 无论成败都按精确 PID 收摊（`trap EXIT`）。
+**开发机只发指令，不碰数据。** 实测 922MB / 253 秒。
+
+那个临时 http 服务**对整个 tailnet 可见**，而 tailnet 上有别人的设备。
+所以四条：只绑 tailnet 地址（公网不可达）· 目录名 `mktemp` 随机 ·
+只服务那一个目录（不是 `/tmp`）· 传完立刻关，**不留持久配置**
+（所以不用 `tailscale serve --bg`）。
 
 ### ⚠️ 代码在镜像里，不在节点的文件系统上
 
@@ -159,7 +185,7 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 |---|---|
 | **冷启动被限流** | 一次 run 开头的头一两条常见 `Page.goto` 120 秒超时，之后就顺。**P2-16 已做**：这类失败分类成 `timeout`，自动退避重排（30s → 60s，最多 3 次）。开关 `CRAWL_AUTO_RETRY_ENABLED`，见 `BACKEND.md` §7.2。手动 `POST /v1/crawl-jobs/{id}/retry` 仍然可用，且会把计数清零 |
 | **家宽 IP 是动态的** | tailscale 自己能重连；但风控与 `storage_state` 会不会受影响，没验过 |
-| **传镜像会卡死（已修）** | `deploy.sh` 的 ssh 原先没有保活。传镜像那条管道跑好几分钟，中途断掉时 ssh **不报错也不退出** —— 数据停了、进程还挂着，表现是「传了 35 分钟还没完」而 `podman load` 的 CPU 是 0。已加 `ServerAliveInterval=20`。**判断卡没卡看 `du -sm /var/lib/containers/storage` 涨不涨**，别看进程在不在 |
+| **传镜像会卡死（已修，但根因当初判错了）** | 表现是「传了 35 分钟还没完」而 `podman load` 的 CPU 是 0。**2026-08-15 判成「ssh 没有保活」并加了 `ServerAliveInterval=20` —— 那个判断是错的。** 2026-08-16 实测出真根因：数据流经过开发机，而开发机连有线局域网都只有 3MB/s（见上面「数据不能经过你的开发机」）。保活能救「连接断了」，救不了「路径本来就慢」，所以加完之后照样卡。保活留着（对 `docker save` 那段仍有用），但它不是这件事的修法。现在 `curl --speed-limit 500000 --speed-time 30` 会在卡住时**自己报错退出**，不必再靠人去看 `du` |
 | **节点不是独占的** | 我们这台还跑着别的服务。任何 `pkill` / `pgrep` **都要按精确 PID** —— 模式匹配会误伤 |
 | **`storage_state` 会过期，而且是悄悄的** | 原以为过期表现是「一批 job 全 failed」——**不是**。2026-08-15 的真实形态是**悄悄降级**：还能抓，只是每次 run 头几条卡在 WAF 挑战上超时。**P2-07 已做**：`GET /v1/health/credentials` 直接给出「这份登录态从哪儿签发、最早过期的 cookie 还剩多久」，见 `BACKEND.md` §7.3 |
 

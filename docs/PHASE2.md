@@ -124,7 +124,7 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-08** | 失败原因分类 | ✅ **后端已落**（`services/failure_kinds.py`），前端展示留给 P2-09 |
 | **P2-07** | **登录态健康度** | ✅ `services/credential_health.py` + `GET /v1/health/credentials`。**看的是「从哪儿签发的」**，不是「多久没成功」 |
 | **P2-36** | 记录采集节点 → **采集环境** | ✅ `services/crawl_env.py` + `crawl_environments` 表 + `GET /v1/runs/{id}` 的 `environments[]`。**长度 > 1 就是混了两个出口** |
-| **P2-06a** | 接豆包 | ⬜ **进行中**（P2-33 · P2-35 · P2-16 · P2-07 · P2-36 全部完成） |
+| **P2-06a** | 接豆包 | 🟡 **代码 + 部署已完成，等第一次真抓**。落在 `providers/doubao_web.py` · `providers/browser.py`（指纹加固）· 采集节点镜像已更新。见下「部署已完成」 |
 | **P2-37** | **联网搜索 + 新基线** | ⬜ **P2-06a 之后**。方向已拍板（客户要求），见 §4.0.1。**四层后果，不是打个开关** |
 | **P2-34** | crawler 改 HTTP worker（**正式**） | P2-06a |
 | **P2-09** | 前端多平台改造 | P2-05 · P2-06a |
@@ -187,6 +187,41 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 **P2-33 是临时方案，退役条件写死：接完豆包（P2-06a）就做 P2-34。**
 不设条件它会永远留着 —— 而它带着两个不该长期存在的代价（数据库凭证跑在
 家宽链路上、截图降级）。
+
+#### 部署已完成（2026-08-16），但**还没标 ✅**
+
+采集节点镜像已更新到 `2026-08-16 00:21:46`（与 VPS 侧一致），
+`deploy.sh verify` 五项全过，其中「容器出口 `120.228.64.174` ≠ 代理出口
+`42.200.172.28`」—— 那条唯一会静默毁掉整件事的检查过了。
+`GET /v1/health/credentials` 现在是两行：
+
+```
+deepseek  ok  cn       huawei
+doubao    ok  unknown  none      ← unknown 是预期，不是故障
+```
+
+`unknown` 是因为豆包用字节自家的 `ttwid`/`sessionid` 体系，28 个 cookie
+里没有任何 WAF cookie，所以认不出签发地。`credential_health.derive_status`
+对 `unknown` **刻意不报 mismatch**（`BACKEND.md` §7.3 第 3 条）——
+这条设计正是为接第二个平台写的，现在它第一次真的被用上了。
+
+**为什么不标 ✅：这一切只证明「装上了」，没证明「抓得到」。**
+豆包的真实风险在反自动化（见上），而那只有真抓一次才知道。第一次真抓要盯三处：
+
+| 看什么 | 在哪 | 说明什么 |
+|---|---|---|
+| `failure_kind` 是不是 `login_required` | `GET /v1/runs/{id}` 的 job | 是 → 登录态又废了，要重新导出 |
+| `raw_json.session_deleted` 是不是 `true` | 响应记录 | 验证自动删会话那段（DeepSeek 为这事花过 3 条 commit） |
+| `environments[]` 长度 | `GET /v1/runs/{id}` | 长度 > 1 就是混了两个出口（P2-36） |
+
+⚠️ **实测任务必须只勾豆包一个平台。** 前端 `fetchRunCounts` 不带 `platform`
+参数，勾两个平台会让 KPI 与命中矩阵**静默混算** —— 平台筛选器要等 P2-09。
+
+⚠️ **豆包登录态的 `earliest_expiry` 是 `2026-08-16T14:53:11Z`**（签发后约一天）。
+28 个 cookie 里既有 `sessionid` / `sid_guard` / `ttwid` 这类会话核心，
+也有 `passport_csrf_token` / `biz_trace_id` 这类短命的，所以这个时间
+**大概率是后者在叫**。但健康度端点报的就是它 —— 明天它翻成告警时，
+先确认是哪一条到期，别直接当成登录态失效去重新导出。
 
 ### 第三梯队 —— 规模与信任
 
