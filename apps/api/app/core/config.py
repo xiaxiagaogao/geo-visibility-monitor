@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # 抖开的成本近乎为零。置 0 可让退避完全确定（测试用）
     crawl_retry_jitter: float = 0.2
     playwright_headless: bool = True
+    # 浏览器上报的时区。**必须和采集出口所在的地区一致** —— 不设的话
+    # Playwright 取容器的系统时区（UTC），页面看到的就是「IP 在长沙、时区在伦敦」。
+    # 切到 VPS 冷备（新加坡出口）时要改成 Asia/Singapore，否则只是换一种不一致。
+    crawl_timezone_id: str = "Asia/Shanghai"
     deepseek_storage_state: str = ""
     deepseek_user_data_dir: str = ""
     # 抓完即删该会话。默认开：不删则侧栏无限堆积，DOM 抓取迟早又抓到侧栏

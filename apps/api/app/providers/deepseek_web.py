@@ -146,6 +146,7 @@ class DeepSeekWebProvider(BaseProvider):
         user_data_dir: Optional[str] = None,
         screenshot_dir: Optional[str] = None,
         delete_session_after: bool = True,
+        timezone_id: str = "Asia/Shanghai",
     ):
         self.headless = headless
         self.timeout_ms = timeout_ms
@@ -153,6 +154,12 @@ class DeepSeekWebProvider(BaseProvider):
         self.user_data_dir = user_data_dir
         self.screenshot_dir = screenshot_dir
         self.delete_session_after = delete_session_after
+        #: **必须和采集出口所在的时区一致。** 不设的话 Playwright 取容器的系统时区，
+        #: 而容器是 UTC —— 于是页面看到的是「IP 在长沙、语言中文、时区在伦敦」。
+        #: 2026-08-15 实测确实如此（`Intl.DateTimeFormat().resolvedOptions().timeZone`
+        #: 返回 UTC、offset 0，大陆应为 -480）。
+        #: 切到 VPS 冷备时出口变成新加坡，这里也要跟着改，否则只是换了一种不一致。
+        self.timezone_id = timezone_id
 
     def search(self, prompt: str) -> CrawlResult:
         try:
@@ -177,6 +184,7 @@ class DeepSeekWebProvider(BaseProvider):
                         headless=self.headless,
                         viewport={"width": 1280, "height": 1600},
                         locale="zh-CN",
+                        timezone_id=self.timezone_id,
                     )
                     page = context.new_page()
                 else:
@@ -184,6 +192,7 @@ class DeepSeekWebProvider(BaseProvider):
                     ctx_kwargs: Dict[str, Any] = {
                         "viewport": {"width": 1280, "height": 900},
                         "locale": "zh-CN",
+                        "timezone_id": self.timezone_id,
                     }
                     if self.storage_state:
                         ctx_kwargs["storage_state"] = self.storage_state

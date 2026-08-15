@@ -54,6 +54,7 @@ def _build_deepseek(ctx: ProviderContext) -> BaseProvider:
         user_data_dir=s.deepseek_user_data_dir or None,
         screenshot_dir=s.screenshot_dir or None,
         delete_session_after=s.deepseek_delete_session,
+        timezone_id=s.crawl_timezone_id,
     )
 
 
