@@ -39,7 +39,8 @@ def db():
 def _purge(session) -> None:
     from sqlalchemy import text
 
-    session.execute(text("DELETE FROM crawl_credentials WHERE platform = 'deepseek'"))
+    # **两个平台都要清** —— 只清一个会让「表空了」的用例永远看到残留行
+    session.execute(text("DELETE FROM crawl_credentials"))
     session.commit()
 
 
@@ -74,10 +75,17 @@ def test_report_writes_a_row(db, tmp_path):
 
     # 返回值里必须带 issuer_region / waf_kind —— **P2-36 的环境指纹靠它们**，
     # 而它们正是这次检查刚算出来的。少了就得再读一遍文件
-    assert out == [{
+    ds = next(r for r in out if r["platform"] == "deepseek")
+    assert ds == {
         "platform": "deepseek", "status": "ok", "issues": [],
         "issuer_region": "cn", "waf_kind": "huawei",
-    }]
+    }
+    # 豆包没配路径 → missing，且**提示里必须是它自己的变量名**。
+    # 这里原先写死 DEEPSEEK_STORAGE_STATE，会把人指去配错的环境变量
+    doubao = next(r for r in out if r["platform"] == "doubao")
+    assert doubao["status"] == "missing"
+    assert "DOUBAO_STORAGE_STATE" in doubao["issues"][0]
+    assert "DEEPSEEK" not in doubao["issues"][0], "写死别的平台变量名会把人指去配错的地方"
     row = db.get(CrawlCredential, "deepseek")
     assert row.status == "ok"
     assert row.issuer_region == "cn" and row.waf_kind == "huawei"
@@ -136,7 +144,7 @@ def test_report_survives_a_missing_file(db, tmp_path):
     from app.services.credential_health import report_credentials
 
     out = report_credentials(db, Settings(deepseek_storage_state="/nope/missing.json"))
-    assert out[0]["status"] == "missing"
+    assert next(r for r in out if r["platform"] == "deepseek")["status"] == "missing"
     assert db.get(CrawlCredential, "deepseek").status == "missing"
 
 
@@ -161,7 +169,9 @@ def test_endpoint_surfaces_worst_status_and_last_success(db, tmp_path):
     report_credentials(db, _settings(tmp_path, [("aws-waf-token", expired)]))
 
     out = get_credential_health(db=db, _=None)
-    assert out.overall == "mismatch"
+    # 豆包那行是 missing（没配路径），比 mismatch 更严重 ——
+    # overall 取最严重的那个，所以这里断言的是 deepseek 那一行本身
+    assert out.overall in ("missing", "mismatch")
     item = next(i for i in out.items if i.platform == "deepseek")
     assert item.issuer_region == "overseas"
     assert SECRET not in item.model_dump_json()

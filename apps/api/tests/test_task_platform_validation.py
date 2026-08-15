@@ -42,7 +42,7 @@ def test_known_and_runnable_platform_passes():
 
 @pytest.fixture
 def real_crawl_mode(monkeypatch):
-    """doubao/kimi/tongyi 是「已知但没有 real Provider」的平台 ——
+    """kimi/tongyi 是「已知但没有 real Provider」的平台（豆包已于 2026-08-15 接入）——
     只有切到 real 模式才能触发「不可跑」这一档，fake 模式下全部放行。
     """
     monkeypatch.setenv("CRAWL_MODE", "real")
@@ -53,7 +53,7 @@ def real_crawl_mode(monkeypatch):
 
 def test_known_but_unrunnable_platform_rejected_in_real_mode(real_crawl_mode):
     with pytest.raises(HTTPException) as exc:
-        task_svc.validate_platforms(["doubao"])
+        task_svc.validate_platforms(["kimi"])
     assert exc.value.status_code == 400
 
 

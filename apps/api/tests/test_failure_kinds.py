@@ -6,7 +6,7 @@
 - ``crawl timed out after 165s``             ``crawl_runner.process_job``
 - ``DeepSeek appears to require login. ...`` ``providers/deepseek_web``
 - ``empty answer from DeepSeek (UI changed or blocked)``  同上
-- ``real crawl not implemented for platform=doubao; ...``  ``providers/registry``
+- ``real crawl not implemented for platform=kimi; ...``  ``providers/registry``
 """
 from __future__ import annotations
 
@@ -77,7 +77,7 @@ def test_login_wins_over_timeout_in_the_same_message():
 
 def test_platform_not_implemented():
     msg = (
-        "real crawl not implemented for platform=doubao; "
+        "real crawl not implemented for platform=kimi; "
         "implemented=['deepseek'] or use crawl_mode=fake"
     )
     assert classify_failure(RuntimeError(msg)) == PLATFORM_UNAVAILABLE

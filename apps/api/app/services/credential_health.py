@@ -71,10 +71,14 @@ def classify_waf(cookie_names: List[str]) -> Tuple[str, str]:
     return "none", REGION_UNKNOWN
 
 
-def inspect_storage_state(path: Optional[str]) -> Dict[str, Any]:
+def inspect_storage_state(path: Optional[str], *, setting_name: str = "") -> Dict[str, Any]:
     """读一份 ``storage_state``，只取元信息。**返回值里没有任何 cookie 的值。**
 
     读不到 / 解析不了都不抛异常 —— 这是个健康检查，它自己不能成为故障源。
+
+    ``setting_name`` 只用来把「没配置」这条说清楚。**不给的话不要瞎猜** ——
+    这里原先写死 ``未配置 DEEPSEEK_STORAGE_STATE``，接豆包时那句话出现在
+    豆包那一行里，会把人指去配错的环境变量（2026-08-15 被用例抓到）。
     """
     out: Dict[str, Any] = {
         "path": path or None,
@@ -89,7 +93,7 @@ def inspect_storage_state(path: Optional[str]) -> Dict[str, Any]:
         "parse_error": None,
     }
     if not path:
-        out["parse_error"] = "未配置 DEEPSEEK_STORAGE_STATE"
+        out["parse_error"] = f"未配置 {setting_name.upper()}" if setting_name else "未配置登录态文件路径"
         return out
 
     p = Path(path)
@@ -180,7 +184,14 @@ def worse_of(a: str, b: str) -> str:
 
 
 #: 平台 → 该平台登录态文件的配置项名。加平台时往这里加一行。
-_STORAGE_SETTING = {"deepseek": "deepseek_storage_state"}
+_STORAGE_SETTING = {
+    "deepseek": "deepseek_storage_state",
+    # 豆包没有 WAF cookie（用的是字节自家的 ttwid/sessionid 体系），
+    # 所以 issuer_region 会是 unknown —— 而 derive_status 对 unknown
+    # **刻意不报 mismatch**（宁可不报，也不给一个不确定的结论）。
+    # 这正是那条设计在接第二个平台时兑现的地方
+    "doubao": "doubao_storage_state",
+}
 
 
 def report_credentials(db, settings) -> List[Dict[str, Any]]:
@@ -197,7 +208,9 @@ def report_credentials(db, settings) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for platform, setting_name in _STORAGE_SETTING.items():
         try:
-            info = inspect_storage_state(getattr(settings, setting_name, "") or None)
+            info = inspect_storage_state(
+                getattr(settings, setting_name, "") or None, setting_name=setting_name
+            )
             status, issues = derive_status(
                 info,
                 expected_region=getattr(settings, "crawl_expected_credential_region", ""),

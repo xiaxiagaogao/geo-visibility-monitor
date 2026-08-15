@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     # P2-36 的第一块：这条采集是哪台机器报的。空 = 未标注
     crawl_node_label: str = ""
     deepseek_storage_state: str = ""
+    # 豆包（P2-06a）。**没有 user_data_dir 时用临时 profile** ——
+    # 每次干净，代价是每次重灌 storage_state
+    doubao_storage_state: str = ""
+    doubao_user_data_dir: str = ""
+    doubao_delete_session: bool = True
     deepseek_user_data_dir: str = ""
     # 抓完即删该会话。默认开：不删则侧栏无限堆积，DOM 抓取迟早又抓到侧栏
     # （docs/18 的事故，库里已有两条 answer_status=error 的样本）

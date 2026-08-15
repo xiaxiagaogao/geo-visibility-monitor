@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.providers.base import BaseProvider
 from app.providers.deepseek_web import DeepSeekWebProvider
+from app.providers.doubao_web import DoubaoWebProvider
 
 
 @dataclass(frozen=True)
@@ -58,9 +59,23 @@ def _build_deepseek(ctx: ProviderContext) -> BaseProvider:
     )
 
 
+def _build_doubao(ctx: ProviderContext) -> BaseProvider:
+    s = ctx.settings
+    return DoubaoWebProvider(
+        headless=s.playwright_headless,
+        timeout_ms=s.crawl_timeout_ms,
+        storage_state=s.doubao_storage_state or None,
+        user_data_dir=s.doubao_user_data_dir or None,
+        screenshot_dir=s.screenshot_dir or None,
+        delete_session_after=s.doubao_delete_session,
+        timezone_id=s.crawl_timezone_id,
+    )
+
+
 #: 有 real Provider 的平台。**没进这个表 = 没实现**，不需要另外维护一份布尔值。
 _REAL_BUILDERS: Dict[str, ProviderBuilder] = {
     "deepseek": _build_deepseek,
+    "doubao": _build_doubao,
 }
 
 
@@ -75,7 +90,7 @@ class Platform:
 #: 已知平台。顺序即前端 chip 的展示顺序。
 PLATFORMS: Tuple[Platform, ...] = (
     Platform("deepseek", "DeepSeek"),
-    Platform("doubao", "豆包", note="Provider 未实现"),
+    Platform("doubao", "豆包"),
     Platform("kimi", "Kimi", note="Provider 未实现"),
     Platform("tongyi", "通义千问", note="Provider 未实现"),
 )

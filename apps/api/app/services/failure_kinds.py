@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Optional, Union
 
 from app.providers.deepseek_web import DeepSeekLoginRequired
+from app.providers.doubao_web import DoubaoLoginRequired
 
 #: 冷启动限流、``Page.goto`` 超时、``process_job`` 的硬上限超时
 TIMEOUT = "timeout"
@@ -111,7 +112,7 @@ def classify_failure(exc: Union[BaseException, str, None]) -> str:
         return classify_message(exc)
 
     # 1) 我们自己的异常类型 —— 精确，且改名字时 import 会当场报错
-    if isinstance(exc, DeepSeekLoginRequired):
+    if isinstance(exc, (DeepSeekLoginRequired, DoubaoLoginRequired)):
         return LOGIN_REQUIRED
     # 2) Playwright 的超时（`Page.goto: Timeout 120000ms exceeded`）——
     #    P2-16 要解决的就是这一条
