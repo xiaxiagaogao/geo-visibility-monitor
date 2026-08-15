@@ -123,8 +123,8 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-16** | 自动退避重试 | ✅ 代码 + **开关已开**（2026-08-15，`GEO_AUTO_RETRY=true`）。根因更正见 §3「零」 |
 | **P2-08** | 失败原因分类 | ✅ **后端已落**（`services/failure_kinds.py`），前端展示留给 P2-09 |
 | **P2-07** | **登录态健康度** | ✅ `services/credential_health.py` + `GET /v1/health/credentials`。**看的是「从哪儿签发的」**，不是「多久没成功」 |
-| **P2-36** | 记录采集节点 → **采集环境** | ⬜ **优先级上调**，与 P2-07 一起做更省事 |
-| **P2-06a** | 接豆包 | ⬜ **下一步**（P2-33 · P2-35 · P2-16 · P2-07 都已完成） |
+| **P2-36** | 记录采集节点 → **采集环境** | ✅ `services/crawl_env.py` + `crawl_environments` 表 + `GET /v1/runs/{id}` 的 `environments[]`。**长度 > 1 就是混了两个出口** |
+| **P2-06a** | 接豆包 | ⬜ **下一步**（P2-33 · P2-35 · P2-16 · P2-07 · P2-36 全部完成） |
 | **P2-34** | crawler 改 HTTP worker（**正式**） | P2-06a |
 | **P2-09** | 前端多平台改造 | P2-05 · P2-06a |
 | **P2-06b** | 接千问 | P2-34 |

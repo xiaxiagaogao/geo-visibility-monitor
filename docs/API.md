@@ -453,6 +453,7 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 
 `RunDetailOut` = `RunOut` + **`prompts[]`**（`prompt_id` + `prompt_text`）
 + **`competitors[]`**（`competitor_brand_id` + `brand_name`）
++ **`environments[]`** + **`n_jobs_unstamped`**（P2-36，见 §8.5.3）
 
 **`run.note` 怎么写进去**：只能在 `POST /v1/tasks/{id}/runs` 时带，
 **没有事后修改的接口**（`/v1/runs/{id}` 只有 GET）。
@@ -466,6 +467,39 @@ POST /v1/tasks/27/runs
 事后补要么忘、要么补的是回忆。它是「这一次的口径和别的不一样」的唯一落点 ——
 换了采集出口、关了截图、换了标注器版本，都该写在这儿，
 否则趋势图上那个跳变以后没人解释得了。
+
+### 8.5.3 采集环境：这次是在什么条件下采的（P2-36）
+
+```jsonc
+"environments": [{
+  "environment_id": 3,
+  "fingerprint": "changsha-home|120.228.64.174|Asia/Shanghai|real|cn|huawei",
+  "node_label": "changsha-home",
+  "exit_ip": "120.228.64.174",
+  "timezone_id": "Asia/Shanghai",
+  "crawl_mode": "real",
+  "credential_region": "cn",     // 登录态从哪儿签发的
+  "waf_kind": "huawei",
+  "n_jobs": 20                   // 这次运行里有多少条样本出自这个环境
+}],
+"n_jobs_unstamped": 0
+```
+
+**`environments.length > 1` 就是混了两个出口** —— 那样这次 run 的数字
+不能当成一个整体看，比率是两种条件下的样本硬凑出来的。
+
+冷备「只接替不并行」是一条纪律，而纪律需要证据。2026-08-14 那次部署
+把 VPS 冷备静默拉起来跑了 4 小时，当时**没有任何办法事后确认那段时间
+有没有混采** —— 这个字段就是为了让那个问题有答案。
+
+**`n_jobs_unstamped` 不是缺陷。** 本功能上线（2026-08-15）之前的所有 run
+都会等于 `n_jobs`：当时确实没记。给历史数据编一个「默认环境」等于伪造。
+
+⚠️ **跨 run 比数字之前先比 `fingerprint`。** 指纹不同的两次运行，
+差异里混着环境变化 —— run 215 / 292 / 293 之间出口 IP、时区、登录态签发地
+全都不一样，而那三次的品牌构成差异一度被当成「出口影响回答」的证据。
+
+---
 
 ### 8.5.1 `status` 是算出来的，不是存的
 

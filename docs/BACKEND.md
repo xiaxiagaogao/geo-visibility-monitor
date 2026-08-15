@@ -90,7 +90,9 @@ RawResponse ──< Citation
 | brands | 配置 | 有 **`workspace_id`（默认 1）**，`GET /v1/brands` 可按它过滤 —— 目前**唯一的隔离键**，做「客户」角色时是地基。它是最初 `Org → Workspace → Brand` 三层归属模型的残留，上面两层从未建表 |
 | brand_aliases / competitor_links | 配置 | 别名勿过宽（见 §6）；竞品**也是 brand 行**，不是字符串 |
 | prompts | 配置 | 监测提问；**正文不应含监测品牌名**（见 §6） |
-| crawl_jobs | 采集 | pending → running → success/failed；**`sample_index` = 同一 prompt 的第几次采样**。一条 job = **一个样本**，不是一个批次 |
+| crawl_jobs | 采集 | pending → running → success/failed；**`sample_index` = 同一 prompt 的第几次采样**。一条 job = **一个样本**，不是一个批次。`environment_id` 见 §7.4 |
+| crawl_environments | 采集 | **一行 = 一种采集环境**（P2-36），不是一行一次抓取。见 §7.4 |
+| crawl_credentials | 采集 | 登录态健康度快照（P2-07），每平台一行。见 §7.3 |
 | raw_responses | L0+L1 | `full_text` 必须是**原文**；`answer_status`；`annotator_version` |
 | mentions | L1 | 见下方字段说明 |
 | citations | L0 | **当前全库 0 行**，根因见 §7.2 |
@@ -571,6 +573,32 @@ api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用
 
 分类不认识的失败会打 `kind=unknown` 的 WARNING 日志，
 `grep kind=unknown` 就能捞出「下一个该提上来的模式」。
+
+---
+
+### 7.4 采集环境指纹（P2-36，2026-08-15 起）
+
+| 组件 | 位置 |
+|---|---|
+| 指纹与探测 | `app/services/crawl_env.py`（指纹是纯函数） |
+| 落库 | 同文件 `upsert_environment()`，worker 每 `CRAWL_CREDENTIAL_CHECK_SEC` 刷新 |
+| 打标记 | `claim_pending_jobs(..., environment_id=)` —— **领取那一刻** |
+| 出口 | `GET /v1/runs/{id}` 的 `environments[]` / `n_jobs_unstamped` |
+
+指纹的六个维度：`node_label` · `exit_ip` · `timezone_id` · `crawl_mode` ·
+`credential_region` · `waf_kind`。**任何一维变了就是另一种环境。**
+
+四条：
+
+1. **一行 = 一种环境。** 环境很少变，job 每天几十条。
+   `SELECT DISTINCT environment_id FROM crawl_jobs WHERE run_id=?`
+   **多于一行就是混了** —— 这是一次查询就能得到的事实，不是回忆。
+2. **指纹可读不做哈希**，缺失维度写 `-` 不省略（否则不同环境会撞成同一个指纹）。
+3. **探不到就留 NULL，不编默认值。** 上线前的 run 全部 `unstamped`，那是事实。
+4. **改 `FINGERPRINT_FIELDS` = 改「什么算同一种环境」**，加维度会让历史环境行
+   全部变成「另一种」。加之前想清楚值不值。
+
+**跨 run 比数字之前先比指纹** —— 指纹不同的两次运行，差异里混着环境变化。
 
 ---
 
