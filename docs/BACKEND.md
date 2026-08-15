@@ -720,6 +720,49 @@ docker exec -w /app/apps/api -e PYTHONPATH=. \
 
 **密钥、pem、storage_state、截图 bulk：禁止进 Git。**
 
+### 10.3 只有一个 main —— 拓扑不进代码，更不进分支
+
+**采集节点上没有 git。** 它跑的是一个**镜像**，那个镜像由 VPS 从 `main` build、
+经 tailnet 传过去（`scripts/crawl-node/deploy.sh all`）。所以：
+
+```text
+           ┌──────────────── 唯一的真相 ────────────────┐
+本机 main ──push──▶ VPS 裸仓 ──build──▶ deploy-api / deploy-web / deploy-crawler
+                                              │
+                                              └──save|load──▶ 采集节点（只有镜像）
+```
+
+**「哪台 crawler 在跑」不是分支，是运行时状态。** 三样东西决定当前拓扑，
+全都在代码之外：
+
+| 维度 | 由什么决定 | 在哪看 |
+|---|---|---|
+| 哪台 crawler 在采 | 容器起没起（VPS 那台是冷备，`Created`/`Exited`） | `docker ps -a` / `podman ps` |
+| 出口地理位置 | 容器跑在哪台机器上 + 不设代理 | `deploy.sh verify` 第 ③ 项 |
+| 时区 / 重试 / 截图 | 环境变量（`CRAWL_TIMEZONE_ID` 等） | `deploy.sh` 里的 `podman run` |
+| 登录态 | 节点 `/data/deepseek_storage.json` | `deploy.sh verify` 第 ① 项 |
+
+#### 为什么不按拓扑开分支
+
+直觉上很想要一条「长沙分支」和一条「新加坡分支」。**别做**，三条理由都硬：
+
+1. **切换出口会变成一次 merge。** 而切换出口本该是 `docker start` / `docker stop`
+   —— 冷备存在的全部意义就是几秒钟切过去。
+2. **两条分支必然漂移。** 所有与拓扑无关的改动（Provider、API、前端）都要
+   cherry-pick 两遍，漏一次就是两套口径。
+3. **回滚要动 git。** 而 `PHASE2` §6 规矩 1 写得很清楚：
+   **能不用 git 回滚的，就别依赖 git 回滚。** 让危险的东西活在容器编排层。
+
+#### 分支怎么用
+
+一次任务一条短分支 → ff 进 `main` → **删掉**。`main` 永远等于线上
+（`git --git-dir=/opt/geo-demo.git rev-parse main` 可核对）。
+长期存在的分支只会让人猜「这条是不是还有用」。
+
+> **唯一的 git 远端是生产服务器本身**（`vps` → `/opt/geo-demo.git`）。
+> 也就是说仓库历史只存在于本机和那台 VPS 上，**没有异地备份**。
+> 这不影响日常，但那台机器没了就只剩本机一份。
+
 ---
 
 ## 11. 已知债务（现行代码的真实状态，不是待办清单）
