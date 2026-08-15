@@ -130,6 +130,37 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-06b** | 接千问 | P2-34 |
 | **P2-06c** | 接 Kimi | P2-06b |
 
+#### ⚠️ 豆包这条路可能不成立（2026-08-15 实测）
+
+**接豆包不是「把 DeepSeek 的选择器换一套」，风险级别不一样。**
+
+第一条探针提问发出后，页面直接跳 `?from_logout=1`，登录态当场失效。
+在采集节点容器里实测，crawler 的浏览器有四个明着写着「我是自动化」的破绽
+（`webdriver=True` · `plugins=0` · `window.chrome=undefined` · UA 里带
+`HeadlessChrome`）。豆包同时加载了 `s2-security-audit` / `-verify` / `-message`
+三个模块 —— 它在**主动做检测**，而 DeepSeek 一年没咬过我们。
+
+已做的加固见 `BACKEND.md` §7.5（新 headless + 参数 + UA + persistent context），
+节点实测四项全过。**但这只说明今天能过。**
+
+| | DeepSeek | 豆包 |
+|---|---|---|
+| DOM 钩子 | `.ds-markdown` 语义类名 | **无 `data-testid`**，只有生成式工具类 |
+| 输入框 | `textarea` | `textarea` 有两个，**第二个是 `aria-hidden` 的隐藏替身** |
+| 反自动化 | 没遇到 | **发一条就登出** |
+
+**三条必须写在前面的判断：**
+
+1. **这是一场会持续的对抗。** 今天能过不代表下个月能过，而每次失效的表现
+   都是「一批 job 全 failed」（P2-08 会归成 `parse_error`，不重试 —— 分类是对的，
+   但看不出根因）。
+2. **豆包的 DOM 比 DeepSeek 脆得多。** 选择器只能靠 `aria-label` +
+   `placeholder` + 结构位置，改版当天就会全线失效。
+3. **所以接豆包之前要接受一件事**：它的可用性天然低于 DeepSeek，
+   且维护成本是**持续的**，不是一次性的。如果某次改版之后长期过不去，
+   **那时要重新讨论的是「豆包还做不做」，不是「再加一层伪装」** ——
+   本仓不做 stealth 注入，理由见 `providers/browser.py` 的模块 docstring。
+
 **为什么把 P2-07 也提到豆包之前**（2026-08-15 改的顺序，原计划它依赖 P2-06a）：
 
 一份**过期 11 天**的登录态悄悄让每次 run 丢掉头几条，而没有任何地方报警 ——

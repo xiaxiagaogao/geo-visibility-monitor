@@ -602,6 +602,36 @@ api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用
 
 ---
 
+### 7.5 浏览器指纹加固（2026-08-15 起）
+
+`app/providers/browser.py` —— provider 与 `scripts/export_storage_state.py` 共用。
+
+**为什么有它**：豆包第一条探针提问就把登录态打掉了（`?from_logout=1`）。
+节点实测，旧用法有四个破绽：
+
+| 检测点 | 旧 headless | 新 headless + 本模块 |
+|---|---|---|
+| `navigator.webdriver` | `True` | `False` |
+| `navigator.plugins` | `0` | `5` |
+| `window.chrome` | `undefined` | `object` |
+| User-Agent | `HeadlessChrome/131.0.6778.33` | `Chrome/131.0.0.0` |
+
+四条：
+
+1. **`channel="chromium"`（新 headless）白送 `plugins` 与 `window.chrome`** ——
+   这两项本来只能靠注入伪造，一行配置省掉整个 stealth 层。
+2. **UA 必须显式覆盖。** 参数改不掉它，而它比 `webdriver` 还直白。
+   `strip_headless_marker` 只换标记不编版本号 —— 编了会在升级镜像后过期。
+3. **出生环境要等于使用环境。** 用 `launch_persistent_context` + `user_data_dir`，
+   不用 `storage_state=` 移植 —— 会话在一种浏览器里出生、另一种里使用本身就是信号。
+4. **不做 stealth 注入。** 只做「看起来像普通浏览器」，不做「伪装成别人」；
+   笨拙的注入本身就是指纹，不一致的覆盖比不覆盖更可疑。
+
+> **DeepSeek 刻意还没迁过来。** 它用旧路径跑了一年没出事，
+> 而调试新平台时不能同时改动唯一在工作的平台。等豆包稳定后再单独决定。
+
+---
+
 ## 8. 前后端契约（后端保证）
 
 1. 展示用指标：**只信** `/v1/counts` 整数，前端自己除；时间窗一律 Σm/Σn（§2.1）。  
