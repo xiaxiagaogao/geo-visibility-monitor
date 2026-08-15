@@ -144,6 +144,32 @@ _MIGRATIONS = [
             ON crawl_jobs(status, next_attempt_at);
         """,
     ),
+    (
+        "008_crawl_credentials",
+        """
+        -- P2-07 登录态健康度。每个平台一行，由 crawler 定期上报。
+        --
+        -- **为什么要有这张表**：storage_state 在采集节点上，而 api 在 VPS ——
+        -- api 读不到那个文件。让 crawler 把「元信息」写回来是唯一的路。
+        -- P2-34 worker 化之后改成 POST 上报，这张表不用动。
+        --
+        -- ⚠️ **这里永远不存 cookie 的值。** 只存名字、域、过期时间。
+        -- 值是凭证本身，落进数据库就等于把登录态复制到了一个没人当它是凭证的地方。
+        CREATE TABLE IF NOT EXISTS crawl_credentials (
+            platform        TEXT PRIMARY KEY,
+            node_label      TEXT,
+            status          TEXT NOT NULL,
+            issuer_region   TEXT,
+            waf_kind        TEXT,
+            cookie_count    INT,
+            cookie_names    JSONB NOT NULL DEFAULT '[]'::jsonb,
+            earliest_expiry TIMESTAMPTZ,
+            file_mtime      TIMESTAMPTZ,
+            issues          JSONB NOT NULL DEFAULT '[]'::jsonb,
+            checked_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """,
+    ),
 ]
 
 

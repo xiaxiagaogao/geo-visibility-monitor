@@ -19,6 +19,7 @@ from geo_metrics.aggregate import ResponseObservation
 
 from app.api import brands as brands_router
 from app.api import crawl_jobs as crawl_jobs_router
+from app.api import health_credentials as health_credentials_router
 from app.api import prompts as prompts_router
 from app.api import responses as responses_router
 from app.api import counts as counts_router
@@ -80,6 +81,7 @@ app.include_router(users_router.router)
 app.include_router(qa_router.router)
 app.include_router(ingest_router.router)
 app.include_router(tasks_router.router)
+app.include_router(health_credentials_router.router)
 
 
 class AnalyzeRequest(BaseModel):

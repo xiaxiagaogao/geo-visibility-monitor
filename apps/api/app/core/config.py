@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     # Playwright 取容器的系统时区（UTC），页面看到的就是「IP 在长沙、时区在伦敦」。
     # 切到 VPS 冷备（新加坡出口）时要改成 Asia/Singapore，否则只是换一种不一致。
     crawl_timezone_id: str = "Asia/Shanghai"
+    # P2-07 登录态健康度。期望的签发地：`cn` | `overseas` | 空（= 不判）。
+    # **和 crawl_timezone_id 是同一件事的两面** —— 切到 VPS 冷备时两个都要改。
+    crawl_expected_credential_region: str = "cn"
+    # 登录态文件多久没更新算「该换了」。0 = 不判
+    crawl_credential_max_age_days: int = 14
+    # 多久自检一次登录态（crawler 进程内，0 = 关）
+    crawl_credential_check_sec: int = 300
+    # P2-36 的第一块：这条采集是哪台机器报的。空 = 未标注
+    crawl_node_label: str = ""
     deepseek_storage_state: str = ""
     deepseek_user_data_dir: str = ""
     # 抓完即删该会话。默认开：不删则侧栏无限堆积，DOM 抓取迟早又抓到侧栏

@@ -343,3 +343,35 @@ class RunCompetitor(Base):
     brand_name: Mapped[str] = mapped_column(Text, nullable=False)
 
     run: Mapped[Run] = relationship(back_populates="competitors")
+
+
+class CrawlCredential(Base):
+    """登录态健康度快照（P2-07），每个平台一行，由 crawler 定期上报。
+
+    **为什么是一张表而不是让 api 直接读文件**：``storage_state`` 在采集节点上，
+    而 api 跑在 VPS —— 它读不到那个文件。让 crawler 把元信息写回来是唯一的路。
+    P2-34 worker 化之后改成 POST 上报，这张表不用动。
+
+    ⚠️ **这里永远不存 cookie 的值。** 只存名字、域、过期时间 ——
+    值是凭证本身，落进数据库就等于把登录态复制到了一个没人当它是凭证的地方。
+    """
+
+    __tablename__ = "crawl_credentials"
+
+    platform: Mapped[str] = mapped_column(Text, primary_key=True)
+    #: 哪台机器报的（P2-36 的第一块）。空 = 未标注
+    node_label: Mapped[Optional[str]] = mapped_column(Text)
+    #: ``ok`` | ``aging`` | ``expired`` | ``mismatch`` | ``missing``
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    #: ``cn`` | ``overseas`` | ``unknown`` —— 由 WAF cookie 的类型判定
+    issuer_region: Mapped[Optional[str]] = mapped_column(Text)
+    waf_kind: Mapped[Optional[str]] = mapped_column(Text)
+    cookie_count: Mapped[Optional[int]] = mapped_column(Integer)
+    #: 只有名字，**没有值**。留着是为了接新平台时能看出它用的哪家 WAF
+    cookie_names: Mapped[Any] = mapped_column(JSONB, server_default="[]")
+    earliest_expiry: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    file_mtime: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    issues: Mapped[Any] = mapped_column(JSONB, server_default="[]")
+    checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
