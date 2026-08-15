@@ -46,7 +46,9 @@ GEO_AUTO_RETRY=true ./deploy.sh start     # 回滚 = 去掉这个变量重跑 st
 ### 1. 容器绝对不能走代理
 
 节点上可能装着代理（我们这台是 mihomo 在 `7890`）。**走代理出口就变成代理的落地**
-——我们这台走代理是香港 `42.200.231.233`，直连才是长沙移动 `36.157.231.164`。
+——我们这台走代理是香港，直连才是长沙移动。**具体 IP 会变**（家宽是动态的，
+2026-08-15 已从 `36.157.231.164` 变成 `120.228.64.174`），所以自检比的是
+**两者相不相等**，不是比对某个写死的地址。
 
 **这是唯一会静默毁掉整件事的错误**：走了代理，数据照样采得到，只是全部来自错误
 的地理位置，而没有任何地方会报错。所以 `deploy.sh verify` 里有一条硬检查 ——
@@ -124,6 +126,20 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 **启用冷备时必须意识到：从那一刻起采集出口换回了新加坡**，
 那段数据与前后不可比。
 
+### 切冷备要一起改的三样
+
+出口、时区、登录态签发地**是同一件事的三个面**。2026-08-15 那次就是只切了第一样：
+
+| | 大陆节点 | VPS 冷备 |
+|---|---|---|
+| 容器跑在哪 | 采集节点 | VPS |
+| `GEO_TZ` → `CRAWL_TIMEZONE_ID` | `Asia/Shanghai` | `Asia/Singapore` |
+| `GEO_EXPECT_REGION` → `CRAWL_EXPECTED_CREDENTIAL_REGION` | `cn` | `overseas` |
+| `storage_state` | 在大陆重建的那份 | 在新加坡重建的那份 |
+
+只切容器、不切后两样，等于把一种不一致换成另一种 ——
+而 `GET /v1/health/credentials` 会当场报 `mismatch`（那是它存在的意义）。
+
 ### 部署曾经会把冷备静默拉起来（2026-08-14 已修）
 
 旧判断是「容器存在就 `compose up -d`」，而 `docker ps -a | grep -qx geo-crawler`
@@ -144,17 +160,43 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 | **冷启动被限流** | 一次 run 开头的头一两条常见 `Page.goto` 120 秒超时，之后就顺。**P2-16 已做**：这类失败分类成 `timeout`，自动退避重排（30s → 60s，最多 3 次）。开关 `CRAWL_AUTO_RETRY_ENABLED`，见 `BACKEND.md` §7.2。手动 `POST /v1/crawl-jobs/{id}/retry` 仍然可用，且会把计数清零 |
 | **家宽 IP 是动态的** | tailscale 自己能重连；但风控与 `storage_state` 会不会受影响，没验过 |
 | **节点不是独占的** | 我们这台还跑着别的服务。任何 `pkill` / `pgrep` **都要按精确 PID** —— 模式匹配会误伤 |
-| **`storage_state` 会过期** | 过期的表现是**一批 job 全 failed**，和「平台没接」「网络问题」的排查方向完全不同。`PHASE2` P2-07 要做可观测性 |
+| **`storage_state` 会过期，而且是悄悄的** | 原以为过期表现是「一批 job 全 failed」——**不是**。2026-08-15 的真实形态是**悄悄降级**：还能抓，只是每次 run 头几条卡在 WAF 挑战上超时。**P2-07 已做**：`GET /v1/health/credentials` 直接给出「这份登录态从哪儿签发、最早过期的 cookie 还剩多久」，见 `BACKEND.md` §7.3 |
 
-## storage_state 怎么送过去
+## storage_state 怎么做、怎么送过去
 
-它是凭证，**不进 Git**（`BACKEND.md` 的既有规矩）。从 VPS 直接管道到节点，
-中间不落盘：
+### ⚠️ 绝不能从 VPS 拷一份过来
+
+**这节原先写的就是「从 VPS 直接管道到节点」—— 那正是 2026-08-15 事故的操作步骤。**
+
+登录态**带地理位置**：会话建立时的出口决定了服务端下发给它的 WAF 令牌、
+功能开关与模型通道。VPS 在新加坡，导出的那份带的是 `aws-waf-token`；
+而 DeepSeek 境内走华为云 WAF（`HWWAFSES*`）。拿前者去大陆采集，就是
+「IP 切了、环境没切」—— 表现是每次 run 头几条超时、且回答口径偏离，
+**而没有任何地方会报错**。
+
+### 正确做法：从目标出口重新登录
+
+让登录流量**从采集节点出去**，浏览器仍开在你自己机器上（密码不经过任何脚本）：
 
 ```bash
-ssh -n -i "$GEO_VPS_KEY" "$GEO_VPS" 'docker exec geo-crawler cat /data/deepseek_storage.json' \
-| ssh -i "$GEO_NODE_KEY" "$GEO_NODE" \
-    'cat > /opt/geo-crawl-data/deepseek_storage.json && chmod 600 $_'
+# 1. 开一条到采集节点的 SOCKS 隧道
+#    ExitOnForwardFailure 不能省：-f -N 绑不上端口时照样会 fork 到后台挂着
+ssh -i "$GEO_NODE_KEY" -o ExitOnForwardFailure=yes -D 18080 -N -f "$GEO_NODE"
+
+# 2. 导出（脚本会在登录**之前**打印出口 IP，不是 CN 会大声警告）
+apps/api/.venv/bin/python scripts/export_deepseek_storage.py \
+    --proxy socks5://127.0.0.1:18080
+
+# 3. 送到节点：管道直传，中间不落盘。传完对字节数
+cat deploy/deepseek_storage.json | ssh -i "$GEO_NODE_KEY" "$GEO_NODE" \
+    'cat > /opt/geo-crawl-data/deepseek_storage.json && chmod 600 $_ && wc -c < $_'
+
+# 4. 收尾：按精确 PID 关隧道，**别用 pkill -f**（节点上还跑着别的生产服务）
+lsof -nP -iTCP:18080 | grep LISTEN     # 拿到 PID
+kill <那个PID>
 ```
 
-传完对一下字节数，两边应该一致。
+换完之后 `GET /v1/health/credentials` 应该是 `ok` 且 `issuer_region: "cn"`；
+还是 `mismatch` 就说明登录时走的不是节点的出口。
+
+**它是凭证，不进 Git**（`.gitignore` 已挡，`BACKEND.md` 的既有规矩）。

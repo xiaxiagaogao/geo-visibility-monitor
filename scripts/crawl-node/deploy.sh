@@ -30,6 +30,14 @@ DB_URL=${GEO_DB_URL:?需要 GEO_DB_URL，例如 postgresql+psycopg://user:pass@1
 # timeout 认得准（`grep kind=unknown`），再 `GEO_AUTO_RETRY=true ./deploy.sh start`。
 # 回滚就是改回 false 重跑 start —— 不必 git revert（PHASE2 §6 规矩 1）
 AUTO_RETRY=${GEO_AUTO_RETRY:-false}
+# 浏览器上报的时区 + 期望的登录态签发地。
+# **这两个和「crawler 跑在哪台机器上」是同一件事的三个面**：
+# 切到 VPS 冷备（新加坡出口）时，两个都要跟着改，否则只是把一种不一致
+# 换成另一种 —— 2026-08-15 那次就是「IP 切了、时区和登录态没切」。
+TZ_ID=${GEO_TZ:-Asia/Shanghai}
+EXPECT_REGION=${GEO_EXPECT_REGION:-cn}
+# 这台机器的标签，随健康度一起上报（P2-36 的第一块）
+NODE_LABEL=${GEO_NODE_LABEL:-changsha-home}
 
 IMAGE=deploy-crawler:latest
 NODE_DATA=/opt/geo-crawl-data
@@ -66,6 +74,9 @@ do_start() {
       -e DEEPSEEK_STORAGE_STATE=/data/deepseek_storage.json \
       -e SCREENSHOT_DIR= \
       -e CRAWL_AUTO_RETRY_ENABLED='$AUTO_RETRY' \
+      -e CRAWL_TIMEZONE_ID='$TZ_ID' \
+      -e CRAWL_EXPECTED_CREDENTIAL_REGION='$EXPECT_REGION' \
+      -e CRAWL_NODE_LABEL='$NODE_LABEL' \
       -e FAKE_WORKER_INTERVAL_SEC=5 \
       -e FAKE_WORKER_BATCH_SIZE=1 \
       -v $NODE_DATA:/data:rw,Z \

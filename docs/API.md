@@ -386,6 +386,52 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 
 ---
 
+### `GET /v1/health/credentials`（仅超管/运营）
+
+登录态健康度（P2-07）。**不含任何 cookie 的值** —— 只有名字、域、过期时间。
+
+```jsonc
+{
+  "overall": "mismatch",          // 所有平台里最严重的；一条都没上报过 = "unreported"
+  "generated_at": "2026-08-15T...",
+  "items": [{
+    "platform": "deepseek",
+    "status": "mismatch",         // ok | aging | expired | mismatch | missing
+    "node_label": "changsha-home",
+    "issuer_region": "overseas",  // cn | overseas | unknown  ← 最关键的字段
+    "waf_kind": "aws",
+    "cookie_count": 4,
+    "cookie_names": ["aws-waf-token", "ds_session_id", "smidV2"],
+    "earliest_expiry": "2026-08-04T...",
+    "file_mtime": "2026-08-12T...",
+    "issues": ["签发地是 overseas（aws WAF），而采集出口期望 cn —— IP 切了、环境没切",
+               "最早过期的 cookie 已过期 11 天"],
+    "checked_at": "2026-08-15T...",
+    "last_success_at": "2026-08-15T..."
+  }]
+}
+```
+
+**`issuer_region` 是这里唯一能提前发现问题的字段。** DeepSeek 的境内与境外流量
+走两套不同的基础设施，WAF cookie 的名字直接把签发地写在脸上
+（`HWWAFSES*` = 华为云 = 境内，`aws-waf-token` = AWS = 境外）。
+拿境外签发的登录态在大陆采集，就是「IP 切了、环境没切」。
+
+**`last_success_at` 不够用，别只看它。** 2026-08-15 那次故障里它一直是
+「几分钟前」—— 抓取确实在成功，只是每次 run 头几条卡在 WAF 挑战上超时。
+**它只能发现「全红」，发现不了「悄悄降级」。**
+
+三个容易看错的地方：
+
+- **`overall: "unreported"` 不是 ok** —— 那表示 crawler 从没上报过
+  （老版本，或压根没在跑）。没有数据不等于健康。
+- **`issuer_region: "unknown"` 不会被判成 `mismatch`** —— 认不出来就不下结论。
+  接新平台时它一开始就是 unknown，那是正常的。
+- **`checked_at` 自己也是信号** —— api 读的是 crawler 写的快照，不是实时检查。
+  太旧说明 crawler 没在跑。
+
+---
+
 ## 8.5 检测任务与运行
 
 **任务（Task）= 命名的监测定义**（一个主品牌 + 平台 + 采样数），可反复执行。

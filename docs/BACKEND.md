@@ -215,6 +215,7 @@ Base：`http://<host>:8200`。字段以代码 `apps/api/app/api/*` 为准。
 | 计数 | GET | `/v1/counts`（**`run_id` 会同时切换竞品集到快照**，见 §3.4） |
 | 登录 | POST | `/v1/auth/login`（公开）· `/v1/auth/logout` · GET `/v1/auth/me` |
 | 用户 | CRUD | `/v1/users` · `/v1/users/{id}` —— **仅超管** |
+| 登录态健康度 | GET | `/v1/health/credentials` —— **仅超管/运营**，见 §7.3 |
 | 口径 | GET | `/v1/config/metrics` |
 | 平台可用性 | GET | `/v1/config/platforms` —— 前端据此渲染 chip，**勿硬编码平台清单**（见 §7.1） |
 | 灌入 | POST | `/v1/ingest/l0`（非主路径） |
@@ -510,6 +511,35 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 
 > **存量污染不可回填。** 早期样本的 L0 被旧清洗规则改写过、且丢了首块，
 > 重跑 L1 也补不回来 —— 要干净数据只能重抓。安踏那 35 条是修复后抓的，是干净的。
+
+### 7.3 登录态健康度（P2-07，2026-08-15 起）
+
+| 组件 | 位置 |
+|---|---|
+| 判级规则 | `app/services/credential_health.py`（纯函数） |
+| 落库 | 同文件 `report_credentials()`，**由 crawler 调用**，写 `crawl_credentials`（迁移 008） |
+| 出口 | `GET /v1/health/credentials`（仅超管/运营），见 `API.md` |
+
+**为什么要经数据库中转**：`storage_state` 在采集节点上，而 api 跑在 VPS ——
+api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用动。
+
+四条：
+
+1. **看的是「从哪儿签发的」，不是「多久没成功」。** WAF cookie 的名字直接暴露
+   签发地（`HWWAFSES*` = 华为云 = 境内，`aws-waf-token` = AWS = 境外）。
+   2026-08-15 那次故障里「上次成功抓取」一直是几分钟前 —— **它只能发现
+   「全红」，发现不了「悄悄降级」**。
+2. **绝不读取、绝不落库 cookie 的值。** 只存名字、域、过期时间。值是凭证本身，
+   落进库或日志就等于把登录态复制到一个没人当它是凭证的地方。有用例钉着。
+3. **认不出签发地就不报不匹配。** 接新平台时 `issuer_region` 一开始必然是
+   `unknown`，报红会让这个端点第一天就没人看。
+4. **一条都没上报 ≠ 健康** —— `overall` 返回 `unreported`。
+
+`CRAWL_TIMEZONE_ID` · `CRAWL_EXPECTED_CREDENTIAL_REGION` · 容器跑在哪台机器上
+**是同一件事的三个面**，切冷备时要一起改（`scripts/crawl-node/deploy.sh` 里
+`GEO_TZ` / `GEO_EXPECT_REGION` 两个环境变量）。
+
+---
 
 ### 7.2 失败分类与自动退避重试（2026-08-14 起）
 
