@@ -13,8 +13,18 @@ Usage:
 
 所以要让登录流量从**采集节点**出去。先开一条到节点的 SOCKS 隧道：
 
-  ssh -i <node.pem> -D 18080 -N -f root@<节点>
+  ssh -i <node.pem> -o ExitOnForwardFailure=yes -D 18080 -N -f root@<节点>
   apps/api/.venv/bin/python scripts/export_deepseek_storage.py --proxy socks5://127.0.0.1:18080
+
+``ExitOnForwardFailure=yes`` **不能省**：`-f -N` 在端口已被占用时照样会 fork
+到后台挂着，只是没有转发 —— 反复重试就会在节点上攒出一串没用的 SSH 会话
+（2026-08-15 攒了 4 条），而命令行看起来和正常那条一模一样，事后只能靠
+`lsof -nP -iTCP:18080` 分辨谁真的在 LISTEN。加上它，绑不上就直接退出。
+
+用完按精确 PID 关，**别用 `pkill -f`** —— 节点上还跑着别的生产服务：
+
+  lsof -nP -iTCP:18080 | grep LISTEN     # 拿到 PID
+  kill <那个PID>
 
 脚本会在你登录**之前**把当前出口 IP 打出来，不是大陆会大声警告 ——
 这一步不确认，登完才发现登错了地方就白搭。
