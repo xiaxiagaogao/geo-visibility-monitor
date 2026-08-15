@@ -82,11 +82,33 @@ class RunOut(BaseModel):
     n_jobs: int
 
 
+class RunEnvironmentOut(BaseModel):
+    """这次运行用到的一种采集环境（P2-36）及其样本数。"""
+
+    environment_id: int
+    #: 可读指纹：`节点|出口IP|时区|模式|登录态签发地|WAF`
+    fingerprint: str
+    node_label: Optional[str] = None
+    exit_ip: Optional[str] = None
+    timezone_id: Optional[str] = None
+    crawl_mode: Optional[str] = None
+    credential_region: Optional[str] = None
+    waf_kind: Optional[str] = None
+    #: 这次运行里有多少条 job 是在这个环境下跑的
+    n_jobs: int
+
+
 class RunDetailOut(RunOut):
     """带快照 —— 前端据此显示「这次跑的是哪些提问、比的是哪些竞品」。"""
 
     prompts: List[RunPromptOut]
     competitors: List[RunCompetitorOut]
+    #: P2-36：这次运行的样本是在哪些环境下采的。
+    #: **长度 > 1 就是混了两个出口** —— 那样这次 run 的数字不能当成一个整体看
+    environments: List[RunEnvironmentOut] = Field(default_factory=list)
+    #: 没有环境记录的 job 数。**本功能上线前的 run 会等于 n_jobs**，
+    #: 那是事实（当时确实没记），不是缺陷
+    n_jobs_unstamped: int = 0
 
 
 class RunListOut(BaseModel):

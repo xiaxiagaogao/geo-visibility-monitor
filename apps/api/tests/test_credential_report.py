@@ -72,7 +72,12 @@ def test_report_writes_a_row(db, tmp_path):
     exp = int((datetime.now(timezone.utc) + timedelta(days=300)).timestamp())
     out = report_credentials(db, _settings(tmp_path, [("HWWAFSESID", 0), ("smidV2", exp)]))
 
-    assert out == [{"platform": "deepseek", "status": "ok", "issues": []}]
+    # 返回值里必须带 issuer_region / waf_kind —— **P2-36 的环境指纹靠它们**，
+    # 而它们正是这次检查刚算出来的。少了就得再读一遍文件
+    assert out == [{
+        "platform": "deepseek", "status": "ok", "issues": [],
+        "issuer_region": "cn", "waf_kind": "huawei",
+    }]
     row = db.get(CrawlCredential, "deepseek")
     assert row.status == "ok"
     assert row.issuer_region == "cn" and row.waf_kind == "huawei"

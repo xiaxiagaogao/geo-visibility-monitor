@@ -139,12 +139,16 @@ def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
         return None
 
 
-def run_once(db: Session, batch_size: int = 5) -> List[int]:
+def run_once(
+    db: Session, batch_size: int = 5, environment_id: Optional[int] = None
+) -> List[int]:
+    """``environment_id``（P2-36）由调用方（worker 循环）算好传进来 ——
+    它是节流刷新的，不该每批重算一次（要探出口 IP，是次网络请求）。"""
     reclaimed = reclaim_stuck_jobs(db, get_settings().crawl_stuck_job_sec)
     if reclaimed:
         logger.warning("reclaimed stuck running jobs %s", reclaimed)
 
-    jobs = claim_pending_jobs(db, batch_size)
+    jobs = claim_pending_jobs(db, batch_size, environment_id=environment_id)
     done: List[int] = []
     for claimed in jobs:
         job = db.get(CrawlJob, claimed.id)

@@ -170,6 +170,37 @@ _MIGRATIONS = [
         );
         """,
     ),
+    (
+        "009_crawl_environments",
+        """
+        -- P2-36 采集环境指纹。**一行 = 一种环境**，不是一行一次抓取 ——
+        -- 环境很少变，而 job 每天几十条。
+        --
+        -- 为什么需要：run 215 / 292 / 293 之间出口 IP、时区、登录态签发地全都不一样，
+        -- 而数据里唯一记得住的是 run.note 这个自由文本。**没有它，任何跨 run 对比
+        -- 都不可信** —— 也无法证明某次 run 没有混着两个出口采。
+        CREATE TABLE IF NOT EXISTS crawl_environments (
+            id                SERIAL PRIMARY KEY,
+            -- 归一化后的指纹，用来去重。可读（不是哈希）——排查时一眼能看出差在哪
+            fingerprint       TEXT NOT NULL UNIQUE,
+            node_label        TEXT,
+            exit_ip           TEXT,
+            timezone_id       TEXT,
+            crawl_mode        TEXT,
+            credential_region TEXT,
+            waf_kind          TEXT,
+            first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        -- 可空：本次迁移之前的所有 job 都没有环境记录，而那是**事实**
+        -- （当时确实没记），不该用一个编出来的默认值把它盖掉。
+        -- ON DELETE SET NULL 而不是 CASCADE —— 环境行是历史，不该因为清理它而删掉样本
+        ALTER TABLE crawl_jobs ADD COLUMN IF NOT EXISTS environment_id INT
+            REFERENCES crawl_environments(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_crawl_jobs_environment ON crawl_jobs(environment_id);
+        """,
+    ),
 ]
 
 

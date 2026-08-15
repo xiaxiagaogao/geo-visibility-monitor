@@ -218,7 +218,15 @@ def report_credentials(db, settings) -> List[Dict[str, Any]]:
             row.checked_at = now
             db.add(row)
             db.commit()
-            out.append({"platform": platform, "status": status, "issues": issues})
+            # issuer_region / waf_kind 一并返回：P2-36 的环境指纹要用它们，
+            # 而它们正是这次检查刚算出来的 —— 让 worker 再读一遍文件没有意义
+            out.append({
+                "platform": platform,
+                "status": status,
+                "issues": issues,
+                "issuer_region": info["issuer_region"],
+                "waf_kind": info["waf_kind"],
+            })
         except Exception:  # noqa: BLE001
             db.rollback()
     return out

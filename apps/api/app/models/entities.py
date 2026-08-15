@@ -111,6 +111,11 @@ class CrawlJob(Base):
     #: 退避中的 job 状态仍是 ``pending``——不新增状态值，否则 ``derive_run_status``、
     #: ``/v1/crawl-jobs?status=`` 的调用方、前端样本表口径都要跟着改
     next_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    #: P2-36 这条 job 是在哪种采集环境下跑的（出口 IP / 时区 / 登录态签发地）。
+    #: 可空：本列之前的 job 确实没记，**不该用一个编出来的默认值把它盖掉**
+    environment_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("crawl_environments.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -373,5 +378,33 @@ class CrawlCredential(Base):
     file_mtime: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     issues: Mapped[Any] = mapped_column(JSONB, server_default="[]")
     checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CrawlEnvironment(Base):
+    """采集环境指纹（P2-36）。**一行 = 一种环境**，不是一行一次抓取。
+
+    出口 IP、浏览器时区、登录态签发地任何一维变了，就是另一种环境。
+    ``crawl_jobs.environment_id`` 指过来，于是
+    ``SELECT DISTINCT environment_id FROM crawl_jobs WHERE run_id=?``
+    **多于一行就是混了** —— 一次查询就能得到的事实，不是回忆。
+    """
+
+    __tablename__ = "crawl_environments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    #: 归一化后的可读指纹。**刻意不做哈希** —— 排查时一眼要看出两种环境差在哪
+    fingerprint: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    node_label: Mapped[Optional[str]] = mapped_column(Text)
+    exit_ip: Mapped[Optional[str]] = mapped_column(Text)
+    timezone_id: Mapped[Optional[str]] = mapped_column(Text)
+    crawl_mode: Mapped[Optional[str]] = mapped_column(Text)
+    credential_region: Mapped[Optional[str]] = mapped_column(Text)
+    waf_kind: Mapped[Optional[str]] = mapped_column(Text)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

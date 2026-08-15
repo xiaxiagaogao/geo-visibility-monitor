@@ -246,7 +246,9 @@ def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
     return [j.id for j in stuck]
 
 
-def claim_pending_jobs(db: Session, limit: int) -> List[CrawlJob]:
+def claim_pending_jobs(
+    db: Session, limit: int, environment_id: Optional[int] = None
+) -> List[CrawlJob]:
     """领一批 pending 的 job，标成 running。
 
     ``FOR UPDATE SKIP LOCKED`` **本来就是多 worker 安全的** —— 两个 worker
@@ -256,6 +258,10 @@ def claim_pending_jobs(db: Session, limit: int) -> List[CrawlJob]:
     **``next_attempt_at`` 是 P2-16 的退避闸门**：正在退避的 job 状态也是
     ``pending``，靠这个时刻把它挡在门外。``NULL`` 视为立刻可领 ——
     迁移前的旧行、以及冷备那台旧代码 crawler 建的行，都是 NULL。
+
+    ``environment_id``（P2-36）在**领取那一刻**打上 —— 那正是「这台机器接下了
+    这条 job」成为事实的时刻。传 ``None``（冷备旧代码、或环境探测失败）就不打，
+    留 NULL 表示「没记」，不编一个默认值盖过去。
     """
     now = _utcnow()
     jobs = list(
@@ -279,6 +285,8 @@ def claim_pending_jobs(db: Session, limit: int) -> List[CrawlJob]:
         job.error_message = None
         job.failure_kind = None
         job.next_attempt_at = None
+        if environment_id is not None:
+            job.environment_id = environment_id
     if jobs:
         db.commit()
         for job in jobs:

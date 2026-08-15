@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -16,10 +16,11 @@ from app.api.deps import (
     visible_task_ids,
 )
 from app.core.security import Principal
-from app.models import Run, Task
+from app.models import CrawlEnvironment, CrawlJob, Run, Task
 from app.schemas.task import (
     RunCreate,
     RunDetailOut,
+    RunEnvironmentOut,
     RunListOut,
     RunOut,
     TaskCreate,
@@ -248,9 +249,50 @@ def get_run(
     return _run_detail(db, run)
 
 
+def _run_environments(db: Session, run_id: int) -> Tuple[List[RunEnvironmentOut], int]:
+    """这次运行的样本各自来自哪种采集环境（P2-36），以及有几条没记录。
+
+    **长度 > 1 就是混了。** 冷备「只接替不并行」是一条纪律，而纪律需要证据 ——
+    在此之前「这次 run 有没有混着两个出口采」事后完全查不出来。
+    """
+    rows = db.execute(
+        select(CrawlEnvironment, func.count(CrawlJob.id))
+        .join(CrawlJob, CrawlJob.environment_id == CrawlEnvironment.id)
+        .where(CrawlJob.run_id == run_id)
+        .group_by(CrawlEnvironment.id)
+        .order_by(func.count(CrawlJob.id).desc())
+    ).all()
+    envs = [
+        RunEnvironmentOut(
+            environment_id=e.id,
+            fingerprint=e.fingerprint,
+            node_label=e.node_label,
+            exit_ip=e.exit_ip,
+            timezone_id=e.timezone_id,
+            crawl_mode=e.crawl_mode,
+            credential_region=e.credential_region,
+            waf_kind=e.waf_kind,
+            n_jobs=n,
+        )
+        for e, n in rows
+    ]
+    unstamped = int(
+        db.scalar(
+            select(func.count(CrawlJob.id)).where(
+                CrawlJob.run_id == run_id, CrawlJob.environment_id.is_(None)
+            )
+        )
+        or 0
+    )
+    return envs, unstamped
+
+
 def _run_detail(db: Session, run: Run) -> RunDetailOut:
+    envs, unstamped = _run_environments(db, run.id)
     return RunDetailOut(
         **_run_out(db, run),
         prompts=list(run.prompts),
         competitors=list(run.competitors),
+        environments=envs,
+        n_jobs_unstamped=unstamped,
     )
