@@ -42,8 +42,13 @@ NODE_LABEL=${GEO_NODE_LABEL:-changsha-home}
 IMAGE=deploy-crawler:latest
 NODE_DATA=/opt/geo-crawl-data
 
-node() { ssh -i "$NODE_KEY" -o BatchMode=yes -o ConnectTimeout=20 "$NODE" "$@"; }
-vps()  { ssh -i "$VPS_KEY"  -o BatchMode=yes -o ConnectTimeout=20 "$VPS"  "$@"; }
+# **ServerAlive 不能省。** 传镜像那条管道要跑好几分钟，中途连接断掉时
+# ssh 不会报错、也不会退出 —— 数据停了、进程还挂着，表现是「传了 35 分钟
+# 还没完」而 podman load 的 CPU 是 0（2026-08-15 实际卡过一次）。
+# 加上保活，断了 60 秒内自己退出并报错。
+SSH_KEEPALIVE="-o ServerAliveInterval=20 -o ServerAliveCountMax=3"
+node() { ssh -i "$NODE_KEY" -o BatchMode=yes -o ConnectTimeout=20 $SSH_KEEPALIVE "$NODE" "$@"; }
+vps()  { ssh -i "$VPS_KEY"  -o BatchMode=yes -o ConnectTimeout=20 $SSH_KEEPALIVE "$VPS"  "$@"; }
 say()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 
 do_image() {
@@ -72,6 +77,7 @@ do_start() {
       -e PLAYWRIGHT_HEADLESS=true \
       -e CRAWL_TIMEOUT_MS=120000 \
       -e DEEPSEEK_STORAGE_STATE=/data/deepseek_storage.json \
+      -e DOUBAO_STORAGE_STATE=/data/doubao_storage.json \
       -e SCREENSHOT_DIR= \
       -e CRAWL_AUTO_RETRY_ENABLED='$AUTO_RETRY' \
       -e CRAWL_TIMEZONE_ID='$TZ_ID' \

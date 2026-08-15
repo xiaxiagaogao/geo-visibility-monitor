@@ -159,6 +159,7 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 |---|---|
 | **冷启动被限流** | 一次 run 开头的头一两条常见 `Page.goto` 120 秒超时，之后就顺。**P2-16 已做**：这类失败分类成 `timeout`，自动退避重排（30s → 60s，最多 3 次）。开关 `CRAWL_AUTO_RETRY_ENABLED`，见 `BACKEND.md` §7.2。手动 `POST /v1/crawl-jobs/{id}/retry` 仍然可用，且会把计数清零 |
 | **家宽 IP 是动态的** | tailscale 自己能重连；但风控与 `storage_state` 会不会受影响，没验过 |
+| **传镜像会卡死（已修）** | `deploy.sh` 的 ssh 原先没有保活。传镜像那条管道跑好几分钟，中途断掉时 ssh **不报错也不退出** —— 数据停了、进程还挂着，表现是「传了 35 分钟还没完」而 `podman load` 的 CPU 是 0。已加 `ServerAliveInterval=20`。**判断卡没卡看 `du -sm /var/lib/containers/storage` 涨不涨**，别看进程在不在 |
 | **节点不是独占的** | 我们这台还跑着别的服务。任何 `pkill` / `pgrep` **都要按精确 PID** —— 模式匹配会误伤 |
 | **`storage_state` 会过期，而且是悄悄的** | 原以为过期表现是「一批 job 全 failed」——**不是**。2026-08-15 的真实形态是**悄悄降级**：还能抓，只是每次 run 头几条卡在 WAF 挑战上超时。**P2-07 已做**：`GET /v1/health/credentials` 直接给出「这份登录态从哪儿签发、最早过期的 cookie 还剩多久」，见 `BACKEND.md` §7.3 |
 
