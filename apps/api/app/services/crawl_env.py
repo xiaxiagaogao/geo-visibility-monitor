@@ -126,17 +126,24 @@ def upsert_environment(db, fields: Dict[str, Any]) -> Optional[int]:
     if not fp:
         return None
     try:
-        from sqlalchemy import select
+        from sqlalchemy import func, select
 
         now = _utcnow()
         row = db.scalars(
             select(CrawlEnvironment).where(CrawlEnvironment.fingerprint == fp)
         ).first()
         if row is None:
-            row = CrawlEnvironment(fingerprint=fp, first_seen_at=now)
             # **新环境要吼一声。** 出口/时区/登录态任何一维变了都会走到这里，
-            # 而那正是「跨 run 对比要小心」的时刻
-            logger.warning("采集环境变了，新指纹: %s", fp)
+            # 而那正是「跨 run 对比要小心」的时刻。
+            #
+            # 但第一行要说「首次记录」而不是「变了」—— 表是空的时候什么都没变，
+            # 说「变了」是句假话，而假日志比没日志更坏：它会让人去找一个不存在的变更
+            is_first = db.scalar(select(func.count(CrawlEnvironment.id))) == 0
+            row = CrawlEnvironment(fingerprint=fp, first_seen_at=now)
+            if is_first:
+                logger.info("首次记录采集环境: %s", fp)
+            else:
+                logger.warning("采集环境变了，新指纹: %s", fp)
         for k in FINGERPRINT_FIELDS:
             setattr(row, k, fields.get(k))
         row.last_seen_at = now

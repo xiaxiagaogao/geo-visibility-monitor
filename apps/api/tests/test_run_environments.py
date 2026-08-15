@@ -118,6 +118,28 @@ def test_changed_environment_gets_a_new_row(db):
     assert a != b
 
 
+def test_first_row_is_logged_as_first_not_as_changed(db, caplog):
+    """表是空的时候什么都没变，说「变了」是句假话 ——
+    而假日志比没日志更坏：它会让人去找一个不存在的变更。"""
+    import logging
+    from sqlalchemy import text
+    from app.services.crawl_env import compute_fingerprint, upsert_environment
+
+    db.execute(text("DELETE FROM crawl_jobs WHERE environment_id IS NOT NULL"))
+    db.execute(text("DELETE FROM crawl_environments"))
+    db.commit()
+
+    with caplog.at_level(logging.INFO, logger="geo.crawl_env"):
+        upsert_environment(db, dict(CN, fingerprint=compute_fingerprint(CN)))
+        first_msgs = [r.message for r in caplog.records]
+        caplog.clear()
+        upsert_environment(db, dict(SG, fingerprint=compute_fingerprint(SG)))
+        second_msgs = [r.message for r in caplog.records]
+
+    assert any("首次记录" in m for m in first_msgs), first_msgs
+    assert any("环境变了" in m for m in second_msgs), second_msgs
+
+
 def test_claim_stamps_the_environment(db, fixtures):
     """领取那一刻才是「这台机器接下了这条 job」成为事实的时刻。"""
     from app.services.crawl_env import compute_fingerprint, upsert_environment
