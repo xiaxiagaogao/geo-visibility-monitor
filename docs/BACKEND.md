@@ -630,6 +630,15 @@ api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用
 > **DeepSeek 刻意还没迁过来。** 它用旧路径跑了一年没出事，
 > 而调试新平台时不能同时改动唯一在工作的平台。等豆包稳定后再单独决定。
 
+**实测确认（2026-08-15）**：加固之后无头发提问**不再被登出**
+（`POST /chat/completion` → 200 `text/event-stream`，会话存活）。
+所以「无头」本身不是问题，指纹才是 —— **不需要上 Xvfb**。
+
+`seed_storage_state()`：`launch_persistent_context` **不接受 `storage_state=`**
+（那是 `new_context` 的参数），所以要手动灌。顺序不能反 ——
+**先 cookies，再导航到该 origin，最后写 localStorage**：
+localStorage 按 origin 隔离，没导航过去就没有可写的存储区。
+
 ---
 
 ## 8. 前后端契约（后端保证）

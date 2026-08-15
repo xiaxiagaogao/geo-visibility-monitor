@@ -160,3 +160,58 @@ def launch_persistent(
         kw.update(context_kwargs(user_agent=ua, locale=locale,
                                  timezone_id=timezone_id, viewport=viewport))
         return playwright.chromium.launch_persistent_context(user_data_dir, **kw)
+
+
+def seed_storage_state(context, state_path: str, *, timeout_ms: int = 60_000) -> bool:
+    """把导出的 ``storage_state`` 灌进一个 **persistent context**。
+
+    ``launch_persistent_context`` **不接受 ``storage_state=``** —— 那是
+    ``new_context`` 的参数。而我们又必须用 persistent context（见模块 docstring：
+    出生环境要等于使用环境），所以只能手动灌。
+
+    顺序不能反：**先 cookies，再导航到该 origin，最后写 localStorage** ——
+    localStorage 是按 origin 隔离的，没导航过去就没有可写的存储区。
+
+    失败只记日志返回 ``False``，不抛 —— 灌不进去的表现是「登录墙」，
+    而那条路径 provider 本来就处理得了，不该在这里炸掉整次抓取。
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    try:
+        state = _json.loads(_Path(state_path).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        logger.warning("读不了 storage_state: %s", state_path, exc_info=True)
+        return False
+
+    cookies = state.get("cookies") or []
+    if cookies:
+        try:
+            context.add_cookies(cookies)
+        except Exception:  # noqa: BLE001
+            logger.warning("add_cookies 失败", exc_info=True)
+            return False
+
+    origins = state.get("origins") or []
+    if not origins:
+        return True
+
+    page = context.pages[0] if context.pages else context.new_page()
+    ok = True
+    for o in origins:
+        origin = o.get("origin")
+        items = o.get("localStorage") or []
+        if not origin or not items:
+            continue
+        try:
+            page.goto(origin, wait_until="domcontentloaded", timeout=timeout_ms)
+            page.evaluate(
+                """(items) => { for (const it of items) {
+                     try { localStorage.setItem(it.name, it.value); } catch (e) {}
+                   } }""",
+                items,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("localStorage 灌入失败 origin=%s", origin, exc_info=True)
+            ok = False
+    return ok
