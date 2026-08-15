@@ -42,10 +42,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "api"))
+from app.providers.browser import (  # noqa: E402
+    context_kwargs,
+    launch_kwargs,
+    resolve_user_agent,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -181,20 +189,20 @@ def main() -> int:
     print("=" * 60)
 
     with sync_playwright() as p:
-        ctx_kwargs = dict(
-            user_data_dir=str(profile_dir),
-            headless=False,
-            viewport={"width": 1280, "height": 900},
-            locale="zh-CN",
-            # 和 providers/deepseek_web.py 保持同一套指纹 —— 登录时是一个时区、
-            # 抓取时是另一个，等于给服务端看两个不同的人
-            timezone_id=args.timezone,
-            args=["--disable-blink-features=AutomationControlled"],
+        # **和 crawler 用同一套指纹**（app/providers/browser.py）——
+        # 登录态在一种浏览器里出生、在另一种里使用，本身就是信号。
+        # 2026-08-15 豆包第一条探针就是这么被登出的。
+        ctx_kwargs = launch_kwargs(headless=False)
+        ctx_kwargs.update(
+            context_kwargs(
+                user_agent=resolve_user_agent(p, headless=False),
+                timezone_id=args.timezone,
+            )
         )
         if args.proxy:
             # SOCKS 代理在 Chromium 上必须在 launch 时给，不能按 context 设
             ctx_kwargs["proxy"] = {"server": args.proxy}
-        context = p.chromium.launch_persistent_context(**ctx_kwargs)
+        context = p.chromium.launch_persistent_context(str(profile_dir), **ctx_kwargs)
         page = context.pages[0] if context.pages else context.new_page()
 
         print("\n=== 登录前先确认出口 ===")
