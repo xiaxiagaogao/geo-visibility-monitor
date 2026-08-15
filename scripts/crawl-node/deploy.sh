@@ -7,12 +7,15 @@
 #
 # **不含任何凭证。** 主机、密钥、数据库串全从环境变量来；缺了就报错退出。
 #
-#   ./deploy.sh all        同步代码 → 传镜像（缺才传）→ 起容器 → 自检
-#   ./deploy.sh sync       只同步代码
-#   ./deploy.sh image      强制重传镜像
-#   ./deploy.sh start      只重起容器
+#   ./deploy.sh all        传镜像 → 起容器 → 自检（部署代码走这个）
+#   ./deploy.sh image      只重传镜像
+#   ./deploy.sh start      只重起容器（**用现有镜像，不更新代码**）
 #   ./deploy.sh verify     只跑自检
 #   ./deploy.sh logs       看日志
+#
+# ⚠️ **crawler 的代码在镜像里，不在节点的文件系统上。** 容器只挂 /data。
+# 所以「更新代码」= 在 VPS 上重新 build（`git push vps main` 就会做）
+# → `./deploy.sh all` 把新镜像传过来。`start` 单用只是换个容器跑同一份旧代码。
 #
 set -euo pipefail
 
@@ -30,30 +33,20 @@ AUTO_RETRY=${GEO_AUTO_RETRY:-false}
 
 IMAGE=deploy-crawler:latest
 NODE_DATA=/opt/geo-crawl-data
-NODE_SRC=/opt/geo-crawl
-REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 
 node() { ssh -i "$NODE_KEY" -o BatchMode=yes -o ConnectTimeout=20 "$NODE" "$@"; }
 vps()  { ssh -i "$VPS_KEY"  -o BatchMode=yes -o ConnectTimeout=20 "$VPS"  "$@"; }
 say()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 
-do_sync() {
-  say "同步代码到 $NODE:$NODE_SRC"
-  # 用 git archive 而不是 rsync/clone：拿到的是**某个提交的干净内容**，
-  # 不带 .git、不带未提交的改动、不需要在节点上配 git 凭证
-  git -C "$REPO_ROOT" archive --format=tar HEAD \
-    | node "mkdir -p $NODE_SRC && tar -x -C $NODE_SRC"
-  echo "  已同步 $(git -C "$REPO_ROOT" rev-parse --short HEAD)"
-}
-
 do_image() {
   say "从 VPS 经 tailnet 传镜像"
   # **不从 mcr 拉。** 家宽拉那个 2GB 基础镜像要 90 分钟（实测 136KB/s 直连 /
   # 386KB/s 走代理），而 VPS 上本来就有构建好的镜像，经 tailnet 传只要一分钟。
+  #
+  # 这一步就是**唯一的代码更新路径** —— 容器只挂 /data，代码全在镜像里。
   vps "docker save $IMAGE | gzip -1" | node "gunzip | podman load"
+  echo "  VPS 侧镜像 build 于 $(vps "docker image inspect $IMAGE --format '{{.Created}}'")"
 }
-
-has_image() { node "podman image exists $IMAGE" 2>/dev/null; }
 
 do_start() {
   say "起容器"
@@ -122,20 +115,28 @@ do_verify() {
     echo "  ✗ 数据库连不上（检查 VPS 上的 tailscale serve）"; ok=0
   fi
 
+  # ⑤ 跑的是哪一份代码 —— **不判定成功失败，只把它摆出来**。
+  #    代码全在镜像里，而「镜像旧了」这件事不会有任何地方报错：容器照常起、
+  #    照常采集，只是跑的是上一版。2026-08-15 就踩过一次
+  #    （以为 `deploy.sh sync` 更新了代码，其实那个目录根本没被挂载）。
+  echo "  · 容器镜像 build 于 $(node "podman inspect geo-crawler --format '{{.ImageName}} {{.Created}}'" 2>/dev/null || echo '取不到')"
+  echo "    对不上就 ./deploy.sh image 重传（VPS 侧的 build 由 git push vps main 触发）"
+
   [ "$ok" = 1 ] && echo "  —— 自检通过" || { echo "  —— 自检失败"; return 1; }
 }
 
 case "${1:-all}" in
-  sync)   do_sync ;;
   image)  do_image ;;
   start)  do_start ;;
   verify) do_verify ;;
   logs)   node "podman logs --tail ${2:-30} geo-crawler" ;;
   all)
-    do_sync
-    if has_image; then echo "  镜像已存在，跳过传输（要强制重传：./deploy.sh image）"; else do_image; fi
+    # **每次都重传镜像。** 原先是「镜像已存在就跳过」，配上那个没人读的 sync，
+    # 结果是改完代码跑 all 什么都没更新 —— 而且不报错。传一次约一分钟，
+    # 拿这一分钟换「all 一定是当前代码」，值得
+    do_image
     do_start
     do_verify
     ;;
-  *) sed -n '2,20p' "$0"; exit 2 ;;
+  *) sed -n '2,22p' "$0"; exit 2 ;;
 esac

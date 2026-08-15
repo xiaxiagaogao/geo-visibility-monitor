@@ -61,9 +61,24 @@ GEO_AUTO_RETRY=true ./deploy.sh start     # 回滚 = 去掉这个变量重跑 st
 **要 90 分钟**。而 VPS 上本来就有构建好的镜像，`docker save` 经 tailnet 传
 **只要 66 秒**（21MB/s）。
 
-所以节点上**不 build**，只 `podman load`。代码更新走 `deploy.sh sync`
-（`git archive` 推当前 HEAD 的干净内容）；只有 Dockerfile 变了才需要在 VPS 上
-重新 build 再 `deploy.sh image` 重传。
+所以节点上**不 build**，只 `podman load`。
+
+### ⚠️ 代码在镜像里，不在节点的文件系统上
+
+容器**只挂 `/data`**，没有任何源码目录被挂进去。所以：
+
+```text
+改了代码 → git push vps main（VPS 上 build 出新 deploy-crawler:latest）
+         → ./deploy.sh all（把新镜像传过来 + 重建容器）
+```
+
+`./deploy.sh start` 单用只是换个容器跑**同一份旧代码**。
+
+> 这里原先写着「代码更新走 `deploy.sh sync`」，**是错的** ——
+> 那个子命令把源码推到 `/opt/geo-crawl`，而那个目录根本没被挂载，谁也不读它。
+> 更糟的是 `all` 当时还有一条「镜像已存在就跳过传输」，于是**改完代码跑 `all`
+> 什么都不会更新，而且不报错**。2026-08-15 差点因此把「分类不生效」错判成代码 bug。
+> `sync` 已删除，`all` 改成每次都重传（约一分钟）。
 
 ### 3. postgres 不改绑定
 

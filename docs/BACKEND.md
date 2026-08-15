@@ -598,7 +598,7 @@ run 215 vs run 27/54），而 VPS 在新加坡、服务对象是大陆用户、�
 
 | | |
 |---|---|
-| 部署 / 自检 | `scripts/crawl-node/deploy.sh`（不含凭证，全走环境变量） |
+| 部署 / 自检 | `scripts/crawl-node/deploy.sh`（不含凭证，全走环境变量）。**crawler 的代码在镜像里，容器只挂 `/data`** —— 更新代码 = `git push vps main`（VPS 上 build）→ `./deploy.sh all`（重传镜像） |
 | 约束与切换 | `scripts/crawl-node/README.md` —— **改任何东西之前先读它** |
 | 链路 | 采集节点 ──tailnet──▶ `100.64.240.17:5433` |
 
