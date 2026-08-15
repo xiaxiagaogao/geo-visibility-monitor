@@ -250,7 +250,7 @@ Playwright 就取了容器的系统时区。于是服务端看到的是
    登录态的签发地、以及服务端按签发地下发的功能开关与模型通道。
    **只验 IP 就宣布迁移完成是不够的** —— `deploy.sh verify` 当时四项全过。
 2. **重建登录态必须从目标出口做。** 办法见
-   `scripts/export_deepseek_storage.py`：开一条到采集节点的 SOCKS 隧道
+   `scripts/export_storage_state.py`：开一条到采集节点的 SOCKS 隧道
    （`ssh -o ExitOnForwardFailure=yes -D 18080 -N -f`），
    `--proxy socks5://127.0.0.1:18080`。脚本会在登录**之前**打印出口 IP。
 3. **品牌构成 1.64 → 1.19 但没回到 0.96，且样本数不同，不足以下结论。**

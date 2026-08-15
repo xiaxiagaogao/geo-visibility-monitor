@@ -95,7 +95,7 @@ RawResponse ──< Citation
 | crawl_credentials | 采集 | 登录态健康度快照（P2-07），每平台一行。见 §7.3 |
 | raw_responses | L0+L1 | `full_text` 必须是**原文**；`answer_status`；`annotator_version` |
 | mentions | L1 | 见下方字段说明 |
-| citations | L0 | **当前全库 0 行**，根因见 §7.2 |
+| citations | L0 | **当前全库 0 行**，根因见 §7.0 |
 | tasks | 配置 | 命名的监测定义：一个主品牌 + 平台 + 采样数，可反复执行 |
 | runs | 采集 | 一次执行。**刻意没有 `status` 列** —— 由其下 job 的状态派生（`services/tasks.py:derive_run_status`）。存一份就要有人同步，而 job 状态在 worker 里变、run 在 API 里变，漂移是迟早的事，而漂移了的状态列比没有更糟：它看起来权威 |
 | run_prompts / run_competitors | 采集 | **口径快照**，见下方 §3.4 |
@@ -514,35 +514,6 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 > **存量污染不可回填。** 早期样本的 L0 被旧清洗规则改写过、且丢了首块，
 > 重跑 L1 也补不回来 —— 要干净数据只能重抓。安踏那 35 条是修复后抓的，是干净的。
 
-### 7.3 登录态健康度（P2-07，2026-08-15 起）
-
-| 组件 | 位置 |
-|---|---|
-| 判级规则 | `app/services/credential_health.py`（纯函数） |
-| 落库 | 同文件 `report_credentials()`，**由 crawler 调用**，写 `crawl_credentials`（迁移 008） |
-| 出口 | `GET /v1/health/credentials`（仅超管/运营），见 `API.md` |
-
-**为什么要经数据库中转**：`storage_state` 在采集节点上，而 api 跑在 VPS ——
-api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用动。
-
-四条：
-
-1. **看的是「从哪儿签发的」，不是「多久没成功」。** WAF cookie 的名字直接暴露
-   签发地（`HWWAFSES*` = 华为云 = 境内，`aws-waf-token` = AWS = 境外）。
-   2026-08-15 那次故障里「上次成功抓取」一直是几分钟前 —— **它只能发现
-   「全红」，发现不了「悄悄降级」**。
-2. **绝不读取、绝不落库 cookie 的值。** 只存名字、域、过期时间。值是凭证本身，
-   落进库或日志就等于把登录态复制到一个没人当它是凭证的地方。有用例钉着。
-3. **认不出签发地就不报不匹配。** 接新平台时 `issuer_region` 一开始必然是
-   `unknown`，报红会让这个端点第一天就没人看。
-4. **一条都没上报 ≠ 健康** —— `overall` 返回 `unreported`。
-
-`CRAWL_TIMEZONE_ID` · `CRAWL_EXPECTED_CREDENTIAL_REGION` · 容器跑在哪台机器上
-**是同一件事的三个面**，切冷备时要一起改（`scripts/crawl-node/deploy.sh` 里
-`GEO_TZ` / `GEO_EXPECT_REGION` 两个环境变量）。
-
----
-
 ### 7.2 失败分类与自动退避重试（2026-08-14 起）
 
 采集出口迁到大陆家宽之后，**每次 run 开头一两条会被限流**
@@ -573,6 +544,35 @@ api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用
 
 分类不认识的失败会打 `kind=unknown` 的 WARNING 日志，
 `grep kind=unknown` 就能捞出「下一个该提上来的模式」。
+
+---
+
+### 7.3 登录态健康度（P2-07，2026-08-15 起）
+
+| 组件 | 位置 |
+|---|---|
+| 判级规则 | `app/services/credential_health.py`（纯函数） |
+| 落库 | 同文件 `report_credentials()`，**由 crawler 调用**，写 `crawl_credentials`（迁移 008） |
+| 出口 | `GET /v1/health/credentials`（仅超管/运营），见 `API.md` |
+
+**为什么要经数据库中转**：`storage_state` 在采集节点上，而 api 跑在 VPS ——
+api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用动。
+
+四条：
+
+1. **看的是「从哪儿签发的」，不是「多久没成功」。** WAF cookie 的名字直接暴露
+   签发地（`HWWAFSES*` = 华为云 = 境内，`aws-waf-token` = AWS = 境外）。
+   2026-08-15 那次故障里「上次成功抓取」一直是几分钟前 —— **它只能发现
+   「全红」，发现不了「悄悄降级」**。
+2. **绝不读取、绝不落库 cookie 的值。** 只存名字、域、过期时间。值是凭证本身，
+   落进库或日志就等于把登录态复制到一个没人当它是凭证的地方。有用例钉着。
+3. **认不出签发地就不报不匹配。** 接新平台时 `issuer_region` 一开始必然是
+   `unknown`，报红会让这个端点第一天就没人看。
+4. **一条都没上报 ≠ 健康** —— `overall` 返回 `unreported`。
+
+`CRAWL_TIMEZONE_ID` · `CRAWL_EXPECTED_CREDENTIAL_REGION` · 容器跑在哪台机器上
+**是同一件事的三个面**，切冷备时要一起改（`scripts/crawl-node/deploy.sh` 里
+`GEO_TZ` / `GEO_EXPECT_REGION` 两个环境变量）。
 
 ---
 

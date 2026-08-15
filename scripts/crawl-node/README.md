@@ -184,12 +184,14 @@ ssh root@100.64.240.17 'docker stop geo-crawler'
 ssh -i "$GEO_NODE_KEY" -o ExitOnForwardFailure=yes -D 18080 -N -f "$GEO_NODE"
 
 # 2. 导出（脚本会在登录**之前**打印出口 IP，不是 CN 会大声警告）
-apps/api/.venv/bin/python scripts/export_deepseek_storage.py \
-    --proxy socks5://127.0.0.1:18080
+#    换平台只改 --platform，见脚本里的 PLATFORMS 表
+PLATFORM=deepseek       # 或 doubao
+apps/api/.venv/bin/python scripts/export_storage_state.py \
+    --platform "$PLATFORM" --proxy socks5://127.0.0.1:18080
 
 # 3. 送到节点：管道直传，中间不落盘。传完对字节数
-cat deploy/deepseek_storage.json | ssh -i "$GEO_NODE_KEY" "$GEO_NODE" \
-    'cat > /opt/geo-crawl-data/deepseek_storage.json && chmod 600 $_ && wc -c < $_'
+cat "deploy/${PLATFORM}_storage.json" | ssh -i "$GEO_NODE_KEY" "$GEO_NODE" \
+    "cat > /opt/geo-crawl-data/${PLATFORM}_storage.json && chmod 600 \$_ && wc -c < \$_"
 
 # 4. 收尾：按精确 PID 关隧道，**别用 pkill -f**（节点上还跑着别的生产服务）
 lsof -nP -iTCP:18080 | grep LISTEN     # 拿到 PID
@@ -199,4 +201,8 @@ kill <那个PID>
 换完之后 `GET /v1/health/credentials` 应该是 `ok` 且 `issuer_region: "cn"`；
 还是 `mismatch` 就说明登录时走的不是节点的出口。
 
-**它是凭证，不进 Git**（`.gitignore` 已挡，`BACKEND.md` 的既有规矩）。
+换完之后那个平台在 `GET /v1/health/credentials` 里应该出现一行。
+
+**它是凭证，不进 Git。** `.gitignore` 按 `**/*_storage.json` 通配 ——
+**不要再逐个平台加行**：2026-08-15 接豆包时发现原先只挡了 `deepseek_storage.json`，
+而「忘了加一行」的代价是把登录态提交进 Git。

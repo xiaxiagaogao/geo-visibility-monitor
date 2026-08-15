@@ -56,6 +56,12 @@ deploy/deepseek_storage.json
 deploy/deepseek_live_answer.json
 
 **/deepseek_storage.json
+# **按平台通配，不要再逐个平台加行。** 2026-08-15 接豆包时发现
+# 原先只挡了 deepseek_storage.json —— 多一个平台就多一份不受保护的凭证，
+# 而「忘了加一行」的代价是把登录态提交进 Git
+**/*_storage.json
+**/*_storage_state.json
 
 data/deepseek_profile/
+data/*_profile/
 data/*.png

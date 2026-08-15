@@ -6,7 +6,7 @@ HOST="${GEO_VPS_HOST:-root@96.9.213.230}"
 STATE="${1:-$ROOT/deploy/deepseek_storage.json}"
 
 if [[ ! -f "$STATE" ]]; then
-  echo "找不到 $STATE ，请先运行: python scripts/export_deepseek_storage.py"
+  echo "找不到 $STATE ，请先运行: python scripts/export_storage_state.py"
   exit 1
 fi
 if [[ ! -f "$PEM" ]]; then

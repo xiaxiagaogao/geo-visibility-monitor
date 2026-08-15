@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Export DeepSeek storage_state with an isolated Chromium profile.
+"""导出某个平台的 storage_state（独立 Chromium profile，不碰日常 Chrome）。
 
 Does NOT touch your daily Chrome profile or Chrome Safe Storage keychain.
 
 Usage:
-  apps/api/.venv/bin/python scripts/export_deepseek_storage.py
-  apps/api/.venv/bin/python scripts/export_deepseek_storage.py --auto   # detect login then save
+  apps/api/.venv/bin/python scripts/export_storage_state.py                      # 默认 deepseek
+  apps/api/.venv/bin/python scripts/export_storage_state.py --platform doubao
+  apps/api/.venv/bin/python scripts/export_storage_state.py --auto             # 检测到登录就保存
 
 **登录态是带地理位置的。** 会话建立时的出口 IP 决定了服务端下发给它的功能开关、
 模型通道与 WAF 令牌（这些都会进 storage_state 的 localStorage / cookies）。
@@ -14,7 +15,7 @@ Usage:
 所以要让登录流量从**采集节点**出去。先开一条到节点的 SOCKS 隧道：
 
   ssh -i <node.pem> -o ExitOnForwardFailure=yes -D 18080 -N -f root@<节点>
-  apps/api/.venv/bin/python scripts/export_deepseek_storage.py --proxy socks5://127.0.0.1:18080
+  apps/api/.venv/bin/python scripts/export_storage_state.py --proxy socks5://127.0.0.1:18080
 
 ``ExitOnForwardFailure=yes`` **不能省**：`-f -N` 在端口已被占用时照样会 fork
 到后台挂着，只是没有转发 —— 反复重试就会在节点上攒出一串没用的 SSH 会话
@@ -39,12 +40,29 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILE_DIR = ROOT / "data" / "deepseek_profile"
-OUT_PATH = ROOT / "deploy" / "deepseek_storage.json"
-URL = "https://chat.deepseek.com/"
+
+#: 每个平台一条。**加平台只改这里** —— 与 `providers/registry.py` 同一条纪律。
+#:
+#: `detect` 为 None 表示没有自动登录检测：`--auto` 不可用，只能手动按 Enter。
+#: 刻意不为新平台瞎写一个检测器 —— 检测错了会在你还没登完时就导出一份空会话，
+#: 而那份会话拿去采集的表现是「一批 job 全 failed」，排查方向完全跑偏。
+PLATFORMS = {
+    "deepseek": {
+        "url": "https://chat.deepseek.com/",
+        "profile": "deepseek_profile",
+        "out": "deepseek_storage.json",
+        "detect": "deepseek",
+    },
+    "doubao": {
+        "url": "https://www.doubao.com/chat/",
+        "profile": "doubao_profile",
+        "out": "doubao_storage.json",
+        "detect": None,     # 未实测，见 PHASE2 P2-06a 第 0 步
+    },
+}
 
 
-def looks_logged_in(page) -> bool:
+def looks_logged_in_deepseek(page) -> bool:
     try:
         # input box present
         if page.locator("textarea").count() == 0:
@@ -98,8 +116,18 @@ def check_exit_ip(page) -> None:
         print()
 
 
+#: 检测器注册。加平台若写了检测器，往这里加一行。
+DETECTORS = {"deepseek": looks_logged_in_deepseek}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--platform",
+        default="deepseek",
+        choices=sorted(PLATFORMS),
+        help="要导出哪个平台的登录态（默认 deepseek）",
+    )
     parser.add_argument("--auto", action="store_true", help="auto-save when login detected (max wait)")
     parser.add_argument("--wait-sec", type=int, default=300, help="max seconds for --auto")
     parser.add_argument(
@@ -114,13 +142,26 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    cfg = PLATFORMS[args.platform]
+    profile_dir = ROOT / "data" / cfg["profile"]
+    out_path = ROOT / "deploy" / cfg["out"]
+    url = cfg["url"]
+    detect = DETECTORS.get(cfg["detect"]) if cfg["detect"] else None
+
+    if args.auto and detect is None:
+        print(f"⚠ {args.platform} 还没有登录检测器，--auto 不可用 —— 改为手动按 Enter。")
+        print("  （不为新平台瞎写检测器是有意的：检测错了会导出一份空会话，")
+        print("    而空会话拿去采集的表现是「一批 job 全 failed」，排查方向完全跑偏）")
+        args.auto = False
+
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     print("=" * 60)
     print("DeepSeek storage_state 导出（独立浏览器，不碰主 Chrome）")
-    print("Profile:", PROFILE_DIR)
-    print("输出:  ", OUT_PATH)
+    print("平台:  ", args.platform)
+    print("Profile:", profile_dir)
+    print("输出:  ", out_path)
     print("=" * 60)
     print("请在弹出的 Chromium 窗口登录 DeepSeek（不要用日常 Chrome）。")
     print("代理:  ", args.proxy or "（无 —— 走本机默认网络出口）")
@@ -133,7 +174,7 @@ def main() -> int:
 
     with sync_playwright() as p:
         ctx_kwargs = dict(
-            user_data_dir=str(PROFILE_DIR),
+            user_data_dir=str(profile_dir),
             headless=False,
             viewport={"width": 1280, "height": 900},
             locale="zh-CN",
@@ -151,13 +192,13 @@ def main() -> int:
         print("\n=== 登录前先确认出口 ===")
         check_exit_ip(page)
 
-        page.goto(URL, wait_until="domcontentloaded", timeout=120000)
+        page.goto(url, wait_until="domcontentloaded", timeout=120000)
         print("浏览器已打开。\n")
 
         if args.auto:
             deadline = time.time() + args.wait_sec
             while time.time() < deadline:
-                if looks_logged_in(page):
+                if detect and detect(page):
                     print("检测到疑似已登录 UI，导出中…")
                     break
                 time.sleep(2)
@@ -170,22 +211,22 @@ def main() -> int:
                 print("非交互：切换为自动等待 180s…")
                 deadline = time.time() + 180
                 while time.time() < deadline:
-                    if looks_logged_in(page):
+                    if detect and detect(page):
                         break
                     time.sleep(2)
 
-        context.storage_state(path=str(OUT_PATH))
-        context.storage_state(path=str(PROFILE_DIR / "storage_state.json"))
+        context.storage_state(path=str(out_path))
+        context.storage_state(path=str(profile_dir / "storage_state.json"))
         context.close()
 
-    data = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+    data = json.loads(out_path.read_text(encoding="utf-8"))
     cookies = data.get("cookies") or []
     domains = sorted({c.get("domain", "") for c in cookies})
     print("\n导出完成")
     print("  cookies:", len(cookies))
     print("  domains:", domains)
-    print("  file:", OUT_PATH)
-    print("\n下一步: ./scripts/deploy_deepseek_storage_to_vps.sh")
+    print("  file:", out_path)
+    print("\n下一步：把它管道送到采集节点，见 scripts/crawl-node/README.md")
     return 0
 
 
