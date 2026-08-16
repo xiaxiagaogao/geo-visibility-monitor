@@ -33,11 +33,14 @@ def test_known_but_not_implemented_is_a_real_state():
 
 
 def test_real_mode_blocks_unimplemented_platform():
-    """real 模式下没实现的平台不可跑 —— 这正是 create_jobs 要挡掉的那一刀。"""
-    assert registry.is_runnable("deepseek", crawl_mode="real")
-    assert registry.is_runnable("doubao", crawl_mode="real")
+    """real 模式下没实现的平台不可跑 —— 这正是 create_jobs 要挡掉的那一刀。
+
+    tongyi 已于 2026-08-16 接入（P2-06b），所以这条断言挪给 kimi 顶着。
+    **接平台时这个测试挂掉是对的**：它就是用来提醒「注册表变了」的。
+    """
+    for done in ("deepseek", "doubao", "tongyi"):
+        assert registry.is_runnable(done, crawl_mode="real"), done
     assert not registry.is_runnable("kimi", crawl_mode="real")
-    assert not registry.is_runnable("tongyi", crawl_mode="real")
 
 
 def test_fake_mode_allows_every_known_platform():

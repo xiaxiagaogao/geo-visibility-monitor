@@ -42,7 +42,8 @@ def test_known_and_runnable_platform_passes():
 
 @pytest.fixture
 def real_crawl_mode(monkeypatch):
-    """kimi/tongyi 是「已知但没有 real Provider」的平台（豆包已于 2026-08-15 接入）——
+    """**kimi 是目前唯一「已知但没有 real Provider」的平台** ——
+    豆包 2026-08-15 接入（P2-06a）、通义千问 2026-08-16 接入（P2-06b）。
     只有切到 real 模式才能触发「不可跑」这一档，fake 模式下全部放行。
     """
     monkeypatch.setenv("CRAWL_MODE", "real")

@@ -32,6 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from app.providers.base import BaseProvider
 from app.providers.deepseek_web import DeepSeekWebProvider
 from app.providers.doubao_web import DoubaoWebProvider
+from app.providers.qianwen_web import QianwenWebProvider
 
 
 @dataclass(frozen=True)
@@ -72,10 +73,26 @@ def _build_doubao(ctx: ProviderContext) -> BaseProvider:
     )
 
 
+def _build_tongyi(ctx: ProviderContext) -> BaseProvider:
+    s = ctx.settings
+    return QianwenWebProvider(
+        headless=s.playwright_headless,
+        timeout_ms=s.crawl_timeout_ms,
+        storage_state=s.tongyi_storage_state or None,
+        # **持久 profile 从第一天就接上** —— 豆包漏了这一项，
+        # 结果每条 job 一个临时 profile（PHASE2 现象 C）
+        user_data_dir=s.tongyi_user_data_dir or None,
+        screenshot_dir=s.screenshot_dir or None,
+        delete_session_after=s.tongyi_delete_session,
+        timezone_id=s.crawl_timezone_id,
+    )
+
+
 #: 有 real Provider 的平台。**没进这个表 = 没实现**，不需要另外维护一份布尔值。
 _REAL_BUILDERS: Dict[str, ProviderBuilder] = {
     "deepseek": _build_deepseek,
     "doubao": _build_doubao,
+    "tongyi": _build_tongyi,
 }
 
 
@@ -92,7 +109,9 @@ PLATFORMS: Tuple[Platform, ...] = (
     Platform("deepseek", "DeepSeek"),
     Platform("doubao", "豆包"),
     Platform("kimi", "Kimi", note="Provider 未实现"),
-    Platform("tongyi", "通义千问", note="Provider 未实现"),
+    # 站点已改名叫「千问」（qianwen.com），但平台代码保持 tongyi ——
+    # 它在 ALLOWED_PLATFORMS 与历史数据里，改代码等于一次数据迁移
+    Platform("tongyi", "通义千问"),
 )
 
 _BY_CODE: Dict[str, Platform] = {p.code: p for p in PLATFORMS}
