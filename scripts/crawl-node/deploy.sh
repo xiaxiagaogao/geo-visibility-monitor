@@ -144,6 +144,12 @@ do_start() {
   #    现在 FAKE_WORKER_BATCH_SIZE=1 串行，成立；P2-34 worker 化时要重新考虑。
   # 回滚：删掉这一行重跑 start，就回到每条 job 全新临时 profile。
   #
+  # TONGYI_*（P2-06b）—— **千问从第一天就带持久 profile**，理由同上。
+  # ⚠️ `tongyi_storage.json` 比另外两份敏感：用支付宝登录的话，cookies 里
+  # 带着 `auth.alipay.com` / `securitycore.alipay.com` 的会话 ——
+  # 泄露的后果不是「别人能用我们的千问账号」，是一个支付宝会话。
+  # 送过来那条管道有 chmod 600，导出脚本也已补上（2026-08-16 之前是 644）。
+  #
   # **DeepSeek 刻意不跟**（BACKEND §7.5）：它用旧路径跑了一年没出事，
   # 而调试新平台时不能同时改动唯一在工作的平台。
   node "podman run -d --name geo-crawler \
@@ -155,6 +161,8 @@ do_start() {
       -e DEEPSEEK_STORAGE_STATE=/data/deepseek_storage.json \
       -e DOUBAO_STORAGE_STATE=/data/doubao_storage.json \
       -e DOUBAO_USER_DATA_DIR=/data/doubao_profile \
+      -e TONGYI_STORAGE_STATE=/data/tongyi_storage.json \
+      -e TONGYI_USER_DATA_DIR=/data/tongyi_profile \
       -e SCREENSHOT_DIR= \
       -e CRAWL_AUTO_RETRY_ENABLED='$AUTO_RETRY' \
       -e CRAWL_TIMEZONE_ID='$TZ_ID' \
