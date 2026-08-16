@@ -88,6 +88,15 @@ class Settings(BaseSettings):
     # 抓完即删该会话。默认开：不删则侧栏无限堆积，DOM 抓取迟早又抓到侧栏
     # （docs/18 的事故，库里已有两条 answer_status=error 的样本）
     deepseek_delete_session: bool = True
+    # 通义千问（P2-06b）。**平台代码是 tongyi、站点是 qianwen.com** ——
+    # 阿里把产品改名叫「千问」，但代码已在 ALLOWED_PLATFORMS 与历史数据里，
+    # 改它等于一次数据迁移，收益只是名字好看。这个不一致是有意保留的。
+    tongyi_storage_state: str = ""
+    # **持久 profile 从第一天就有，不重蹈豆包的覆辙**：豆包是先用临时 profile
+    # 上线、抓了两轮才发现「老会话 + 空白设备」这个自相矛盾的组合可能正是
+    # 被封的诱因（PHASE2 现象 C）。空值仍会回落到临时目录，但 deploy.sh 会设它
+    tongyi_user_data_dir: str = ""
+    tongyi_delete_session: bool = True
     screenshot_dir: str = "/data/screenshots"
 
 

@@ -191,6 +191,10 @@ _STORAGE_SETTING = {
     # **刻意不报 mismatch**（宁可不报，也不给一个不确定的结论）。
     # 这正是那条设计在接第二个平台时兑现的地方
     "doubao": "doubao_storage_state",
+    # 千问走阿里体系，用的是 `sufei_data` 那套设备 ID，同样没有我们认得的
+    # WAF cookie —— 所以 issuer_region 大概率也是 unknown。不必为此特殊处理：
+    # `derive_status` 对 unknown 不报 mismatch，这条设计接第二个平台时已兑现
+    "tongyi": "tongyi_storage_state",
 }
 
 

@@ -75,6 +75,16 @@ PLATFORMS = {
         "out": "doubao_storage.json",
         "detect": None,     # 未实测，见 PHASE2 P2-06a 第 0 步
     },
+    # 通义千问。**入口用 qianwen.com 而不是 tongyi.com** —— 后者只是 302
+    # 跳转过来（实测 `?ch=tongyi_redirect`），直接用落地页少一跳。
+    # 平台代码仍是 `tongyi`：它已经在 ALLOWED_PLATFORMS 与历史数据里，
+    # 改代码等于一次数据迁移，而收益只是名字好看。
+    "tongyi": {
+        "url": "https://www.qianwen.com/",
+        "profile": "tongyi_profile",
+        "out": "tongyi_storage.json",
+        "detect": None,     # 同豆包：不为新平台瞎写检测器，理由见上
+    },
 }
 
 
@@ -174,12 +184,14 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     print("=" * 60)
-    print("DeepSeek storage_state 导出（独立浏览器，不碰主 Chrome）")
+    print("storage_state 导出（独立浏览器，不碰主 Chrome）")
     print("平台:  ", args.platform)
     print("Profile:", profile_dir)
     print("输出:  ", out_path)
     print("=" * 60)
-    print("请在弹出的 Chromium 窗口登录 DeepSeek（不要用日常 Chrome）。")
+    # **平台名不能写死。** 原先这两行硬编码 "DeepSeek"，导出豆包/千问时
+    # 会明明白白让你去登录另一个平台 —— 提示文案说假话比没有提示更糟
+    print(f"请在弹出的 Chromium 窗口登录 {args.platform}（不要用日常 Chrome）。")
     print("代理:  ", args.proxy or "（无 —— 走本机默认网络出口）")
     print("时区:  ", args.timezone)
     if args.auto:
