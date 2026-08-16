@@ -124,7 +124,7 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-08** | 失败原因分类 | ✅ **后端已落**（`services/failure_kinds.py`），前端展示留给 P2-09 |
 | **P2-07** | **登录态健康度** | ✅ `services/credential_health.py` + `GET /v1/health/credentials`。**看的是「从哪儿签发的」**，不是「多久没成功」 |
 | **P2-36** | 记录采集节点 → **采集环境** | ✅ `services/crawl_env.py` + `crawl_environments` 表 + `GET /v1/runs/{id}` 的 `environments[]`。**长度 > 1 就是混了两个出口** |
-| **P2-06a** | 接豆包 | 🟡 **代码 + 部署已完成，等第一次真抓**。落在 `providers/doubao_web.py` · `providers/browser.py`（指纹加固）· 采集节点镜像已更新。见下「部署已完成」 |
+| **P2-06a** | 接豆包 | 🟡 **provider 已被真抓证明成立**（run 294，6 条 1000+ 字的好答案），但真抓挖出 bug A（已修）· bug B（未修）· 现象 C（未定性）。落在 `providers/doubao_web.py` · `providers/browser.py`（指纹加固）。**要一次干净的 run 才能标 ✅**，见下「第一次真抓」 |
 | **P2-37** | **联网搜索 + 新基线** | ⬜ **P2-06a 之后**。方向已拍板（客户要求），见 §4.0.1。**四层后果，不是打个开关** |
 | **P2-34** | crawler 改 HTTP worker（**正式**） | P2-06a |
 | **P2-09** | 前端多平台改造 | P2-05 · P2-06a |
@@ -205,17 +205,54 @@ doubao    ok  unknown  none      ← unknown 是预期，不是故障
 对 `unknown` **刻意不报 mismatch**（`BACKEND.md` §7.3 第 3 条）——
 这条设计正是为接第二个平台写的，现在它第一次真的被用上了。
 
-**为什么不标 ✅：这一切只证明「装上了」，没证明「抓得到」。**
-豆包的真实风险在反自动化（见上），而那只有真抓一次才知道。第一次真抓要盯三处：
-
-| 看什么 | 在哪 | 说明什么 |
-|---|---|---|
-| `failure_kind` 是不是 `login_required` | `GET /v1/runs/{id}` 的 job | 是 → 登录态又废了，要重新导出 |
-| `raw_json.session_deleted` 是不是 `true` | 响应记录 | 验证自动删会话那段（DeepSeek 为这事花过 3 条 commit） |
-| `environments[]` 长度 | `GET /v1/runs/{id}` | 长度 > 1 就是混了两个出口（P2-36） |
-
 ⚠️ **实测任务必须只勾豆包一个平台。** 前端 `fetchRunCounts` 不带 `platform`
 参数，勾两个平台会让 KPI 与命中矩阵**静默混算** —— 平台筛选器要等 P2-09。
+（**后端不缺这个能力**：`/v1/counts` 早就有 `platform` 参数，
+`api/counts.py:25`，`group_by` 也已支持 `platform`。P2-09 是纯前端工作。）
+
+#### 第一次真抓：run 294（2026-08-16）—— provider 成立，但挖出两个 bug
+
+**结论先写：豆包 provider 是能用的。** 6 条 `ok`，1000–1700 字，
+内容质量高（安踏 / 李宁 / 特步 / 361° / 乔丹，带价位与适用人群）。
+**选择器、指纹加固、SSE 拦截都被证明是对的** —— 这一点不用再怀疑。
+
+预定要盯的三处，结果：
+
+| 看什么 | 结果 |
+|---|---|
+| `failure_kind` 是不是 `login_required` | **不是，一条失败都没有** —— 而这本身就是 bug A |
+| `raw_json.session_deleted` | **全是 `false`** —— 见 bug B |
+| `environments[]` | ✅ 19/20 打上同一环境 `changsha-home\|120.228.64.174\|Asia/Shanghai\|real\|cn\|huawei`，单一出口。未打标的 1 条是从没被领取的 pending。**P2-36 工作正常** |
+
+**bug A（已修，commit `b6c4b56`）· 超时被伪装成成功。**
+`_wait_for_answer` 超时后 `return prev`，而豆包不答时 `.md-box-root`
+匹配到的是**用户自己那条提问气泡** —— 于是 11/17 条以「成功，答案 = 提问原文」
+入库（`full_text` 11–16 字符，latency 全是 126 秒）。
+靠 L1 的 `too_short` 才被发现，**但那是运气**：提问词长过阈值就会当成真答案。
+已改成抛 `DoubaoAnswerTimeout(TimeoutError)` → `failure_kinds` 按类型归 `timeout`
+→ P2-16 退避重排。
+
+**bug B（未修）· 会话删除从来没成功过。**
+`page.url` 一直停在 `https://www.doubao.com/chat/local_XXXX`，`local_` 是客户端
+占位符，所以 `_delete_current_session` 每次都走「拿不到会话 id」分支返回 False。
+**账号里每抓一条就堆一个对话，一条没删。** 这可能正是现象 C 的原因之一 ——
+所以先别急着单独修它，等 C 定性。
+
+**现象 C（未定性）· 豆包在第 3 个提问词、第 6 条之后就不答了。**
+前 6 条 35–47 秒正常，之后 10 条全部打满 120 秒。是限流还是反自动化，
+**现有数据分不出来**。修完 A 之后重跑一次它就会自己显形：
+退避后恢复 = 限流，连续失败到上限 = 反自动化。
+**这就是为什么 A 必须先修** —— 失败全被伪装成成功时，重试机制根本不触发，
+也就拿不到「退避之后还会不会失败」这个唯一能区分二者的信号。
+
+**一处被证伪的判断（还没改代码）**：`_answer_text` 的 docstring 写着
+「`.md-box-root` 只包答案」—— run 294 证明它**连用户提问气泡一起匹配**，
+否则不答时 `count()` 应该是 0、`prev` 应该是空字符串、`search()` 会
+`raise RuntimeError("empty answer")` 归成 `parse_error`。
+修它要换选择器，而本仓的规矩是**选择器必须在节点上实测、不照抄** ——
+手上没有那次的 DOM，猜一个反而更危险。下次真抓时连 DOM 一起取。
+
+⚠️ **run 294 不能当基线用**（11/17 是垃圾）。
 
 ⚠️ **豆包登录态的 `earliest_expiry` 是 `2026-08-16T14:53:11Z`**（签发后约一天）。
 28 个 cookie 里既有 `sessionid` / `sid_guard` / `ttwid` 这类会话核心，
