@@ -176,6 +176,16 @@ class DoubaoLoginRequired(RuntimeError):
     `services/failure_kinds.py` 靠它归成 `login_required`（不自动重试）。"""
 
 
+class DoubaoAnswerTimeout(TimeoutError):
+    """等答案等到超时。
+
+    **继承 `TimeoutError` 是为了走类型判定**：`failure_kinds.classify_failure`
+    第 3 步就是 `isinstance(exc, TimeoutError)` → `timeout` → P2-16 退避重试。
+    不靠消息里带没带「超时」两个字 —— 那个模块自己写着「类型优先，
+    字符串匹配是脆的」。
+    """
+
+
 # ---------------------------------------------------------------- helpers
 
 
@@ -237,7 +247,24 @@ def _wait_for_answer(page, *, timeout_ms: int, poll_ms: int = 1500) -> str:
         if stable >= 3 and len(cur) > 100:
             logger.info("按长度稳定判定写完（%s 属性没出现）", STREAMING_ATTR)
             return cur
-    return prev
+
+    # **超时必须抛，绝不能 `return prev`。**
+    #
+    # 原先是 `return prev`，而 `prev` 是最后一次 `_answer_text` 的结果 ——
+    # 豆包不答时 `.md-box-root` 匹配到的是**用户自己那条提问气泡**，
+    # 于是超时被静默转成「成功，答案 = 提问原文」：`search()` 只判非空
+    # （`if not text.strip()`），非空就照写 `success`。
+    #
+    # 2026-08-16 的 run 294 里 11/17 条就是这么进库的：`full_text` 是提问本身，
+    # latency 全是 126 秒（120 秒超时打满）。这次靠 L1 的 `answer_status=too_short`
+    # 才被发现，**但那是运气** —— 提问词长过阈值就会当成真答案入库，
+    # 而且没有任何地方会报错。这正是本仓最忌讳的那类：静默产出错数据。
+    #
+    # 抛出去之后 `failure_kinds` 按类型归成 `timeout` → P2-16 退避重排。
+    raise DoubaoAnswerTimeout(
+        f"等答案超过 {timeout_ms}ms；页面上最长气泡 {len(prev)} 字符"
+        f"（还在 streaming={is_streaming(page)}）"
+    )
 
 
 def _delete_current_session(page) -> bool:

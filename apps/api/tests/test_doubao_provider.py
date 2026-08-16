@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from app.core.config import Settings
@@ -17,8 +19,10 @@ from app.providers.doubao_web import (
     DOUBAO_URL,
     INPUT_SELECTOR,
     STREAMING_ATTR,
+    DoubaoAnswerTimeout,
     DoubaoLoginRequired,
     DoubaoWebProvider,
+    _wait_for_answer,
 )
 
 
@@ -164,3 +168,89 @@ def test_l0_is_stored_raw_without_cleaning():
 
     src = inspect.getsource(doubao_web.DoubaoWebProvider.search)
     assert "full_text=text.strip()" in src
+
+
+# ------------------------------------------------- 等答案：超时不能伪装成成功
+
+
+class _FakeNode:
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    def inner_text(self, timeout: int | None = None) -> str:  # noqa: ARG002
+        return self._text
+
+
+class _FakeLocator:
+    def __init__(self, texts: list[str]) -> None:
+        self._texts = texts
+
+    def count(self) -> int:
+        return len(self._texts)
+
+    def nth(self, i: int) -> _FakeNode:
+        return _FakeNode(self._texts[i])
+
+
+class _FakePage:
+    """只实现 `_wait_for_answer` 真正用到的三个方法。
+
+    **不是 Mock 库的自动替身** —— 这里要钉的是「页面上有什么」到
+    「函数返回什么」的映射，用真实的数据结构表达比断言调用次数清楚得多。
+    """
+
+    def __init__(self, *, bubbles: list[str], streaming: bool) -> None:
+        self.bubbles = bubbles
+        self.streaming = streaming
+
+    def wait_for_timeout(self, ms: int) -> None:
+        time.sleep(ms / 1000)
+
+    def locator(self, selector: str) -> _FakeLocator:
+        if selector == f"[{STREAMING_ATTR}]":
+            return _FakeLocator(["streaming"] if self.streaming else [])
+        assert selector == ANSWER_SELECTOR
+        return _FakeLocator(self.bubbles)
+
+
+def test_timeout_raises_instead_of_returning_the_question_as_the_answer():
+    """**2026-08-16 run 294 的真实故障，11/17 条就这么进的库。**
+
+    豆包不答时 `[data-streaming]` 一直在（所以「状态位消失即写完」那条提前
+    返回从不触发），而 `.md-box-root` **连用户自己那条提问气泡一起匹配** ——
+    于是轮询里 `prev` 始终是提问原文，长度兜底又被 `len > 100` 挡住，
+    最后 `return prev` 把**提问当成答案**返回，`search()` 只判非空就写成
+    `success`。11 条的 `full_text` 就是提问本身，latency 全是 126 秒（超时打满）。
+
+    这次靠 `answer_status=too_short` 才被发现，**但那是运气**：
+    提问词长过阈值就会当成真答案入库，且没有任何地方会报错。
+
+    超时必须抛，让 P2-16 归成 `timeout` 去退避重试。
+    """
+    page = _FakePage(bubbles=["打篮球穿什么牌子的鞋好？"], streaming=True)
+
+    with pytest.raises(DoubaoAnswerTimeout):
+        _wait_for_answer(page, timeout_ms=40, poll_ms=1)
+
+
+def test_answer_timeout_is_classified_as_timeout_and_retried():
+    """继承 `TimeoutError` 就够 —— `classify_failure` 第 3 步是类型判定。
+
+    **不靠消息里带没带「超时」两个字**：那个模块自己写着「类型优先，
+    字符串匹配是脆的」。
+    """
+    from app.services.failure_kinds import TIMEOUT, classify_failure, is_retryable
+
+    assert classify_failure(DoubaoAnswerTimeout("等答案超时")) == TIMEOUT
+    assert is_retryable(TIMEOUT)
+
+
+def test_completed_answer_is_still_returned():
+    """回归护栏：修超时不能把正常那条路弄坏。
+
+    run 294 里有 6 条是好的（35–47 秒，1000–1700 字）——
+    证明选择器与完成判定本身是对的，这次只动失败路径。
+    """
+    page = _FakePage(bubbles=["问题", "这是一段完整的回答正文。"], streaming=False)
+
+    assert _wait_for_answer(page, timeout_ms=5_000, poll_ms=1) == "这是一段完整的回答正文。"
