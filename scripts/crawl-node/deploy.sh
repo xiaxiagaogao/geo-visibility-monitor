@@ -126,6 +126,26 @@ do_start() {
   #  SCREENSHOT_DIR= 截图关闭：api 在 VPS，读不到本节点的截图目录，
   #                  留着只会让证据页 404。P2-34 worker 化之后随结果传回即可恢复
   #  --shm-size=1g   Chromium 在容器里 /dev/shm 太小会崩
+  #
+  # DOUBAO_USER_DATA_DIR —— **豆包的 profile 必须持久**（2026-08-16 加）。
+  # 不设它时 provider 每条 job 开一个 tempfile.TemporaryDirectory()、跑完删掉，
+  # 于是豆包每次看到的是：**一个从未存在过的全新浏览器，带着一份已经用了
+  # 好几天的 sessionid 登进来，问一个问题就消失**。而 seed_storage_state 只灌
+  # cookies + localStorage —— IndexedDB / Cache / SW 每次都是空的，
+  # 偏偏豆包加载了 s2-security-audit/-verify/-message 三个模块在做设备识别。
+  # 「老会话 + 空白设备」这个组合本身就是矛盾的，真实用户不会这样。
+  #
+  # 这**不是 stealth 注入**，方向恰好相反：不是让指纹更假，是让设备身份连续 ——
+  # 正是 `providers/browser.py` docstring 那条「出生环境要等于使用环境」。
+  # 每次随机化指纹反而会更糟：豆包的惩罚是跨会话累积的（run 294/295 实测
+  # 6 条 → 3 条），对纵向追踪的对手随机化设备等于送更强的信号。
+  #
+  # ⚠️ 依赖单 worker：Chromium 会给 profile 上锁，两条 job 并发会直接起不来。
+  #    现在 FAKE_WORKER_BATCH_SIZE=1 串行，成立；P2-34 worker 化时要重新考虑。
+  # 回滚：删掉这一行重跑 start，就回到每条 job 全新临时 profile。
+  #
+  # **DeepSeek 刻意不跟**（BACKEND §7.5）：它用旧路径跑了一年没出事，
+  # 而调试新平台时不能同时改动唯一在工作的平台。
   node "podman run -d --name geo-crawler \
       --network host --shm-size=1g --restart=no \
       -e DATABASE_URL='$DB_URL' \
@@ -134,6 +154,7 @@ do_start() {
       -e CRAWL_TIMEOUT_MS=120000 \
       -e DEEPSEEK_STORAGE_STATE=/data/deepseek_storage.json \
       -e DOUBAO_STORAGE_STATE=/data/doubao_storage.json \
+      -e DOUBAO_USER_DATA_DIR=/data/doubao_profile \
       -e SCREENSHOT_DIR= \
       -e CRAWL_AUTO_RETRY_ENABLED='$AUTO_RETRY' \
       -e CRAWL_TIMEZONE_ID='$TZ_ID' \

@@ -75,6 +75,7 @@ def test_registry_builds_a_doubao_provider_with_settings_wired():
     s = Settings(
         crawl_mode="real",
         doubao_storage_state="/data/doubao_storage.json",
+        doubao_user_data_dir="/data/doubao_profile",
         crawl_timezone_id="Asia/Shanghai",
         crawl_timeout_ms=99_000,
         doubao_delete_session=False,
@@ -89,6 +90,33 @@ def test_registry_builds_a_doubao_provider_with_settings_wired():
     assert pv.timezone_id == "Asia/Shanghai"
     assert pv.timeout_ms == 99_000
     assert pv.delete_session_after is False
+    # **`user_data_dir` 是承重项，不是可选装饰**（2026-08-16 起）：
+    # 它为空时 provider 每条 job 开一个临时 profile 再删掉，于是豆包看到的是
+    # 「老会话 + 空白设备」这个自相矛盾的组合。接线在这里断掉不会报错，
+    # 只会让 deploy.sh 里那个环境变量**静默失效**，而表现是「抓着抓着就不答了」——
+    # 排查方向会完全跑偏（run 294/295 的教训，见 PHASE2）。
+    assert pv.user_data_dir == "/data/doubao_profile"
+
+
+def test_empty_user_data_dir_falls_back_to_a_throwaway_profile():
+    """空值的行为要钉住：**每条 job 一个全新临时 profile**。
+
+    这是 2026-08-16 之前的默认行为，也是当时怀疑的封锁诱因。
+    留这条不是因为它好，而是因为「空值等于什么」必须是明写的 ——
+    否则回滚（删掉 deploy.sh 那行）时没人知道自己回滚到了什么。
+    """
+    import inspect
+
+    from app.providers import doubao_web
+
+    src = inspect.getsource(doubao_web.DoubaoWebProvider.search)
+    assert "tempfile.TemporaryDirectory()" in src
+
+    s = Settings(crawl_mode="real", doubao_storage_state="/data/doubao_storage.json")
+    pv = registry.build_real_provider(
+        "doubao", registry.ProviderContext(settings=s, sample_index=0, brand_names=["安踏"])
+    )
+    assert pv.user_data_dir is None
 
 
 def test_platform_chip_no_longer_says_unimplemented():
