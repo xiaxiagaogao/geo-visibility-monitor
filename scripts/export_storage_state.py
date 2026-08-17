@@ -247,6 +247,20 @@ def main() -> int:
         context.storage_state(path=str(profile_dir / "storage_state.json"))
         context.close()
 
+    # **写完立刻收权限。** Playwright 按 umask 落盘，默认是 644 ——
+    # 同机器上任何用户都读得到，而这个文件**就是登录态本身**。
+    # 送到采集节点那条管道里一直有 `chmod 600`，本机这头却漏了
+    # （2026-08-16 发现时 deepseek/doubao 两份都是 644）。
+    #
+    # 千问这份尤其要紧：用支付宝登录的话，cookies 里带着
+    # `auth.alipay.com` / `securitycore.alipay.com` 的会话 ——
+    # 泄露的后果不是「别人能用我们的千问账号」，是一个支付宝会话。
+    for f in (out_path, profile_dir / "storage_state.json"):
+        try:
+            f.chmod(0o600)
+        except OSError as exc:  # noqa: PERF203
+            print(f"  ⚠ 收紧 {f} 权限失败（{exc}）—— 请自行 chmod 600")
+
     data = json.loads(out_path.read_text(encoding="utf-8"))
     cookies = data.get("cookies") or []
     domains = sorted({c.get("domain", "") for c in cookies})
