@@ -28,14 +28,23 @@ import {
 import { canWrite } from '@/lib/api/auth'
 import { brandNameMap, listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
+import { fetchPlatforms } from '@/lib/api/config'
 import { fetchRunCounts } from '@/lib/api/counts'
 import { getRun, getTask, listRuns, startRun } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
 import { findGaps } from '@/lib/l3/gaps'
 import { gapCsvFileName, gapCsvRows } from '@/lib/l3/gap-export'
 import { buildMatrix, gapInputsFromMatrix } from '@/lib/l3/matrix'
+import { denominatorParts, platformBars, platformSlices } from '@/lib/l3/platforms'
 import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
-import type { BarDatum, CountsResponse, Run, RunDetail, Task } from '@/lib/types'
+import type {
+  BarDatum,
+  CountsResponse,
+  PlatformOption,
+  Run,
+  RunDetail,
+  Task,
+} from '@/lib/types'
 
 import { SamplesPanel } from './SamplesPanel'
 import { TaskEditPanel } from './TaskEditPanel'
@@ -377,6 +386,11 @@ function RunReport({
   const [run, setRun] = useState<RunDetail | null>(null)
   const [overall, setOverall] = useState<CountsResponse | null>(null)
   const [byPrompt, setByPrompt] = useState<CountsResponse | null>(null)
+  const [byPlatform, setByPlatform] = useState<CountsResponse | null>(null)
+  const [platformOptions, setPlatformOptions] = useState<PlatformOption[]>([])
+  /** 命中矩阵看哪个平台（P2-09）。`null` = 还没定/单平台，用 byPrompt 那份 */
+  const [activePlatform, setActivePlatform] = useState<string | null>(null)
+  const [byPromptOnePlatform, setByPromptOnePlatform] = useState<CountsResponse | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [tab, setTab] = useState('matrix')
   const [attempt, setAttempt] = useState(0)
@@ -387,16 +401,25 @@ function RunReport({
     setRun(null)
     setOverall(null)
     setByPrompt(null)
+    setByPlatform(null)
+    setActivePlatform(null)
+    setByPromptOnePlatform(null)
     Promise.all([
       getRun(runId),
       fetchRunCounts({ brandId, runId }),
       fetchRunCounts({ brandId, runId, groupBy: 'prompt' }),
+      // 分平台面板的数据源：**一次请求**（PHASE2 §4.0 第 2 条）
+      fetchRunCounts({ brandId, runId, groupBy: 'platform' }),
+      // 平台标签**不许硬编码**（API.md §5）—— 接下一个平台时前端零改动
+      fetchPlatforms(),
     ])
-      .then(([r, o, p]) => {
+      .then(([r, o, p, pf, cfg]) => {
         if (!alive) return
         setRun(r)
         setOverall(o)
         setByPrompt(p)
+        setByPlatform(pf)
+        setPlatformOptions(cfg.items)
       })
       .catch((e: unknown) => {
         if (alive) setError(e instanceof Error ? e : new Error(String(e)))
@@ -406,6 +429,38 @@ function RunReport({
     }
   }, [brandId, runId, attempt, refreshKey])
 
+  const slices = useMemo(
+    () => (byPlatform ? platformSlices(byPlatform, platformOptions) : []),
+    [byPlatform, platformOptions],
+  )
+  const multiPlatform = slices.length > 1
+
+  // 多平台时矩阵默认落在第一个平台上（§4.0 第 3 条）
+  useEffect(() => {
+    if (multiPlatform && activePlatform === null) setActivePlatform(slices[0].code)
+  }, [multiPlatform, activePlatform, slices])
+
+  // **矩阵专用的那次取数** —— 只有它带 platform。
+  // 缺口清单与逐提问条形图继续用不带 platform 的 byPrompt：
+  // §4.0 第 4 条要求缺口跨平台合计（补内容的动作是平台无关的，
+  // 而且合计之后样本翻倍、判级更稳）。
+  useEffect(() => {
+    if (!activePlatform) return
+    let alive = true
+    setByPromptOnePlatform(null)
+    fetchRunCounts({ brandId, runId, groupBy: 'prompt', platform: activePlatform })
+      .then((c) => {
+        if (alive) setByPromptOnePlatform(c)
+      })
+      .catch((e: unknown) => {
+        if (alive) setError(e instanceof Error ? e : new Error(String(e)))
+      })
+    return () => {
+      alive = false
+    }
+  }, [brandId, runId, activePlatform, attempt, refreshKey])
+
+  /** 缺口清单与条形图的口径：**跨平台合计**，不随矩阵的平台按钮变。 */
   const rows = useMemo(() => {
     if (!run || !byPrompt) return []
     return buildMatrix({
@@ -415,6 +470,19 @@ function RunReport({
       series: byPrompt.series,
     })
   }, [run, byPrompt, brandId])
+
+  /** 矩阵的口径：**单平台**。单平台 run 时就是 rows 本身，不额外取数。 */
+  const matrixRows = useMemo(() => {
+    if (!run) return []
+    if (!multiPlatform) return rows
+    if (!byPromptOnePlatform) return []
+    return buildMatrix({
+      ownBrandId: brandId,
+      prompts: run.prompts,
+      competitors: run.competitors,
+      series: byPromptOnePlatform.series,
+    })
+  }, [run, rows, multiPlatform, byPromptOnePlatform, brandId])
 
   const gaps = useMemo(() => findGaps(gapInputsFromMatrix(rows)), [rows])
 
@@ -440,6 +508,10 @@ function RunReport({
   const den = overall.denominator
   const brand = overall.brand
   const unusable = den.n_total_responses - den.n_valid
+  // 单平台时 denominatorParts 返回空数组 → composition 为空 → 那一行不出现
+  const composition = denominatorParts(slices)
+    .map((x) => `${x.label} ${x.n}`)
+    .join(' + ')
 
   if (run.status === 'empty') {
     return (
@@ -512,9 +584,18 @@ function RunReport({
           info="分母口径：answer_status = ok"
           value={den.n_valid}
           note={
-            unusable > 0
-              ? `共 ${den.n_total_responses} 条响应，${unusable} 条不可用`
-              : `共 ${den.n_total_responses} 条响应，全部可用`
+            // **多平台时把分母的构成摊开**（PHASE2 §4.0 第 1 条）——
+            // 单平台 `21/35` 够了，多平台不够：两个平台表现完全没变，
+            // 其中一个挂掉一半就能让总数从 50% 涨到 60%。
+            // 摊开之后一眼看出「是分母的构成变了，不是表现变了」。
+            [
+              composition ? `${den.n_valid} = ${composition}` : null,
+              unusable > 0
+                ? `共 ${den.n_total_responses} 条响应，${unusable} 条不可用`
+                : `共 ${den.n_total_responses} 条响应，全部可用`,
+            ]
+              .filter(Boolean)
+              .join(' · ')
           }
           alert={unusable > 0}
         />
@@ -561,6 +642,17 @@ function RunReport({
         <EmphasisBars data={bars} />
       </Panel>
 
+      {/* 分平台表现（§4.0 第 2 条）—— 它直接回答多平台带来的唯一新信息：
+          「我在哪个平台上不行」。单平台时不渲染，界面不该多出无意义的面板。 */}
+      {multiPlatform ? (
+        <Panel
+          title="分平台表现"
+          subtitle="上面的总提及率是这些平台混算出来的 —— 运营要知道的是「我在哪个平台上不行」"
+        >
+          <EmphasisBars data={platformBars(slices)} />
+        </Panel>
+      ) : null}
+
       <Panel
         title="覆盖缺口"
         subtitle="本品缺席或明显落后、而竞品在场的提问。右侧数字是失分量：竞品合计比本品多拿的提及次数"
@@ -584,7 +676,7 @@ function RunReport({
       <Panel>
         <Tabs
           items={[
-            { id: 'matrix', label: '命中矩阵', count: rows.length },
+            { id: 'matrix', label: '命中矩阵', count: matrixRows.length },
             // 计数用**总响应数**而不是 n_valid：样本表把不可用的那些也列出来
             // （标着「不进分母」），tab 上的数字必须和表里的行数对得上
             { id: 'samples', label: '样本列表', count: den.n_total_responses },
@@ -593,7 +685,33 @@ function RunReport({
           onChange={setTab}
         />
         {tab === 'matrix' ? (
-          <HitMatrix rows={rows} columns={columns} />
+          <>
+            {/* **命中矩阵强制单平台**（§4.0 第 3 条）：加一维就是三维，
+                而三维矩阵不可读。默认落在第一个平台。
+                注意缺口清单**不**跟着这个按钮变 —— 它按 §4.0 第 4 条
+                跨平台合计（补内容的动作是平台无关的）。 */}
+            {multiPlatform ? (
+              <div className={runs.platformSwitch}>
+                <span className={runs.platformSwitchLabel}>平台</span>
+                {slices.map((s) => (
+                  <button
+                    key={s.code}
+                    type="button"
+                    className={runs.platformSwitchItem}
+                    aria-pressed={s.code === activePlatform}
+                    onClick={() => setActivePlatform(s.code)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {multiPlatform && !byPromptOnePlatform ? (
+              <Skeleton height={200} />
+            ) : (
+              <HitMatrix rows={matrixRows} columns={columns} />
+            )}
+          </>
         ) : (
           <SamplesPanel runId={runId} ownBrandId={brandId} taskId={taskId} />
         )}

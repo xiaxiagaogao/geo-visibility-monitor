@@ -23,14 +23,26 @@ import { apiFetch } from './client'
 export async function fetchRunCounts(params: {
   brandId: number
   runId: number
-  /** 默认 `none`（总览四个数）；矩阵与缺口清单用 `prompt` */
+  /** 默认 `none`（总览四个数）；矩阵与缺口清单用 `prompt`；分平台面板用 `platform` */
   groupBy?: 'none' | 'day' | 'platform' | 'prompt'
+  /**
+   * 只看某一个平台（P2-09）。**命中矩阵强制单平台就靠它**（PHASE2 §4.0 第 3 条）。
+   *
+   * 后端一直支持这个参数（`api/counts.py`），**但前端在 P2-09 之前一次都没传过** ——
+   * 于是勾了两个平台的任务，KPI 与命中矩阵会**静默混算**：
+   * 两个平台表现完全没变，其中一个挂掉一半就能让总数从 50% 涨到 60%。
+   *
+   * **缺口清单刻意不传它** —— §4.0 第 4 条要求它跨平台合计，
+   * 理由是「补内容这个动作是平台无关的」，而且合计之后样本翻倍、判级更稳。
+   */
+  platform?: string
 }): Promise<CountsResponse> {
   return apiFetch<CountsResponse>('/v1/counts', {
     query: {
       brand_id: params.brandId,
       run_id: params.runId,
       group_by: params.groupBy,
+      platform: params.platform,
     },
   })
 }

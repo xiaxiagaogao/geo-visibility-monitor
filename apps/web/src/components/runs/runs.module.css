@@ -182,3 +182,42 @@
   align-items: center;
   gap: var(--sp-2);
 }
+
+/* ═══ 命中矩阵的平台切换（P2-09）═══
+   矩阵强制单平台（PHASE2 §4.0 第 3 条）—— 加一维就是三维，三维矩阵不可读。
+   **只在多平台时渲染**，单平台 run 上多一排按钮只是噪音。 */
+.platformSwitch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+
+.platformSwitchLabel {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.platformSwitchItem {
+  padding: 4px 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.platformSwitchItem:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* 选中态用 aria-pressed 而不是额外的 class ——
+   可访问性与样式同一个真相源，不会出现「看着选中但读屏说没选」。 */
+.platformSwitchItem[aria-pressed='true'] {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
