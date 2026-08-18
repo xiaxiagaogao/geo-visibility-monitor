@@ -198,6 +198,49 @@ _STORAGE_SETTING = {
 }
 
 
+def store_report(
+    db,
+    *,
+    platform: str,
+    status: str,
+    node_label: Optional[str],
+    issuer_region: Optional[str],
+    waf_kind: Optional[str],
+    cookie_count: Optional[int],
+    cookie_names: List[str],
+    earliest_expiry: Optional[datetime],
+    file_mtime: Optional[datetime],
+    issues: List[str],
+    now: Optional[datetime] = None,
+) -> None:
+    """把一个平台的快照写进 ``crawl_credentials``（每平台一行，upsert）。
+
+    **两个调用方，必须是同一份**：隧道模式的 ``report_credentials``（本进程算完就写），
+    和 P2-34 的 ``POST /v1/worker/credentials``（节点算完 POST 过来，api 写）。
+
+    ``now``（= ``checked_at``）**由服务端给，不接受节点传**。它是
+    「多久没听到这个节点动静」的信号（``BACKEND.md`` §7.3），
+    用节点的时钟，钟一歪这个信号就说假话。
+
+    ⚠️ 参数里没有任何一处能放 cookie 的值 —— 这条红线在签名上就闭死了。
+    """
+    from app.models import CrawlCredential
+
+    row = db.get(CrawlCredential, platform) or CrawlCredential(platform=platform)
+    row.node_label = node_label or None
+    row.status = status
+    row.issuer_region = issuer_region
+    row.waf_kind = waf_kind
+    row.cookie_count = cookie_count
+    row.cookie_names = list(cookie_names or [])
+    row.earliest_expiry = earliest_expiry
+    row.file_mtime = file_mtime
+    row.issues = list(issues or [])
+    row.checked_at = now or _utcnow()
+    db.add(row)
+    db.commit()
+
+
 def report_credentials(db, settings) -> List[Dict[str, Any]]:
     """检查本机上所有已知平台的登录态，写回 ``crawl_credentials``。
 
@@ -205,9 +248,11 @@ def report_credentials(db, settings) -> List[Dict[str, Any]]:
     api 跑在 VPS，它读不到那个文件。
 
     整个函数不抛异常：健康检查坏掉不该把采集也带下去。
-    """
-    from app.models import CrawlCredential
 
+    **P2-34 之后节点不再走这条路** —— 它在本地算完（`inspect_storage_state` +
+    `derive_status` 都是纯函数），POST 到 `/v1/worker/credentials`，由 api 落库。
+    落库那一步是共用的（`store_report`）。这个函数留着给隧道模式与冷备用。
+    """
     now = _utcnow()
     out: List[Dict[str, Any]] = []
     for platform, setting_name in _STORAGE_SETTING.items():
@@ -221,20 +266,21 @@ def report_credentials(db, settings) -> List[Dict[str, Any]]:
                 max_age_days=getattr(settings, "crawl_credential_max_age_days", 0),
                 now=now,
             )
-            row = db.get(CrawlCredential, platform) or CrawlCredential(platform=platform)
-            row.node_label = getattr(settings, "crawl_node_label", "") or None
-            row.status = status
-            row.issuer_region = info["issuer_region"]
-            row.waf_kind = info["waf_kind"]
-            row.cookie_count = info["cookie_count"]
-            # 只有名字，没有值 —— 留着是为了接新平台时能看出它用的哪家 WAF
-            row.cookie_names = info["cookie_names"]
-            row.earliest_expiry = info["earliest_expiry"]
-            row.file_mtime = info["file_mtime"]
-            row.issues = issues
-            row.checked_at = now
-            db.add(row)
-            db.commit()
+            store_report(
+                db,
+                platform=platform,
+                status=status,
+                node_label=getattr(settings, "crawl_node_label", "") or None,
+                issuer_region=info["issuer_region"],
+                waf_kind=info["waf_kind"],
+                cookie_count=info["cookie_count"],
+                # 只有名字，没有值 —— 留着是为了接新平台时能看出它用的哪家 WAF
+                cookie_names=info["cookie_names"],
+                earliest_expiry=info["earliest_expiry"],
+                file_mtime=info["file_mtime"],
+                issues=issues,
+                now=now,
+            )
             # issuer_region / waf_kind 一并返回：P2-36 的环境指纹要用它们，
             # 而它们正是这次检查刚算出来的 —— 让 worker 再读一遍文件没有意义
             out.append({

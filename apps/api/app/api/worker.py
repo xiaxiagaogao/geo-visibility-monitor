@@ -33,6 +33,10 @@ from app.api.deps import get_db, require_write
 from app.core.security import Principal
 from app.schemas.crawl import (
     CrawlJobOut,
+    WorkerCredentialsIn,
+    WorkerCredentialsOut,
+    WorkerEnvironmentIn,
+    WorkerEnvironmentOut,
     WorkerFailIn,
     WorkerLeaseItem,
     WorkerLeaseOut,
@@ -103,3 +107,34 @@ def report_failure(
     """
     job = worker_intake.record_failure(db, job_id, body.reason, kind=body.kind)
     return CrawlJobOut(**job_svc.job_to_out(db, job))
+
+
+@router.post("/environment", response_model=WorkerEnvironmentOut)
+def report_environment(
+    body: WorkerEnvironmentIn,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+) -> WorkerEnvironmentOut:
+    """自报采集环境，换一个 ``environment_id``（P2-36）。
+
+    节点每 `CRAWL_CREDENTIAL_CHECK_SEC` 报一次，把拿到的 id 带在后续的
+    lease 上。**同一种环境只会有一行** —— 那正是
+    ``SELECT DISTINCT environment_id ... > 1 就是混了两个出口`` 这条判据成立的前提。
+    """
+    return WorkerEnvironmentOut(
+        environment_id=worker_intake.record_environment(db, body.model_dump())
+    )
+
+
+@router.post("/credentials", response_model=WorkerCredentialsOut)
+def report_credentials(
+    body: WorkerCredentialsIn,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+) -> WorkerCredentialsOut:
+    """自报各平台登录态健康度（P2-07）。
+
+    判级在节点上算（要读 `storage_state` 文件，api 读不到），这里只落库。
+    ⚠️ 请求体里**没有任何字段能放 cookie 的值**，这条红线在 schema 上就闭死了。
+    """
+    return WorkerCredentialsOut(accepted=worker_intake.record_credentials(db, body.items))

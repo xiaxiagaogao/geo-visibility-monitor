@@ -221,6 +221,80 @@ class WorkerFailIn(BaseModel):
         return v
 
 
+class WorkerEnvironmentIn(BaseModel):
+    """节点自报采集环境的六个维度（P2-36）。
+
+    **刻意没有 `fingerprint` 字段。** 指纹由服务端用 ``compute_fingerprint`` 算，
+    因为它定义「什么算同一种环境」—— 让节点自己算并上报的话，节点与冷备一旦版本
+    不齐，同一种环境会算出两个指纹，造出一个幻影环境，而 P2-36 的告警会据此说
+    「这次 run 混了两个出口」。**告警撒谎比没有告警更糟。**
+    """
+
+    node_label: Optional[str] = None
+    exit_ip: Optional[str] = None
+    timezone_id: Optional[str] = None
+    crawl_mode: Optional[str] = None
+    credential_region: Optional[str] = None
+    waf_kind: Optional[str] = None
+
+
+class WorkerEnvironmentOut(BaseModel):
+    #: ``null`` = 这轮记不上（落库失败）。**不阻断采集** —— 那一批 job 的
+    #: ``environment_id`` 留 NULL，表示「没记」，比编一个准确
+    environment_id: Optional[int] = None
+
+
+class WorkerCredentialIn(BaseModel):
+    """一个平台的登录态健康度快照（P2-07）。
+
+    ⚠️ **这里永远只有 cookie 的名字，没有值。** 模型里根本没有能放值的字段，
+    节点硬塞也塞不进来（pydantic 忽略多余字段）。值是凭证本身，落进数据库
+    就等于把登录态复制到了一个没人当它是凭证的地方。
+
+    **也没有 `checked_at`。** 那是「多久没听到节点动静」的信号，
+    由服务端盖章 —— 用节点的时钟，钟一歪这个信号就说假话。
+    """
+
+    platform: str
+    status: str
+    node_label: Optional[str] = None
+    issuer_region: Optional[str] = None
+    waf_kind: Optional[str] = None
+    cookie_count: Optional[int] = None
+    cookie_names: List[str] = Field(default_factory=list)
+    earliest_expiry: Optional[datetime] = None
+    file_mtime: Optional[datetime] = None
+    issues: List[str] = Field(default_factory=list)
+
+    @field_validator("platform")
+    @classmethod
+    def _known_platform(cls, v: str) -> str:
+        # platform 是主键 —— 写错一次就多一行永远清不掉的假平台，
+        # 而它会直接出现在 GET /v1/health/credentials 里
+        if v not in _known_codes():
+            raise ValueError(f"platform must be one of {list(_known_codes())}")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def _known_status(cls, v: str) -> str:
+        # 乱写的 status 会直接被 worse_of 拿去算 overall，而它不在严重度表里
+        # 就会被当成「比 ok 还轻」—— 一个坏掉的凭证会显示成健康
+        from app.services.credential_health import _SEVERITY
+
+        if v not in _SEVERITY:
+            raise ValueError(f"status must be one of {list(_SEVERITY)}")
+        return v
+
+
+class WorkerCredentialsIn(BaseModel):
+    items: List[WorkerCredentialIn] = Field(default_factory=list)
+
+
+class WorkerCredentialsOut(BaseModel):
+    accepted: int
+
+
 class WorkerLeaseOut(BaseModel):
     """**空列表是正常状态**，不是错误 —— 节点每几秒来问一次，多数时候没活干。
 

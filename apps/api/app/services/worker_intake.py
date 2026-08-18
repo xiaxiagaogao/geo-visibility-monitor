@@ -31,8 +31,14 @@ from sqlalchemy.orm import Session
 from app.models import CrawlJob, Prompt
 from app.providers.base import CitationData, CrawlResult
 from app.schemas.crawl import WorkerResultIn
+from app.services.crawl_env import (
+    FINGERPRINT_FIELDS,
+    compute_fingerprint,
+    upsert_environment,
+)
 from app.services.crawl_jobs import fail_job, first_response_id, get_job_or_404
 from app.services.crawl_runner import persist_result
+from app.services.credential_health import store_report
 
 logger = logging.getLogger("geo.worker_intake")
 
@@ -78,6 +84,46 @@ def record_result(db: Session, job_id: int, payload: WorkerResultIn) -> dict:
     resp = persist_result(db, job, prompt, result)
     logger.info("worker 回传成功 job_id=%s response_id=%s", job.id, resp.id)
     return {"job_id": job.id, "response_id": resp.id, "status": job.status}
+
+
+def record_environment(db: Session, fields: dict) -> Optional[int]:
+    """收下节点自报的采集环境，返回它该用的 ``environment_id``（P2-36）。
+
+    **指纹在这里算，不接受节点上报。** ``FINGERPRINT_FIELDS`` 定义「什么算同一种
+    环境」—— 让节点自己算的话，节点与冷备一旦版本不齐，同一种环境会算出两个指纹，
+    造出一个幻影环境，而 P2-36 的告警会据此说「这次 run 混了两个出口」。
+
+    返回 ``None`` = 这轮记不上（``upsert_environment`` 内部已兜住异常）。
+    **不阻断采集** —— 那一批 job 的 ``environment_id`` 留 NULL 表示「没记」。
+    """
+    payload = {k: fields.get(k) for k in FINGERPRINT_FIELDS}
+    payload["fingerprint"] = compute_fingerprint(payload)
+    return upsert_environment(db, payload)
+
+
+def record_credentials(db: Session, items) -> int:
+    """收下节点自报的各平台登录态快照（P2-07），返回写了几条。
+
+    落库走的是**和隧道模式同一个** ``credential_health.store_report``，
+    ``checked_at`` 在那里由服务端盖章。
+    """
+    n = 0
+    for item in items:
+        store_report(
+            db,
+            platform=item.platform,
+            status=item.status,
+            node_label=item.node_label,
+            issuer_region=item.issuer_region,
+            waf_kind=item.waf_kind,
+            cookie_count=item.cookie_count,
+            cookie_names=item.cookie_names,
+            earliest_expiry=item.earliest_expiry,
+            file_mtime=item.file_mtime,
+            issues=item.issues,
+        )
+        n += 1
+    return n
 
 
 def record_failure(

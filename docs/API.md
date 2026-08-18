@@ -516,6 +516,53 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 - 回的是完整 `CrawlJobOut`，节点据此知道这条**会不会被自动重排**
   （`status='pending'` 且 `next_attempt_at` 在未来 = 正在退避）。
 
+### `POST /v1/worker/environment`
+
+```jsonc
+// 请求：P2-36 的六个维度
+{ "node_label": "changsha-home", "exit_ip": "120.228.64.174",
+  "timezone_id": "Asia/Shanghai", "crawl_mode": "real",
+  "credential_region": "cn", "waf_kind": "huawei" }
+// 响应 200
+{ "environment_id": 41 }     // null = 这轮记不上，**不阻断采集**
+```
+
+- **请求体里没有 `fingerprint`，服务端自己算。** 指纹定义「什么算同一种环境」——
+  让节点上报的话，节点与冷备一旦版本不齐，同一种环境会算出两个指纹，造出一个
+  幻影环境，而 P2-36 的告警会据此说「这次 run 混了两个出口」。
+  **告警撒谎比没有告警更糟**（P2-39 记着的正是这类问题）。
+- 同一种环境**只会有一行**，节点每 `CRAWL_CREDENTIAL_CHECK_SEC` 报一次也不会堆。
+- 拿到的 id 带在后续 `POST /v1/worker/lease?environment_id=` 上，
+  在**领取那一刻**打到 job 上 —— 与隧道模式语义完全一致。
+
+### `POST /v1/worker/credentials`
+
+```jsonc
+// 请求
+{ "items": [{
+    "platform": "tongyi", "status": "ok", "node_label": "changsha-home",
+    "issuer_region": "unknown", "waf_kind": "none",
+    "cookie_count": 12, "cookie_names": ["cna", "tfstk"],
+    "earliest_expiry": "2026-09-01T00:00:00Z",
+    "file_mtime": "2026-08-16T10:00:00Z", "issues": []
+}]}
+// 响应 200
+{ "accepted": 1 }
+```
+
+判级（`inspect_storage_state` + `derive_status`，都是纯函数）**在节点上算** ——
+`storage_state` 文件在那儿，api 读不到。这里只落库，走的是和隧道模式同一个
+`credential_health.store_report`。三条：
+
+- ⚠️ **请求体里没有任何字段能放 cookie 的值。** 这条红线在 schema 上就闭死了，
+  节点硬塞也塞不进来。
+- **也没有 `checked_at`，由服务端盖章。** 它是「多久没听到节点动静」的信号
+  （§7.3），用节点的时钟，钟一歪这个信号就说假话。
+- `platform` 与 `status` 都校验取值，**乱写直接 422**：
+  platform 是主键（写错就多一行永远清不掉的假平台），
+  而不认识的 status 会被 `worse_of` 当成「比 ok 还轻」，
+  让一个坏掉的凭证显示成健康。
+
 ---
 
 ## 8.5 检测任务与运行
