@@ -11,12 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import Brand, BrandAlias, Citation, CrawlJob, Prompt, RawResponse
+from app.models import Citation, CrawlJob, Prompt, RawResponse
 from app.providers.base import CrawlResult
 from app.providers.deepseek_web import DeepSeekLoginRequired
 from app.providers.fake import FakeProvider
 from app.providers.registry import ProviderContext, build_real_provider
 from app.services.annotate import annotate_response
+from app.services.brands import matching_names
 from app.services.crawl_jobs import claim_pending_jobs, fail_job, reclaim_stuck_jobs
 
 logger = logging.getLogger("geo.crawl_runner")
@@ -26,31 +27,11 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _brand_names(db: Session, brand_id: int) -> List[str]:
-    brand = db.get(Brand, brand_id)
-    names: List[str] = []
-    if brand:
-        names.append(brand.name)
-        if brand.name_en:
-            names.append(brand.name_en)
-    aliases = list(
-        db.scalars(select(BrandAlias.alias).where(BrandAlias.brand_id == brand_id)).all()
-    )
-    names.extend(aliases)
-    seen = set()
-    out = []
-    for n in names:
-        if n and n not in seen:
-            seen.add(n)
-            out.append(n)
-    return out or ["示例品牌"]
-
-
 def _build_provider(db: Session, job: CrawlJob, prompt: Prompt):
     settings = get_settings()
     mode = (settings.crawl_mode or "fake").lower()
     platform = (job.platform or "deepseek").lower()
-    brands = _brand_names(db, prompt.brand_id)
+    brands = matching_names(db, prompt.brand_id)
 
     if mode == "fake" or platform == "fake":
         return FakeProvider(

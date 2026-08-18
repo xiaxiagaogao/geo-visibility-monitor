@@ -25,6 +25,29 @@ def _normalize_aliases(aliases: List[str]) -> List[str]:
     return out
 
 
+def matching_names(db: Session, brand_id: int) -> List[str]:
+    """这个品牌在正文里可能长什么样：中文名 · 英文名 · 全部别名。
+
+    **两个调用方，必须是同一份**：``crawl_runner`` 构造 Provider 时要，
+    ``GET /v1/worker/lease`` 下发给采集节点时也要（节点没有数据库，查不到别名）。
+    分两份写迟早只改一边，那时节点采到的和本地采到的会用不同的别名集。
+    """
+    brand = db.get(Brand, brand_id)
+    names: List[str] = []
+    if brand:
+        names.append(brand.name)
+        if brand.name_en:
+            names.append(brand.name_en)
+    names.extend(db.scalars(select(BrandAlias.alias).where(BrandAlias.brand_id == brand_id)).all())
+    seen = set()
+    out: List[str] = []
+    for n in names:
+        if n and n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out or ["示例品牌"]
+
+
 def brand_to_dict(db: Session, brand: Brand) -> dict:
     aliases = [a.alias for a in brand.aliases]
     comp_ids = db.scalars(

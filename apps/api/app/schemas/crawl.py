@@ -146,3 +146,29 @@ class RawResponseSummaryListOut(BaseModel):
 class WorkerRunOut(BaseModel):
     processed: int
     job_ids: List[int]
+
+
+class WorkerLeaseItem(BaseModel):
+    """一条领走的 job —— **采集节点跑完它所需的全部信息**。
+
+    节点没有数据库，所以 ``prompt_text`` 与 ``brand_names`` 必须在这里给全。
+    少给一样，节点就得自己去查库，而「节点不碰库」正是 P2-34 的全部意义。
+    """
+
+    job_id: int
+    platform: str
+    sample_index: int
+    prompt_id: int
+    prompt_text: str
+    #: 中文名 · 英文名 · 全部别名（fake 模式造正文要用）
+    brand_names: List[str] = Field(default_factory=list)
+
+
+class WorkerLeaseOut(BaseModel):
+    """**空列表是正常状态**，不是错误 —— 节点每几秒来问一次，多数时候没活干。
+
+    包一层对象而不是裸数组：将来要加 lease 时长、服务端时间这类字段时
+    不必改调用方的解析形状。
+    """
+
+    jobs: List[WorkerLeaseItem] = Field(default_factory=list)

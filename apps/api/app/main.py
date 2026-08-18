@@ -29,6 +29,7 @@ from app.api import qa as qa_router
 from app.api import ingest as ingest_router
 from app.api import tasks as tasks_router
 from app.api import users as users_router
+from app.api import worker as worker_router
 from app.core.config import get_settings
 from app.core.db import check_connection
 from app.core.schema import ensure_schema
@@ -82,6 +83,7 @@ app.include_router(qa_router.router)
 app.include_router(ingest_router.router)
 app.include_router(tasks_router.router)
 app.include_router(health_credentials_router.router)
+app.include_router(worker_router.router)
 
 
 class AnalyzeRequest(BaseModel):

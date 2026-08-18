@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.models import CrawlJob, Prompt, RawResponse
 from app.providers import registry
 from app.schemas.crawl import CrawlJobCreate
+from app.services import brands as brand_svc
 from app.services.failure_kinds import WORKER_DIED, classify_failure
 from app.services.retry_policy import plan_next_attempt
 
@@ -244,6 +245,48 @@ def reclaim_stuck_jobs(db: Session, older_than_sec: int) -> List[int]:
         )
     db.commit()
     return [j.id for j in stuck]
+
+
+def lease_jobs(
+    db: Session, limit: int, environment_id: Optional[int] = None
+) -> List[dict]:
+    """``GET /v1/worker/lease`` 的正文（P2-34）。
+
+    **刻意不另造一套领取 SQL。** ``claim_pending_jobs`` 用的
+    ``FOR UPDATE SKIP LOCKED`` 本来就是多 worker 安全的，僵死回收也已经有了
+    （``CRAWL_STUCK_JOB_SEC``）—— 换个入口不该换一套并发语义，那会变成两份
+    会分叉的实现。这个函数只做「把领到的 job 翻译成节点能用的 payload」。
+
+    翻译这一步才是关键：**采集节点没有数据库**，它拿不到 prompt 正文，
+    也拿不到品牌别名（fake 模式要用）。所以两样都得跟着 payload 一起下发。
+
+    ``reclaim_stuck_jobs`` 在这里调，是因为 HTTP 模式下没有别人会调它 ——
+    隧道模式是 ``run_once`` 每轮调一次。漏掉它的话，节点断电那批 job
+    会永远停在 ``running``。
+    """
+    reclaimed = reclaim_stuck_jobs(db, get_settings().crawl_stuck_job_sec)
+    if reclaimed:
+        logger.warning("reclaimed stuck running jobs %s", reclaimed)
+
+    out: List[dict] = []
+    for job in claim_pending_jobs(db, limit, environment_id=environment_id):
+        prompt = db.get(Prompt, job.prompt_id)
+        if prompt is None:
+            # 派一条查不到提问词的 job 出去，节点只能原样退回来。就地收掉，
+            # 理由与 process_job 里那条一致（"prompt missing"）
+            fail_job(db, job, "prompt missing")
+            continue
+        out.append(
+            {
+                "job_id": job.id,
+                "platform": job.platform,
+                "sample_index": job.sample_index or 1,
+                "prompt_id": prompt.id,
+                "prompt_text": prompt.text,
+                "brand_names": brand_svc.matching_names(db, prompt.brand_id),
+            }
+        )
+    return out
 
 
 def claim_pending_jobs(

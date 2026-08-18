@@ -432,6 +432,48 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 
 ---
 
+## 8.6 采集节点端点 `/v1/worker/*`（P2-34，仅超管/运营）
+
+**给采集节点用的，前端一条都不该调。** 节点原先直连数据库（`DATABASE_URL`
+走 tailnet 到 VPS 的 postgres），这组端点是那条链路的替代：节点只出站 HTTPS。
+
+> **鉴权复用现有 `X-API-Key`**（2026-08-18 拍板）。代价写在 `BACKEND.md` §7.6：
+> `X-API-Key` 折算成 **superadmin**，所以节点持有的是超管等价凭证 ——
+> P2-34 换掉的是凭证的**形态**（数据库口令 → API key），不是它的**权限面**。
+
+### `POST /v1/worker/lease`
+
+```jsonc
+// POST /v1/worker/lease?batch_size=1&environment_id=41
+{
+  "jobs": [{
+    "job_id": 3512,
+    "platform": "tongyi",
+    "sample_index": 1,
+    "prompt_id": 88,
+    "prompt_text": "国产运动鞋品牌有哪些值得买的？",
+    "brand_names": ["安踏", "ANTA", "安踏体育"]   // 中文名 · 英文名 · 全部别名
+  }]
+}
+```
+
+四条：
+
+- **是 `POST` 不是 `GET`。** 领取会把 job 标成 `running` —— 那是写操作，而中间件
+  对安全方法认 `geo_qa_key` Cookie。做成 GET 就是一个跨站诱导一发就能把一批 job
+  打成空转（600 秒后被僵死回收成 failed）的口子，攻击方连响应都不用读。
+- **`prompt_text` 与 `brand_names` 必须随 payload 下发** —— 节点没有数据库，
+  这两样它自己查不到。少给一样，「节点不碰库」就不成立。
+- **空 `jobs` 是正常状态**，不是错误。节点每几秒来问一次，多数时候没活干。
+- **`environment_id` 不传就不打标记**（P2-36 的语义：留 NULL 表示「没记」，
+  比编一个默认值准确）。它由节点先调 `POST /v1/worker/environment` 换取。
+
+领取沿用 `services/crawl_jobs.claim_pending_jobs` 的 `FOR UPDATE SKIP LOCKED`
+（本来就是多 worker 安全的），**没有另造一套 SQL**；退避闸门（`next_attempt_at`）
+与僵死回收（`CRAWL_STUCK_JOB_SEC`）都照旧生效。
+
+---
+
 ## 8.5 检测任务与运行
 
 **任务（Task）= 命名的监测定义**（一个主品牌 + 平台 + 采样数），可反复执行。
