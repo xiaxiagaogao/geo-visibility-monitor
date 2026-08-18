@@ -127,7 +127,7 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 | **P2-36** | 记录采集节点 → **采集环境** | ✅ `services/crawl_env.py` + `crawl_environments` 表 + `GET /v1/runs/{id}` 的 `environments[]`。**长度 > 1 就是混了两个出口** |
 | **P2-06a** | 接豆包 | ⏸ **暂缓**（2026-08-16）。provider 本身成立（run 294 有 6 条 1000+ 字的好答案），但账号配额持续衰减 **6 → 3 → 1/5**，持久 profile 也没止住。**这已经是产品决策不是技术问题** —— 见下「第一次真抓」与「现象 C」 |
 | **P2-37** | **联网标注 + 引用提取**（原名「联网搜索 + 新基线」） | ⬜ **前提已被推翻，等重新拍板**（2026-08-17）。「必须开联网」在豆包/千问上做不到；行业与学术都要求「记录并分层」而非强制。**重定义后成本降一个数量级：基线不作废、不必整套重抓**。引用走 SSE 已实测可行。见 §4.0.1 |
-| **P2-34** | crawler 改 HTTP worker（**正式**） | ⬜ **退役条件要重述**：原文写「接完豆包就做」，而豆包暂缓了。现在的触发条件应是「P2-37 重抓之前」—— 否则那两笔债（截图关闭、数据库凭证走家宽）会跟着无限期留着 |
+| **P2-34** | crawler 改 HTTP worker（**正式**） | 🟡 **服务端五个端点已落并在真库上验过（2026-08-18），节点侧未切**。见下「P2-34 进行中」 |
 | **P2-09** | 前端多平台改造 | ✅ **已完成并在双平台 run 上验证**（2026-08-17，run 297）。`lib/l3/platforms.ts` + `TaskDetailView` 三处渲染 + `fetchRunCounts` 的 `platform`。见下「P2-09 已完成」 |
 | **P2-06b** | 接千问 | ✅ **已完成**（2026-08-16）。`providers/qianwen_web.py` + 注册表 + `TONGYI_*` 接线。run 296 **10/10 全成功、零衰减、6 分 20 秒**。见下「P2-06b 已完成」 |
 | **P2-06c** | 接 Kimi | P2-06b |
@@ -596,7 +596,7 @@ crawler:  volumes: [crawl_data:/data]
 | P2-32 | **采集出口对照实验** | ✅ **2026-08-14 完成**，结论见下 |
 | P2-33 | **隧道迁移（临时）** | ✅ `scripts/crawl-node/deploy.sh`（image / start / verify / logs）+ README（四条约束、冷备切换、已知问题）。**自检里最重要的一条是「容器出口 ≠ 代理出口」** —— 那是唯一会静默毁掉整件事的错误。⚠️ **crawler 的代码在镜像里**，更新代码只能重传镜像（原先那个 `sync` 子命令推到一个没被挂载的目录，2026-08-15 已删） |
 | P2-35 | **`POST /runs` 接受 `note`** | ✅ body 可选（老调用方不带 body 照样能发起）。前端在「立即运行」的确认那一步加了输入框 —— **发起的那一刻才最清楚这次和以往有什么不同**。⚠️ **run 215 的 note 仍是 null**，那是迁移当次的基线断点，补不了了（没有事后修改接口，也不该为此加一个） |
-| P2-34 | **HTTP worker（正式）** | crawler 不碰数据库：`GET /v1/worker/lease` 领 job · `POST /v1/worker/jobs/{id}/result` 回传（含截图 multipart）· `POST .../fail` 回传失败原因。**采集节点只需要一个 API key，不需要数据库凭证**；只走 HTTPS 出站；截图问题自然解决；天然多节点 |
+| P2-34 | **HTTP worker（正式）** | 🟡 服务端已落 **5 个**端点（不是原文写的 3 个，见下）。crawler 不碰数据库；截图随结果回传；天然多节点。**节点侧未切** |
 | P2-36 | **记录采集环境**（原名「记录采集节点」） | **优先级上调（2026-08-15）。** 原本只想记「哪台机器采的」，但这一轮证明要记的更多：run 215 / 292 / 293 之间**出口 IP、时区、登录态签发地、WAF 类型全都不一样**，而数据里唯一记得住的是 `run.note` 这个自由文本。**没有它，任何跨 run 对比都不可信** —— 包括 P2-32 那个「出口影响回答」的结论本身。建议随 run 存一份环境指纹：采集节点 · 出口 IP · 时区 · 登录态签发地与年龄 |
 
 #### P2-32 的结论（2026-08-14）
@@ -701,10 +701,71 @@ select(CrawlJob).where(status == "pending").with_for_update(skip_locked=True)
 按钮本来就是条件渲染的，没有 `screenshot_path` 就不显示 —— **降级是干净的，
 不会出现 404**。并在 `run.note` 里写明「这次运行未采集截图」。
 
-**P2-34 有一个必须做对的细节：lease 的原子性。** 两个 worker 同时领任务不能领到
-同一个 job —— 要用 `UPDATE ... WHERE status='pending' ... RETURNING` 单条 SQL 占位，
-不是「先 SELECT 再 UPDATE」。且 lease 要有到期时间：worker 领了任务然后家里断电，
-那批 job 不能永远卡在 `running`（现有的 `CRAWL_STUCK_JOB_SEC` 就是干这个的，直接复用）。
+> **⚠️ 2026-08-18 更正：上面那段「必须另写一条 `UPDATE ... RETURNING`」是错的。**
+> 它写在「领取的原子性：已核实」那节之前，而那节的结论覆盖了它 ——
+> `claim_pending_jobs` 的 `FOR UPDATE SKIP LOCKED` 本来就是多 worker 安全的。
+> P2-34 **直接复用了它，没有另造领取 SQL**，也**没有加任何数据库列**
+> （lease 到期靠现有的 `CRAWL_STUCK_JOB_SEC` 僵死回收）。
+> 所以 §6 规矩 2 那条「加可空列」在这一项上没有用武之地。
+
+#### P2-34 进行中（2026-08-18）
+
+**服务端五个端点已落，全部在 VPS 一次性 postgres 上验过；采集节点侧还没切。**
+
+| 端点 | 落在哪 |
+|---|---|
+| `POST /v1/worker/lease` | `api/worker.py` + `services/crawl_jobs.lease_jobs` |
+| `POST /v1/worker/jobs/{id}/result`（multipart，含截图） | `services/worker_intake.record_result` |
+| `POST /v1/worker/jobs/{id}/fail` | `services/worker_intake.record_failure` |
+| `POST /v1/worker/environment` | `services/worker_intake.record_environment` |
+| `POST /v1/worker/credentials` | `services/worker_intake.record_credentials` |
+
+契约见 `API.md` §8.6。测试 `tests/test_worker_{lease,result,selfreport}.py`，
+真库全量 **478 passed / 8 skipped**（本项之前的基线是 434，不是交接文档里那个 422）。
+
+**范围比原文那行大：是 5 个端点不是 3 个。** 原文只列了 job 的领取与回传，
+但 crawler 当时还直接往 `crawl_environments` 与 `crawl_credentials` 两张表写 ——
+**只要还剩一处直连，`DATABASE_URL` 就得留在那台大陆家宽的机器上**，
+这一项最主要的收益就不成立。
+
+**四个「不听节点的」，每个都有用例钉着**（节点在我们控制之下，但它在别人家的网络上，
+且将来可能不止一台）：
+
+| 不听什么 | 为什么 |
+|---|---|
+| `prompt_text` / `platform` | 建 job 时就定下的事实。让节点回传等于给证据页开一个可以说谎的口子 |
+| 环境**指纹** | 它定义「什么算同一种环境」。节点与冷备版本一旦不齐，同一种环境会算出两个指纹 → 幻影环境 → P2-36 谎报「混了两个出口」 |
+| `checked_at` | 它是「多久没听到节点动静」的信号。用节点的时钟，钟一歪这个信号就说假话 |
+| 截图**文件名** | 会被拼进落盘路径与取图 URL。节点传 `../../etc/passwd.png` 就写到目录外面去了 |
+
+**两条被 HTTP 逼出来的幂等规则。** 隧道模式下「抓完」和「落库」在同一个进程里，
+中间不会掉；换成 HTTP 之后中间隔着一条大陆家宽到新加坡的链路，
+**「库里写成功了但响应没回到节点」是必然会发生的形态**，而节点重试是对的做法：
+
+1. 一条 job 只落一条样本（已有样本就回同一个 `response_id`）—— 否则一次网络抖动
+   就多一条样本，而样本直接进 KPI 分母；
+2. 重复回传 fail 不再扣 `attempt` —— 那是重试预算，多扣一次就少试一次。
+
+**两处与原计划不同，都是有意的：**
+
+1. **lease 是 `POST` 不是 `GET`。** 中间件对安全方法认 `geo_qa_key` Cookie，
+   而领取会把 job 标成 `running`。做成 GET 就是跨站诱导一发即可把一批 job 打成
+   空转、600 秒后被僵死回收成 failed 的口子 —— 违反本仓
+   「所有会改状态的路由都是 POST/PUT/PATCH/DELETE」那条红线。
+   **先写用例证实了这个洞是真的（Cookie 单独就走到了数据库依赖），再改的 POST。**
+2. **鉴权复用现有 `X-API-Key`**（用户拍板）。**代价必须写明**：`X-API-Key` 折算成
+   superadmin，所以节点持有的是**超管等价凭证** —— 这一项换掉的是凭证的**形态**
+   （数据库口令 → API key），**不是它的权限面**。
+   于是收益要按实际的说：**只走 HTTPS 出站 · 截图能回来 · 天然多节点**。
+   「让节点只拿最小权限」不在其中，那需要另发一把 worker key。
+
+**还没做的（第 5 步）**：节点侧 `worker_main.py` 改走 HTTP、`deploy.sh` 去掉
+`DATABASE_URL`、`verify` 加一条「容器无数据库凭证」。
+链路先走 tailnet（`http://100.64.240.17:8200`，今天数据库连接走的就是它），
+**稳定之后再换成公网 HTTPS** —— 第 5 步本来就是风险最大的一步，
+不叠「换传输通道」这个新变量。
+
+**只加不改**：隧道模式保持能用，两种模式并存，回滚 = 让节点回到旧模式，不动代码。
 
 ### 一、采集能力
 
