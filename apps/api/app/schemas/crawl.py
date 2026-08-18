@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 #: 已知平台 = ``platform`` 列的合法取值。**注意它不等于「能跑」** ——
@@ -162,6 +162,63 @@ class WorkerLeaseItem(BaseModel):
     prompt_text: str
     #: 中文名 · 英文名 · 全部别名（fake 模式造正文要用）
     brand_names: List[str] = Field(default_factory=list)
+
+
+class WorkerCitationIn(BaseModel):
+    url: str
+    title: Optional[str] = None
+    snippet: Optional[str] = None
+    #: 不传就由 url 推出来（与隧道模式 persist_result 同一套口径）
+    domain: Optional[str] = None
+    cite_index: Optional[int] = None
+
+
+class WorkerResultIn(BaseModel):
+    """节点回传一次成功抓取的正文。
+
+    **刻意没有 `prompt_text` 字段。** 我们知道自己问了什么，服务端按 `job.prompt_id`
+    自己查 —— 让节点回传等于给证据页开一个可以说谎的口子。pydantic 默认忽略多余字段，
+    所以节点顺手传了也不会生效（`test_result_uses_server_side_prompt_text` 钉着）。
+
+    **也没有 `platform`。** 同理，那是建 job 时就定下的事实。
+    """
+
+    full_text: str
+    citations: List[WorkerCitationIn] = Field(default_factory=list)
+    raw_json: Optional[dict] = None
+    latency_ms: Optional[int] = None
+
+
+class WorkerResultOut(BaseModel):
+    job_id: int
+    #: 重复提交时回的是**同一个** id —— 落库成功但响应没回到节点是常态，
+    #: 节点重试是对的做法，不该因此多出一条样本
+    response_id: int
+    status: str
+
+
+class WorkerFailIn(BaseModel):
+    """节点回传一次失败。
+
+    ``kind`` 由**节点**算好带上来：``classify_failure`` 的判定顺序是
+    「异常类型 → 消息模式 → unknown」，而**异常类型过不了 HTTP**。
+    只传字符串的话，`QianwenLoginRequired` 这类会退化成靠子串猜。
+    不传（老版本节点）则退回服务端按消息文本分类。
+    """
+
+    reason: str
+    kind: Optional[str] = None
+
+    @field_validator("kind")
+    @classmethod
+    def _known_kind(cls, v: Optional[str]) -> Optional[str]:
+        # 乱写的 kind 会静默毁掉重试决策（RETRYABLE_KINDS 匹配不上）与 API 契约，
+        # 而它落进库之后没有任何地方会报错。宁可 422
+        from app.services.failure_kinds import ALL_KINDS
+
+        if v is not None and v not in ALL_KINDS:
+            raise ValueError(f"kind must be one of {list(ALL_KINDS)}")
+        return v
 
 
 class WorkerLeaseOut(BaseModel):

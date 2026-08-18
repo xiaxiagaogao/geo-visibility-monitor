@@ -31,8 +31,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_write
 from app.core.security import Principal
-from app.schemas.crawl import WorkerLeaseItem, WorkerLeaseOut
+from app.schemas.crawl import (
+    CrawlJobOut,
+    WorkerFailIn,
+    WorkerLeaseItem,
+    WorkerLeaseOut,
+    WorkerResultIn,
+    WorkerResultOut,
+)
 from app.services import crawl_jobs as job_svc
+from app.services import worker_intake
 
 router = APIRouter(prefix="/v1/worker", tags=["worker"])
 
@@ -64,3 +72,34 @@ def lease_jobs(
             for item in job_svc.lease_jobs(db, batch_size, environment_id=environment_id)
         ]
     )
+
+
+@router.post("/jobs/{job_id}/result", response_model=WorkerResultOut)
+def report_result(
+    job_id: int,
+    body: WorkerResultIn,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+) -> WorkerResultOut:
+    """回传一次成功的抓取 —— 落样本 + 引用 + 收尾 + 跑 L1 标注。
+
+    **重复回传是安全的**：已经有样本就回同一个 ``response_id``，不再建第二条。
+    节点在大陆家宽、api 在新加坡，「写成功了但响应没回去」是必然会发生的形态。
+    """
+    return WorkerResultOut(**worker_intake.record_result(db, job_id, body))
+
+
+@router.post("/jobs/{job_id}/fail", response_model=CrawlJobOut)
+def report_failure(
+    job_id: int,
+    body: WorkerFailIn,
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_write),
+) -> CrawlJobOut:
+    """回传一次失败。
+
+    回的是完整的 ``CrawlJobOut``，节点据此就能知道**这条会不会被自动重排**
+    （``status='pending'`` 且 ``next_attempt_at`` 在未来 = 正在退避）。
+    """
+    job = worker_intake.record_failure(db, job_id, body.reason, kind=body.kind)
+    return CrawlJobOut(**job_svc.job_to_out(db, job))

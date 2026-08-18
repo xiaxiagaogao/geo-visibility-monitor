@@ -53,7 +53,14 @@ def _build_provider(db: Session, job: CrawlJob, prompt: Prompt):
     )
 
 
-def _persist_result(db: Session, job: CrawlJob, prompt: Prompt, result: CrawlResult) -> RawResponse:
+def persist_result(db: Session, job: CrawlJob, prompt: Prompt, result: CrawlResult) -> RawResponse:
+    """把一次成功的抓取落库（样本 + 引用 + 收尾 + L1 标注）。
+
+    **两个调用方，必须是同一份**：隧道模式的 ``process_job``（抓完就在本进程里落），
+    和 P2-34 的 ``POST /v1/worker/jobs/{id}/result``（节点回传，api 落）。
+    分两份写的话，两种模式产出的样本迟早在某个字段上对不上，
+    而那种分叉在数据里看不出来 —— 只会表现成「换了模式之后数字变了」。
+    """
     resp = RawResponse(
         job_id=job.id,
         platform=job.platform,
@@ -108,7 +115,7 @@ def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
                 result = fut.result(timeout=timeout_sec)
             except FuturesTimeout:
                 raise RuntimeError(f"crawl timed out after {timeout_sec}s")
-        return _persist_result(db, job, prompt, result)
+        return persist_result(db, job, prompt, result)
     except DeepSeekLoginRequired as exc:
         # 单独接住只为了不打印整条 traceback —— 登录墙不是异常情况，是凭证过期，
         # 该看的是 failure_kind 而不是栈。收尾逻辑与下面完全一致

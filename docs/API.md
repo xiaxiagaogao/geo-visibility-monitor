@@ -472,6 +472,50 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 （本来就是多 worker 安全的），**没有另造一套 SQL**；退避闸门（`next_attempt_at`）
 与僵死回收（`CRAWL_STUCK_JOB_SEC`）都照旧生效。
 
+### `POST /v1/worker/jobs/{job_id}/result`
+
+```jsonc
+// 请求
+{
+  "full_text": "国产运动鞋里安踏值得买……",
+  "latency_ms": 27000,
+  "citations": [{ "url": "https://example.com/a", "title": "运动鞋横评",
+                  "cite_index": 1, "domain": null, "snippet": null }],
+  "raw_json": { "provider": "qianwen", "match_num": 2 }
+}
+// 响应 200
+{ "job_id": 3512, "response_id": 9101, "status": "success" }
+```
+
+落样本 + 引用 + 收尾 + 跑 L1 标注，走的是**和隧道模式同一个**
+`crawl_runner.persist_result`。三条：
+
+- **重复提交是安全的，而且必须安全。** 已经有样本就回**同一个** `response_id`，
+  不建第二条。节点在大陆家宽、api 在新加坡，「库里写成功了但 200 没回到节点」
+  是必然会发生的形态，节点重试是对的做法 —— 不幂等的话一次抖动就多一条样本，
+  而样本直接进 KPI 分母。
+- **请求体里没有 `prompt_text`，也没有 `platform`。** 那是建 job 时就定下的事实，
+  服务端自己查。让节点回传等于给证据页开一个可以说谎的口子。传了也会被忽略。
+- `domain` 不传就由 `url` 推出来。
+
+### `POST /v1/worker/jobs/{job_id}/fail`
+
+```jsonc
+// 请求
+{ "reason": "等答案超时：正文 0 字符（停止回答按钮=True）", "kind": "timeout" }
+// 响应 200：完整的 CrawlJobOut
+```
+
+- **`kind` 由节点算好带上来。** `classify_failure` 的判定顺序是
+  「异常类型 → 消息模式 → unknown」，而**异常类型过不了 HTTP** ——
+  只传字符串的话 `QianwenLoginRequired` 这类会退化成靠中文子串猜。
+  取值必须是 `API.md` §8.0.1 那七个之一，**乱写直接 422**（写进库不会有任何地方报错，
+  却会静默毁掉重试决策）。不传则退回服务端按消息文本分类。
+- **只在 job 还是 `running` 时才真的收。** 重复提交、或已被僵死回收的，
+  一律原样返回不再动 —— `attempt` 是重试预算，多扣一次就少试一次。
+- 回的是完整 `CrawlJobOut`，节点据此知道这条**会不会被自动重排**
+  （`status='pending'` 且 `next_attempt_at` 在未来 = 正在退避）。
+
 ---
 
 ## 8.5 检测任务与运行
