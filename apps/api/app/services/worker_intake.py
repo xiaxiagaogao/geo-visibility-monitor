@@ -23,11 +23,15 @@
 from __future__ import annotations
 
 import logging
+import secrets
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import CrawlJob, Prompt
 from app.providers.base import CitationData, CrawlResult
 from app.schemas.crawl import WorkerResultIn
@@ -43,7 +47,36 @@ from app.services.credential_health import store_report
 logger = logging.getLogger("geo.worker_intake")
 
 
-def record_result(db: Session, job_id: int, payload: WorkerResultIn) -> dict:
+#: PNG 的魔数。**按字节判，不信 content-type** —— 后者是节点随口说的
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+def save_screenshot(job: CrawlJob, data: bytes) -> Optional[str]:
+    """把截图落到 ``SCREENSHOT_DIR``，返回 **basename**（不是完整路径）。
+
+    **文件名一律服务端生成，绝不使用节点给的那个。** 它会被直接拼进落盘路径，
+    也会成为 ``/v1/media/screenshots/{basename}`` 的一段 —— 节点传
+    ``../../etc/passwd.png`` 就能写到目录外面去。
+
+    ``SCREENSHOT_DIR`` 为空 = 这一侧没配存储，丢弃并 WARNING。样本照落，
+    证据页那个按钮是条件渲染的，**降级是干净的、不会 404**。
+    """
+    root = (get_settings().screenshot_dir or "").strip()
+    if not root:
+        logger.warning("SCREENSHOT_DIR 未配置，job %s 的截图丢弃（样本照落）", job.id)
+        return None
+    directory = Path(root)
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    # platform 取自库、受注册表约束，只会是 [a-z]+；再加随机后缀避免同秒撞名
+    name = f"{job.platform}_{job.id}_{stamp}_{secrets.token_hex(4)}.png"
+    (directory / name).write_bytes(data)
+    return name
+
+
+def record_result(
+    db: Session, job_id: int, payload: WorkerResultIn, screenshot: Optional[bytes] = None
+) -> dict:
     """收下一条成功结果。**同一条 job 重复回传只会有一条样本。**"""
     job = get_job_or_404(db, job_id)
 
@@ -79,7 +112,8 @@ def record_result(db: Session, job_id: int, payload: WorkerResultIn) -> dict:
         ],
         raw_json=payload.raw_json,
         latency_ms=payload.latency_ms,
-        screenshot_path=None,  # 第 4 步接 multipart 之后才有
+        # 落盘放在幂等判断**之后** —— 重复回传不该再写一份文件
+        screenshot_path=save_screenshot(job, screenshot) if screenshot else None,
     )
     resp = persist_result(db, job, prompt, result)
     logger.info("worker 回传成功 job_id=%s response_id=%s", job.id, resp.id)

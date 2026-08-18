@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     tongyi_user_data_dir: str = ""
     tongyi_delete_session: bool = True
     screenshot_dir: str = "/data/screenshots"
+    # P2-34：截图随结果 multipart 传回来时的单张上限。**必须有上限** ——
+    # 没有的话一个跑飞的采集节点就能把 VPS 的盘写满，而那块盘上还有数据库。
+    # 8MB 对一张整页 PNG 足够宽裕（实测的在几百 KB 量级）
+    screenshot_max_bytes: int = 8_000_000
 
 
 @lru_cache

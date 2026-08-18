@@ -20,11 +20,19 @@
 """
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
 
 TEST_DB = os.environ.get("GEO_TEST_DATABASE_URL")
+
+#: 一张合法的 1×1 PNG。用真的字节而不是 b"fake" —— 服务端按**魔数**判类型，
+#: 只看 content-type 的话节点传什么都能进来
+PNG_1X1 = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+    "890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082"
+)
 
 PROBE = "__pytest_result__"
 
@@ -107,6 +115,16 @@ RESULT = {
 }
 
 
+def _post_result(client, job_id, result=None, screenshot=None, filename="shot.png"):
+    """回传走 **multipart**：正文在 ``payload`` 这个表单字段里（JSON 字符串），
+    截图是可选的第二个 part。截图关掉时就只有 payload 一个字段。"""
+    data = {"payload": json.dumps(result if result is not None else RESULT)}
+    files = (
+        {"screenshot": (filename, screenshot, "image/png")} if screenshot is not None else None
+    )
+    return client.post(f"/v1/worker/jobs/{job_id}/result", data=data, files=files)
+
+
 def _count_responses(db, job_id: int) -> int:
     from sqlalchemy import func, select
 
@@ -122,7 +140,7 @@ def _count_responses(db, job_id: int) -> int:
 
 @behaviour
 def test_result_creates_sample_and_marks_job_success(client, db, running_job):
-    r = client.post(f"/v1/worker/jobs/{running_job.id}/result", json=RESULT)
+    r = _post_result(client, running_job.id)
 
     assert r.status_code == 200
     body = r.json()
@@ -137,9 +155,7 @@ def test_result_creates_sample_and_marks_job_success(client, db, running_job):
 def test_result_stores_the_answer_and_citations(client, db, running_job):
     from app.models import Citation, RawResponse
 
-    rid = client.post(f"/v1/worker/jobs/{running_job.id}/result", json=RESULT).json()[
-        "response_id"
-    ]
+    rid = _post_result(client, running_job.id).json()["response_id"]
 
     db.expire_all()
     resp = db.get(RawResponse, rid)
@@ -161,9 +177,7 @@ def test_result_uses_server_side_prompt_text(client, db, running_job):
     from app.models import RawResponse
 
     payload = dict(RESULT, prompt_text="这不是我们问的问题")
-    rid = client.post(f"/v1/worker/jobs/{running_job.id}/result", json=payload).json()[
-        "response_id"
-    ]
+    rid = _post_result(client, running_job.id, result=payload).json()["response_id"]
 
     db.expire_all()
     assert db.get(RawResponse, rid).prompt_text == f"{PROBE} 国产运动鞋有哪些值得买？"
@@ -176,9 +190,7 @@ def test_result_runs_l1_annotation(client, db, running_job):
 
     from app.models import Mention, RawResponse
 
-    rid = client.post(f"/v1/worker/jobs/{running_job.id}/result", json=RESULT).json()[
-        "response_id"
-    ]
+    rid = _post_result(client, running_job.id).json()["response_id"]
 
     db.expire_all()
     assert db.get(RawResponse, rid).answer_status is not None
@@ -192,8 +204,8 @@ def test_result_resubmit_does_not_create_a_second_sample(client, db, running_job
     节点在大陆家宽、api 在新加坡：「库里写成功了但 200 没回到节点」是必然会发生的，
     而节点重试是对的做法。不幂等的话一次抖动就多一条样本，直接污染 KPI 分母。
     """
-    first = client.post(f"/v1/worker/jobs/{running_job.id}/result", json=RESULT).json()
-    second = client.post(f"/v1/worker/jobs/{running_job.id}/result", json=RESULT).json()
+    first = _post_result(client, running_job.id).json()
+    second = _post_result(client, running_job.id).json()
 
     assert first["response_id"] == second["response_id"]
     db.expire_all()
@@ -202,7 +214,102 @@ def test_result_resubmit_does_not_create_a_second_sample(client, db, running_job
 
 @behaviour
 def test_result_on_missing_job_is_404(client, db):
-    assert client.post("/v1/worker/jobs/99999999/result", json=RESULT).status_code == 404
+    assert _post_result(client, 99999999).status_code == 404
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 一之二、截图（P2-34 第 4 步）
+# ─────────────────────────────────────────────────────────────────────────
+#
+# 迁到大陆节点之后截图一直是关着的（`SCREENSHOT_DIR=` 置空）：截图写在节点本地，
+# 而 api 在 VPS，留着只会让证据页 404。随结果传回来之后这笔债才还上。
+
+
+@pytest.fixture
+def shots_dir(tmp_path, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("SCREENSHOT_DIR", str(tmp_path))
+    get_settings.cache_clear()
+    yield tmp_path
+    get_settings.cache_clear()
+
+
+@behaviour
+def test_screenshot_lands_on_disk_and_is_served_back(client, db, running_job, shots_dir):
+    """**第 4 步的验收就是这条**：证据页那个「查看截图」按钮重新出现。
+
+    只断言「文件写下来了」不够 —— 真正要成立的是「api 能把它端回去」，
+    那条路径（`/v1/media/screenshots/{basename}`）另有归属校验和 basename 约束。
+    """
+    from app.models import RawResponse
+
+    rid = _post_result(client, running_job.id, screenshot=PNG_1X1).json()["response_id"]
+
+    db.expire_all()
+    name = db.get(RawResponse, rid).screenshot_path
+    assert name, "screenshot_path 空 = 证据页仍然不显示按钮"
+    assert (shots_dir / name).is_file()
+
+    served = client.get(f"/v1/media/screenshots/{name}")
+    assert served.status_code == 200
+    assert served.content == PNG_1X1
+    # 需要鉴权的证据文件不能被 CDN 缓存到边缘（URL 以 .png 结尾）
+    assert "no-store" in served.headers["cache-control"]
+
+
+@behaviour
+def test_result_without_screenshot_is_still_a_clean_degrade(client, db, running_job, shots_dir):
+    """截图是可选 part。没有它照样落样本，`screenshot_path` 留空 ——
+    证据页那个按钮是条件渲染的，**降级是干净的，不会 404**。"""
+    from app.models import RawResponse
+
+    rid = _post_result(client, running_job.id).json()["response_id"]
+
+    db.expire_all()
+    assert db.get(RawResponse, rid).screenshot_path is None
+    assert list(shots_dir.iterdir()) == []
+
+
+@behaviour
+def test_screenshot_filename_is_generated_server_side(client, db, running_job, shots_dir):
+    """**绝不使用节点给的文件名。** 它会被直接拼进落盘路径与取图 URL。"""
+    from app.models import RawResponse
+
+    rid = _post_result(
+        client, running_job.id, screenshot=PNG_1X1, filename="../../../etc/passwd.png"
+    ).json()["response_id"]
+
+    db.expire_all()
+    name = db.get(RawResponse, rid).screenshot_path
+    assert "/" not in name and ".." not in name
+    assert str(running_job.id) in name  # 服务端按 job 命名，看得出是哪条
+    assert [p.name for p in shots_dir.iterdir()] == [name]
+
+
+@behaviour
+def test_a_file_that_is_not_a_png_is_rejected(client, db, running_job, shots_dir):
+    """按**魔数**判，不信 content-type —— 后者是节点随口说的。"""
+    r = _post_result(client, running_job.id, screenshot=b"<?php echo 1; ?>")
+
+    assert r.status_code == 415
+    assert _count_responses(db, running_job.id) == 0
+    assert list(shots_dir.iterdir()) == []
+
+
+@behaviour
+def test_an_oversized_screenshot_is_rejected(client, db, running_job, shots_dir, monkeypatch):
+    """没有上限 = 一个跑飞的节点能把 VPS 的盘写满，而那块盘上还有数据库。"""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("SCREENSHOT_MAX_BYTES", "1024")
+    get_settings.cache_clear()
+
+    r = _post_result(client, running_job.id, screenshot=PNG_1X1 + b"\x00" * 4096)
+
+    assert r.status_code == 413
+    assert _count_responses(db, running_job.id) == 0
+    assert list(shots_dir.iterdir()) == []
 
 
 # ─────────────────────────────────────────────────────────────────────────

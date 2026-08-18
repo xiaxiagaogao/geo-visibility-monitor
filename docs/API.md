@@ -472,20 +472,35 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 （本来就是多 worker 安全的），**没有另造一套 SQL**；退避闸门（`next_attempt_at`）
 与僵死回收（`CRAWL_STUCK_JOB_SEC`）都照旧生效。
 
-### `POST /v1/worker/jobs/{job_id}/result`
+### `POST /v1/worker/jobs/{job_id}/result` ← **multipart，不是 JSON**
 
+```bash
+curl -X POST "$API/v1/worker/jobs/3512/result" -H "X-API-Key: $KEY" \
+  -F 'payload={"full_text":"国产运动鞋里安踏值得买……","latency_ms":27000,
+                "citations":[{"url":"https://example.com/a","cite_index":1}],
+                "raw_json":{"provider":"qianwen"}}' \
+  -F 'screenshot=@shot.png;type=image/png'      # ← 可选
+```
 ```jsonc
-// 请求
-{
-  "full_text": "国产运动鞋里安踏值得买……",
-  "latency_ms": 27000,
-  "citations": [{ "url": "https://example.com/a", "title": "运动鞋横评",
-                  "cite_index": 1, "domain": null, "snippet": null }],
-  "raw_json": { "provider": "qianwen", "match_num": 2 }
-}
 // 响应 200
 { "job_id": 3512, "response_id": 9101, "status": "success" }
 ```
+
+正文放在 `payload` 表单字段里（`WorkerResultIn` 的 JSON），**截图是可选的第二个
+part**。做成 multipart 就是为了截图 —— 迁到大陆节点之后它一直关着
+（`SCREENSHOT_DIR=` 置空），因为写在节点本地的图 VPS 读不到、留着只会让证据页 404。
+随结果传回来，这笔债才还上。
+
+截图那一侧三条硬规矩：
+
+- **文件名一律服务端生成**（`{platform}_{job_id}_{时间戳}_{随机}.png`），
+  **绝不使用节点给的那个** —— 它会被拼进落盘路径，也会成为
+  `/v1/media/screenshots/{basename}` 的一段。
+- **按魔数判是不是 PNG，不信 `content-type`**（节点随口说的），否则 `415`。
+- **超过 `SCREENSHOT_MAX_BYTES`（默认 8MB）直接 `413`**。没有上限的话，
+  一个跑飞的节点就能把 VPS 的盘写满，而那块盘上还有数据库。
+- 不带 screenshot part 照样落样本，`screenshot_path` 留空 ——
+  证据页那个按钮是条件渲染的，**降级是干净的**。
 
 落样本 + 引用 + 收尾 + 跑 L1 标注，走的是**和隧道模式同一个**
 `crawl_runner.persist_result`。三条：

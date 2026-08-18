@@ -26,10 +26,12 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_write
+from app.core.config import get_settings
 from app.core.security import Principal
 from app.schemas.crawl import (
     CrawlJobOut,
@@ -78,19 +80,65 @@ def lease_jobs(
     )
 
 
+def _read_screenshot(upload: UploadFile) -> bytes:
+    """读出截图并当场校验。**两条都不能省：**
+
+    - **上限**：没有的话一个跑飞的节点就能把 VPS 的盘写满，而那块盘上还有数据库。
+      多读一个字节来判断「超了没有」，不把整个流吃进内存再量。
+    - **魔数**：按字节判是不是 PNG，**不信 ``content-type``** —— 那是节点随口说的，
+      而这个文件会以 ``.png`` 结尾被端回给浏览器。
+    """
+    limit = get_settings().screenshot_max_bytes
+    data = upload.file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(
+            # 写字面量 413：本机 venv（py3.9）还没有 HTTP_413_CONTENT_TOO_LARGE，
+            # 而 api 容器（py3.12）已经把 HTTP_413_REQUEST_ENTITY_TOO_LARGE 标了弃用。
+            # 两边都能跑的只有这个数
+            status_code=413,
+            detail=f"screenshot exceeds SCREENSHOT_MAX_BYTES ({limit})",
+        )
+    if not data.startswith(worker_intake.PNG_MAGIC):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="screenshot must be a PNG (magic bytes checked, not content-type)",
+        )
+    return data
+
+
 @router.post("/jobs/{job_id}/result", response_model=WorkerResultOut)
 def report_result(
     job_id: int,
-    body: WorkerResultIn,
+    payload: str = Form(..., description="WorkerResultIn 的 JSON 字符串"),
+    screenshot: Optional[UploadFile] = File(
+        None, description="可选的证据截图（PNG）。截图关闭时不带这个 part"
+    ),
     db: Session = Depends(get_db),
     _: Principal = Depends(require_write),
 ) -> WorkerResultOut:
-    """回传一次成功的抓取 —— 落样本 + 引用 + 收尾 + 跑 L1 标注。
+    """回传一次成功的抓取 —— 落样本 + 引用 + 截图 + 收尾 + 跑 L1 标注。
 
-    **重复回传是安全的**：已经有样本就回同一个 ``response_id``，不再建第二条。
-    节点在大陆家宽、api 在新加坡，「写成功了但响应没回去」是必然会发生的形态。
+    **是 multipart 不是 JSON**：截图要跟结果一起回来。迁到大陆节点之后截图一直
+    关着（`SCREENSHOT_DIR=` 置空）—— 写在节点本地的图 VPS 读不到，留着只会让
+    证据页 404。随结果传回来，这笔债才还上。
+
+    正文放在 ``payload`` 这个表单字段里（``WorkerResultIn`` 的 JSON），
+    **截图是可选 part** —— 不带它照样落样本，证据页那个按钮条件渲染，降级是干净的。
+
+    **重复回传是安全的**：已经有样本就回同一个 ``response_id``，既不建第二条样本，
+    也不再写一份截图文件。
     """
-    return WorkerResultOut(**worker_intake.record_result(db, job_id, body))
+    try:
+        body = WorkerResultIn.model_validate_json(payload)
+    except ValidationError as exc:
+        # 不让 pydantic 的异常冒成 500 —— 节点看到 500 会当成服务端故障去重试，
+        # 而这其实是它自己发错了，重试多少次都一样
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+        ) from exc
+
+    data = _read_screenshot(screenshot) if screenshot is not None else None
+    return WorkerResultOut(**worker_intake.record_result(db, job_id, body, screenshot=data))
 
 
 @router.post("/jobs/{job_id}/fail", response_model=CrawlJobOut)
