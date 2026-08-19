@@ -198,3 +198,27 @@ def test_client_refuses_to_start_without_a_key():
     """没有 key 的话每一发都会 401，而节点会把它当成「没活干」静静跑一整夜。"""
     with pytest.raises(ValueError):
         WorkerClient("http://100.64.240.17:8200", "")
+
+
+def test_blank_database_url_does_not_kill_the_container(monkeypatch):
+    """**worker 模式下这台机器没有数据库，而 `DATABASE_URL=` 是最直觉的写法。**
+
+    2026-08-19 在 VPS 上预检新镜像时真撞到了：`app/core/db.py` 在 **import 期**
+    就建 engine，而 `create_engine("")` 抛 ArgumentError —— 容器起不来，
+    traceback 里一个字都不提 worker 模式，只有一句
+    「Could not parse SQLAlchemy URL」。
+
+    修之前更坏的一点是它会和自检对上谎：`deploy.sh verify` 那条
+    「容器无数据库凭证」检的是 `^DATABASE_URL=.`（至少一个字符），
+    空值照样算「✓ 没有凭证」—— 自检说通过，容器却在后台反复重启。
+    修完之后两者都成立：空值不再致命，而「没有凭证」这句话也仍然是真的。
+    """
+    from app.core import db as db_mod
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("DATABASE_URL", "")
+    get_settings.cache_clear()
+    try:
+        assert db_mod._make_engine() is not None
+    finally:
+        get_settings.cache_clear()
