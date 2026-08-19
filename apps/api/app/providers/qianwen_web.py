@@ -41,7 +41,7 @@ import time
 from typing import Any, Dict, Optional
 
 from app.providers.base import BaseProvider, CrawlResult
-from app.providers.browser import launch_persistent, seed_storage_state
+from app.providers.browser import capture_evidence, launch_persistent, seed_storage_state
 
 logger = logging.getLogger("geo.qianwen_web")
 
@@ -257,7 +257,13 @@ class QianwenWebProvider(BaseProvider):
                         citations=[],          # 见模块 docstring 与 P2-37
                         raw_json=raw_json,
                         latency_ms=latency,
-                        screenshot_path=None,  # 节点上截图关闭
+                        # P2-34：截图回来了。**这里原先写死 None**（注释是
+                        # 「节点上截图关闭」）—— 那是把一个临时的运维决定
+                        # 焊进了代码，结果 worker 化之后配置说开着、代码说关着，
+                        # 而没有任何地方报错。现在只认 screenshot_dir
+                        screenshot_path=capture_evidence(
+                            page, self.screenshot_dir, platform="tongyi"
+                        ),
                     )
                 finally:
                     try:

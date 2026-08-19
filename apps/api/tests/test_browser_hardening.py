@@ -102,3 +102,67 @@ def test_timezone_is_overridable_for_the_cold_standby():
     """切 VPS 冷备时出口变新加坡，时区要跟着改。"""
     kw = context_kwargs(user_agent=None, timezone_id="Asia/Singapore")
     assert kw["timezone_id"] == "Asia/Singapore"
+
+
+# ------------------------------------------------- 证据截图（P2-34 第 4 步）
+#
+# 迁到大陆节点之后截图关了两个月，而**关的方式是把 None 写死进 provider**
+# （`qianwen_web` 的 `screenshot_path=None,  # 节点上截图关闭`）。
+# 于是 P2-34 把回传链路做完之后，千问那条线仍然一张图都没有 ——
+# 配置说「开着」，代码说「关着」，而没有任何地方报错。
+#
+# 教训：**「暂时关掉」要关在配置上，不要关在代码里。**
+
+
+class _StubPage:
+    """记下 screenshot 被怎么调的。不需要 playwright。"""
+
+    def __init__(self, boom=False):
+        self.calls = []
+        self.boom = boom
+
+    def screenshot(self, **kw):
+        self.calls.append(kw)
+        if self.boom:
+            raise RuntimeError("target closed")
+
+
+def test_evidence_is_captured_when_a_directory_is_configured(tmp_path):
+    from app.providers.browser import capture_evidence
+
+    page = _StubPage()
+    path = capture_evidence(page, str(tmp_path), platform="tongyi")
+
+    assert path and path.endswith(".png") and "tongyi" in path
+    assert page.calls[0]["full_page"] is True, "整页才看得到完整答案（表格/列表会被裁）"
+    assert page.calls[0]["type"] == "png"
+
+
+def test_no_directory_means_no_screenshot_and_no_call(tmp_path):
+    """隧道模式把 SCREENSHOT_DIR 置空 —— 那时连截都不该截。"""
+    from app.providers.browser import capture_evidence
+
+    page = _StubPage()
+    assert capture_evidence(page, "", platform="tongyi") is None
+    assert capture_evidence(page, None, platform="tongyi") is None
+    assert page.calls == []
+
+
+def test_a_failed_screenshot_never_costs_us_the_answer(tmp_path):
+    """**证据图没了，不该把一条真答案一起丢掉。**
+
+    截图发生在答案已经拿到之后。让它抛出去，整条 job 会变成 failed，
+    然后按 P2-16 重试 —— 用三倍配额去换一张图，方向反了。
+    """
+    from app.providers.browser import capture_evidence
+
+    assert capture_evidence(_StubPage(boom=True), str(tmp_path), platform="tongyi") is None
+
+
+def test_two_shots_in_the_same_second_do_not_collide(tmp_path):
+    """文件名撞了就是后一张盖掉前一张，而证据页照样显示 —— 静默错配。"""
+    from app.providers.browser import capture_evidence
+
+    a = capture_evidence(_StubPage(), str(tmp_path), platform="tongyi")
+    b = capture_evidence(_StubPage(), str(tmp_path), platform="tongyi")
+    assert a != b

@@ -215,3 +215,46 @@ def seed_storage_state(context, state_path: str, *, timeout_ms: int = 60_000) ->
             logger.warning("localStorage 灌入失败 origin=%s", origin, exc_info=True)
             ok = False
     return ok
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 证据截图（P2-34 第 4 步）
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def capture_evidence(page, screenshot_dir: Optional[str], *, platform: str) -> Optional[str]:
+    """截一张整页证据图，返回**完整路径**；没配目录或截失败都返回 ``None``。
+
+    **放在这里而不是各 provider 里，是因为它被写死过一次。** 迁到大陆节点后
+    截图被关掉，而关的方式是把 ``screenshot_path=None`` 直接写进 provider
+    （``qianwen_web`` 里那句 ``# 节点上截图关闭``）。于是 P2-34 把回传链路做完
+    之后，千问那条线仍然一张图都没有 —— **配置说开着、代码说关着，
+    而没有任何地方报错**（2026-08-19 上线后第一条真 job 才暴露）。
+
+    教训是通用的：**「暂时关掉」要关在配置上，不要关在代码里。**
+
+    三条：
+
+    1. ``full_page=True`` —— 答案里的表格/列表很长，只截视口会裁掉一半，
+       而证据图的全部意义就是「完整答案长什么样」。
+    2. **截图失败绝不往外抛。** 它发生在答案已经拿到之后；让它抛出去，
+       整条 job 会变成 failed 然后按 P2-16 重试 —— 用三倍配额换一张图，方向反了。
+    3. 文件名带毫秒**加随机后缀**。只用时间戳挡不住同毫秒的两次调用
+       （用例实测撞到了），而撞名的后果是后一张盖掉前一张、证据页照样显示 ——
+       静默错配比 404 难查得多。
+    """
+    if not screenshot_dir:
+        return None
+    try:
+        import secrets
+        import time
+        from pathlib import Path
+
+        Path(screenshot_dir).mkdir(parents=True, exist_ok=True)
+        stamp = f"{int(time.time() * 1000)}_{secrets.token_hex(3)}"
+        path = str(Path(screenshot_dir) / f"{platform}_{stamp}.png")
+        page.screenshot(path=path, full_page=True, type="png")
+        return path
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("证据截图失败（样本照常入库）: %s", type(exc).__name__)
+        return None
