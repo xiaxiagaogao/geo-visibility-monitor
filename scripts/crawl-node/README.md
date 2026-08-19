@@ -13,13 +13,34 @@
  采集节点 ←─────────────────────────────→ sg-dc1 (100.64.240.17)
  podman · Fedora                          docker · Ubuntu
  ┌──────────────────┐                    ┌────────────────────┐
- │ geo-crawler      │                    │ geo-api    :8200   │
+ │ geo-crawler      │  隧道模式：         │ geo-api    :8200   │
  │  --network host  │── DATABASE_URL ───▶│ geo-web    :3000   │
- │  无 proxy        │  100.64.240.17:5433│ geo-postgres       │
+ │  无 proxy        │  :5433（截图关闭）  │ geo-postgres       │
  │  出口 = 家宽     │                    │  只绑 127.0.0.1    │
- │  截图关闭        │                    │ geo-crawler【冷备】│
- └──────────────────┘                    └────────────────────┘
+ │                  │  worker 模式：      │ geo-crawler【冷备】│
+ │                  │── /v1/worker/* ───▶│                    │
+ └──────────────────┘  :8200（截图回传）  └────────────────────┘
 ```
+
+## 两种模式（P2-34 起）
+
+| | 隧道模式（原样） | **HTTP worker 模式** |
+|---|---|---|
+| 节点怎么拿活 | 直连 postgres | `POST /v1/worker/lease` |
+| 节点上的凭证 | **数据库口令** | API key |
+| 截图 | **关闭**（`SCREENSHOT_DIR=` 必须为空） | **开启**（必须非空，随结果传回 VPS） |
+| 开关 | 不设 `GEO_API_BASE` | 设 `GEO_API_BASE` |
+
+**两种模式并存，切换只改环境变量、不动代码** —— 回滚就是把 `GEO_API_BASE`
+去掉重跑 `start`（`PHASE2.md` §6 规矩 1）。
+
+> ⚠️ **`SCREENSHOT_DIR` 两种模式的要求正好相反。** 切换时照抄另一种的配置，
+> 表现是截图静默失效（或证据页 404），而没有任何地方会报错。
+> `deploy.sh` 现在自己按模式设它，`verify` 也会检查 —— 别手动覆盖。
+
+> ⚠️ **worker 模式下节点持有的是「超管等价凭证」。** 复用的 `X-API-Key`
+> 在中间件里折算成 superadmin。所以这一项换掉的是凭证的**形态**，
+> 不是它的**权限面**（详见 `API.md` §8.6）。
 
 ## 部署
 
@@ -28,12 +49,24 @@ export GEO_NODE=root@192.168.2.60
 export GEO_NODE_KEY=~/path/to/node.pem
 export GEO_VPS=root@100.64.240.17          # 走 tailnet，公网那条 SSH 常抖
 export GEO_VPS_KEY=~/path/to/vps.pem
+
+# —— 二选一 ——
+# A. HTTP worker 模式（P2-34）
+export GEO_API_BASE='http://100.64.240.17:8200'   # 先走 tailnet，稳了再换公网
+export GEO_API_KEY='<现有那把 X-API-Key>'
+
+# B. 隧道模式（原样）
 export GEO_DB_URL='postgresql+psycopg://USER:PASS@100.64.240.17:5433/geo'
 
 ./deploy.sh all
 ```
 
 脚本**不含任何凭证**，全从环境变量来，缺了直接报错退出。
+
+**为什么先走 tailnet 而不是直接上 `https://geo.xg22.top`**：切 worker 模式本来
+就是风险最大的一步，不该同时叠上「换传输通道」这个新变量。tailnet 这条路今天
+就在跑（数据库连接走的就是它）。稳定之后改公网只是改一个环境变量 ——
+那时才真正做到「新节点只需要一把 key + 一个公网地址」。
 
 自动退避重试（P2-16）默认关。观察一轮确认分类没问题后再打开：
 

@@ -1,4 +1,14 @@
-"""Standalone crawl worker process (Docker crawler service)."""
+"""采集节点的主进程（Docker crawler 服务）。
+
+**两种模式并存**，按 ``WORKER_API_BASE`` 分流：
+
+- **空（默认）= 隧道模式**：直连数据库跑 ``run_once``。P2-34 之前的全部行为，
+  一个字节没改。
+- **设了 = HTTP worker 模式**（P2-34）：只出站 HTTP，见 ``app/worker_http.py``。
+
+回滚因此不需要动代码 —— 把那个环境变量清掉、重启容器即可
+（``PHASE2.md`` §6 规矩 1）。
+"""
 from __future__ import annotations
 
 import logging
@@ -10,6 +20,7 @@ from app.core.schema import ensure_schema
 from app.services.crawl_runner import run_once
 from app.services.crawl_env import describe_environment, probe_exit_ip, upsert_environment
 from app.services.credential_health import report_credentials
+from app.worker_http import http_mode_enabled, run_forever
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("geo.worker_main")
@@ -17,6 +28,14 @@ logger = logging.getLogger("geo.worker_main")
 
 def main() -> None:
     settings = get_settings()
+
+    # P2-34：设了 WORKER_API_BASE 就走 HTTP 模式（不碰数据库），否则还是隧道模式。
+    # **分流放在 ensure_schema 之前** —— HTTP 模式下这台机器根本没有数据库凭证，
+    # 建表这件事轮不到它做，也做不了
+    if http_mode_enabled(settings):
+        run_forever(settings)
+        return
+
     ensure_schema()
     logger.info(
         "crawler starting mode=%s interval=%s",

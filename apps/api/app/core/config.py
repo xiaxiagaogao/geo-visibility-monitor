@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     crawl_credential_check_sec: int = 300
     # P2-36 的第一块：这条采集是哪台机器报的。空 = 未标注
     crawl_node_label: str = ""
+    # P2-34：采集节点走 HTTP worker 模式时的 api 地址，例如
+    # http://100.64.240.17:8200（tailnet）或 https://geo.xg22.top（公网）。
+    # **空 = 隧道模式**（直连数据库跑 run_once），行为与 P2-34 之前一个字节不差 ——
+    # 这就是「只加不改」那道闸：回滚只需把这个变量清掉重启容器，不必动代码。
+    # 鉴权复用现有 API_KEY（代价见 api/worker.py 的模块 docstring）
+    worker_api_base: str = ""
+    # 单次 worker 请求的超时。要大于一次截图上传的时间（家宽上行不快）
+    worker_http_timeout_sec: float = 60.0
     deepseek_storage_state: str = ""
     # 豆包（P2-06a）。**没有 user_data_dir 时用临时 profile** ——
     # 每次干净，代价是每次重灌 storage_state

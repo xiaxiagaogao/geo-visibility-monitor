@@ -32,6 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from app.providers.base import BaseProvider
 from app.providers.deepseek_web import DeepSeekWebProvider
 from app.providers.doubao_web import DoubaoWebProvider
+from app.providers.fake import FakeProvider
 from app.providers.qianwen_web import QianwenWebProvider
 
 
@@ -161,6 +162,28 @@ def build_real_provider(code: str, ctx: ProviderContext) -> BaseProvider:
             f"implemented={sorted(_REAL_BUILDERS)} or use crawl_mode=fake"
         )
     return builder(ctx)
+
+
+def build_provider(code: str, ctx: ProviderContext) -> BaseProvider:
+    """「这条 job 该用哪个 Provider」的唯一入口 —— **fake / real 的分流也在这里**。
+
+    **为什么从 ``crawl_runner`` 提上来（P2-34）**：原来的
+    ``_build_provider(db, job, prompt)`` 三个参数全是 ORM 对象，
+    而**采集节点没有数据库** —— 它手里只有 lease 回来的 ``platform`` /
+    ``sample_index`` / ``brand_names``。分流留在那儿的话，HTTP 模式只能照抄一份，
+    而那正是本文件开头说的「两处分散且不一致」重演一遍。
+
+    ``platform='fake'`` 在 real 模式下也认：那是造数据用的逃生门。
+    """
+    mode = (getattr(ctx.settings, "crawl_mode", "") or "fake").lower()
+    code = (code or "deepseek").lower()
+    if mode == "fake" or code == "fake":
+        return FakeProvider(
+            platform_label=code if code != "fake" else "deepseek",
+            sample_index=ctx.sample_index,
+            brand_names=ctx.brand_names,
+        )
+    return build_real_provider(code, ctx)
 
 
 def describe(*, crawl_mode: Optional[str]) -> List[dict]:

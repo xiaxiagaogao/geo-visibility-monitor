@@ -26,9 +26,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger("geo.credential_health")
 
 #: WAF cookie 名 → (厂商, 签发地)。**这张表是这一版最有信息量的东西。**
 #:
@@ -198,6 +201,52 @@ _STORAGE_SETTING = {
 }
 
 
+def collect_reports(settings) -> List[Dict[str, Any]]:
+    """读本机所有已知平台的 ``storage_state``，判级，返回快照。**不碰数据库。**
+
+    **分界画在这里是 P2-34 的要求**：HTTP worker 模式下判级仍然在**采集节点**上算
+    （文件在那儿，api 读不到），只是结果改成 ``POST /v1/worker/credentials``
+    上报而不是直接写库。隧道模式的 ``report_credentials`` 也走这个函数，
+    两种模式共用同一套判级。
+
+    ⚠️ 返回值里**没有任何 cookie 的值** —— 它接下来要走一条 HTTP 链路，
+    而红线是「绝不读取、绝不落库 cookie 的值」。
+
+    单个平台出错不影响其余：健康检查坏掉不该把采集也带下去。
+    """
+    now = _utcnow()
+    out: List[Dict[str, Any]] = []
+    for platform, setting_name in _STORAGE_SETTING.items():
+        try:
+            info = inspect_storage_state(
+                getattr(settings, setting_name, "") or None, setting_name=setting_name
+            )
+            status, issues = derive_status(
+                info,
+                expected_region=getattr(settings, "crawl_expected_credential_region", ""),
+                max_age_days=getattr(settings, "crawl_credential_max_age_days", 0),
+                now=now,
+            )
+            out.append(
+                {
+                    "platform": platform,
+                    "status": status,
+                    "node_label": getattr(settings, "crawl_node_label", "") or None,
+                    "issuer_region": info["issuer_region"],
+                    "waf_kind": info["waf_kind"],
+                    "cookie_count": info["cookie_count"],
+                    # 只有名字，没有值
+                    "cookie_names": info["cookie_names"],
+                    "earliest_expiry": info["earliest_expiry"],
+                    "file_mtime": info["file_mtime"],
+                    "issues": issues,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("登录态检查失败 platform=%s（其余平台照常）", platform)
+    return out
+
+
 def store_report(
     db,
     *,
@@ -254,42 +303,13 @@ def report_credentials(db, settings) -> List[Dict[str, Any]]:
     落库那一步是共用的（`store_report`）。这个函数留着给隧道模式与冷备用。
     """
     now = _utcnow()
-    out: List[Dict[str, Any]] = []
-    for platform, setting_name in _STORAGE_SETTING.items():
+    reports = collect_reports(settings)
+    for item in reports:
         try:
-            info = inspect_storage_state(
-                getattr(settings, setting_name, "") or None, setting_name=setting_name
-            )
-            status, issues = derive_status(
-                info,
-                expected_region=getattr(settings, "crawl_expected_credential_region", ""),
-                max_age_days=getattr(settings, "crawl_credential_max_age_days", 0),
-                now=now,
-            )
-            store_report(
-                db,
-                platform=platform,
-                status=status,
-                node_label=getattr(settings, "crawl_node_label", "") or None,
-                issuer_region=info["issuer_region"],
-                waf_kind=info["waf_kind"],
-                cookie_count=info["cookie_count"],
-                # 只有名字，没有值 —— 留着是为了接新平台时能看出它用的哪家 WAF
-                cookie_names=info["cookie_names"],
-                earliest_expiry=info["earliest_expiry"],
-                file_mtime=info["file_mtime"],
-                issues=issues,
-                now=now,
-            )
-            # issuer_region / waf_kind 一并返回：P2-36 的环境指纹要用它们，
-            # 而它们正是这次检查刚算出来的 —— 让 worker 再读一遍文件没有意义
-            out.append({
-                "platform": platform,
-                "status": status,
-                "issues": issues,
-                "issuer_region": info["issuer_region"],
-                "waf_kind": info["waf_kind"],
-            })
+            store_report(db, now=now, **item)
         except Exception:  # noqa: BLE001
             db.rollback()
-    return out
+            logger.exception("登录态快照落库失败 platform=%s（其余平台照常）", item["platform"])
+    # issuer_region / waf_kind 一并返回：P2-36 的环境指纹要用它们，
+    # 而它们正是这次检查刚算出来的 —— 让 worker 再读一遍文件没有意义
+    return reports

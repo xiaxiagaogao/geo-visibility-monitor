@@ -75,11 +75,18 @@ def test_report_writes_a_row(db, tmp_path):
 
     # 返回值里必须带 issuer_region / waf_kind —— **P2-36 的环境指纹靠它们**，
     # 而它们正是这次检查刚算出来的。少了就得再读一遍文件
+    #
+    # **2026-08-18（P2-34）：这里从 `==` 改成逐键断言。**
+    # 判级那一段抽成了 `collect_reports`（不碰数据库，采集节点在 HTTP 模式下
+    # 直接用它），而 `report_credentials` 现在就是「collect + store」，
+    # 返回的是同一批 dict，因此多了 cookie_names / earliest_expiry 等键。
+    # **刻意不再修剪成 5 个键**：修剪等于让同一份信息有两种形状，
+    # 而两种形状迟早只改一边。这条用例要钉的本来就是「那两个字段在不在」。
     ds = next(r for r in out if r["platform"] == "deepseek")
-    assert ds == {
-        "platform": "deepseek", "status": "ok", "issues": [],
-        "issuer_region": "cn", "waf_kind": "huawei",
-    }
+    assert ds["status"] == "ok" and ds["issues"] == []
+    assert ds["issuer_region"] == "cn" and ds["waf_kind"] == "huawei"
+    # 值绝不能跟着返回值跑 —— 它接下来要走一条 HTTP 链路
+    assert "SECRET" not in repr(ds)
     # 豆包没配路径 → missing，且**提示里必须是它自己的变量名**。
     # 这里原先写死 DEEPSEEK_STORAGE_STATE，会把人指去配错的环境变量
     doubao = next(r for r in out if r["platform"] == "doubao")

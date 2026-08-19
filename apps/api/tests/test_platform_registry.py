@@ -64,6 +64,66 @@ def test_build_real_provider_raises_for_unimplemented():
     assert "deepseek" in str(exc.value)
 
 
+class _Settings:
+    """够 build_provider 用的最小 settings（不碰 pydantic，也不读环境）。"""
+
+    def __init__(self, crawl_mode):
+        self.crawl_mode = crawl_mode
+        self.playwright_headless = True
+        self.crawl_timeout_ms = 1000
+        self.crawl_timezone_id = "Asia/Shanghai"
+        self.screenshot_dir = ""
+        for p in ("deepseek", "doubao", "tongyi"):
+            setattr(self, f"{p}_storage_state", "")
+            setattr(self, f"{p}_user_data_dir", "")
+            setattr(self, f"{p}_delete_session", True)
+
+
+def _ctx(crawl_mode, platform_sample=1):
+    return registry.ProviderContext(
+        settings=_Settings(crawl_mode), sample_index=platform_sample, brand_names=["安踏"]
+    )
+
+
+def test_build_provider_gives_fake_in_fake_mode():
+    """fake 模式下每个已知平台都走 FakeProvider —— 本机/CI 造数据靠这个。"""
+    from app.providers.fake import FakeProvider
+
+    for code in ("deepseek", "tongyi", "kimi"):
+        assert isinstance(registry.build_provider(code, _ctx("fake")), FakeProvider)
+
+
+def test_build_provider_gives_the_real_one_in_real_mode():
+    from app.providers.qianwen_web import QianwenWebProvider
+
+    assert isinstance(registry.build_provider("tongyi", _ctx("real")), QianwenWebProvider)
+
+
+def test_build_provider_honours_platform_fake_even_in_real_mode():
+    """``platform='fake'`` 是造数据用的逃生门，real 模式下也得认。"""
+    from app.providers.fake import FakeProvider
+
+    assert isinstance(registry.build_provider("fake", _ctx("real")), FakeProvider)
+
+
+def test_build_provider_still_raises_for_unimplemented():
+    with pytest.raises(RuntimeError):
+        registry.build_provider("kimi", _ctx("real"))
+
+
+def test_build_provider_needs_no_database():
+    """**这条是 P2-34 要的那一条。**
+
+    采集节点没有数据库，它只有 lease 回来的 ``platform`` / ``sample_index`` /
+    ``brand_names``。分流逻辑原先埋在 ``crawl_runner._build_provider(db, job, prompt)``
+    里 —— 三个参数全是 ORM 对象，节点侧一个都拿不到。
+    """
+    import inspect
+
+    sig = inspect.signature(registry.build_provider)
+    assert "db" not in sig.parameters
+
+
 def test_describe_marks_unavailable_with_reason():
     items = {p["code"]: p for p in registry.describe(crawl_mode="real")}
 

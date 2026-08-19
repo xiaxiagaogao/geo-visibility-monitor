@@ -14,8 +14,7 @@ from app.core.config import get_settings
 from app.models import Citation, CrawlJob, Prompt, RawResponse
 from app.providers.base import CrawlResult
 from app.providers.deepseek_web import DeepSeekLoginRequired
-from app.providers.fake import FakeProvider
-from app.providers.registry import ProviderContext, build_real_provider
+from app.providers.registry import ProviderContext, build_provider
 from app.services.annotate import annotate_response
 from app.services.brands import matching_names
 from app.services.crawl_jobs import claim_pending_jobs, fail_job, reclaim_stuck_jobs
@@ -27,28 +26,38 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def run_with_timeout(provider, prompt_text: str, settings) -> CrawlResult:
+    """跑一次抓取，**外面再套一层硬上限**。
+
+    Provider 自己有 ``crawl_timeout_ms``，但一个卡死的 Chromium 可能根本走不到
+    那个超时。这层比它高 45 秒，保证 job 不会被一个僵尸进程永久占住。
+
+    **两种模式共用**：隧道模式的 ``process_job`` 与 HTTP worker 模式
+    （``app/worker_http.py``）。分两份写的话，两种模式的超时行为会悄悄分叉，
+    而那会表现成「换了模式之后失败率变了」。
+    """
+    timeout_sec = max(60, int(settings.crawl_timeout_ms / 1000) + 45)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(provider.search, prompt_text)
+        try:
+            return fut.result(timeout=timeout_sec)
+        except FuturesTimeout:
+            raise RuntimeError(f"crawl timed out after {timeout_sec}s")
+
+
 def _build_provider(db: Session, job: CrawlJob, prompt: Prompt):
+    """把 ORM 对象翻译成 ``registry.build_provider`` 要的三个纯值。
+
+    分流本身**不在这里** —— 它在 `providers/registry.py`，因为 HTTP worker 模式
+    （P2-34）没有数据库，拿不到 job / prompt，却要走完全一样的分流。
+    """
     settings = get_settings()
-    mode = (settings.crawl_mode or "fake").lower()
-    platform = (job.platform or "deepseek").lower()
-    brands = matching_names(db, prompt.brand_id)
-
-    if mode == "fake" or platform == "fake":
-        return FakeProvider(
-            platform_label=platform if platform != "fake" else "deepseek",
-            sample_index=job.sample_index or 1,
-            brand_names=brands,
-        )
-
-    # real 模式：平台与 Provider 的对应关系全在 providers/registry.py。
-    # 未实现的平台在那里明确报错 —— 正常情况下 create_jobs 就该先把它挡成 400，
-    # 走到这里说明是历史遗留任务或直接改库造出来的。
-    return build_real_provider(
-        platform,
+    return build_provider(
+        job.platform,
         ProviderContext(
             settings=settings,
             sample_index=job.sample_index or 1,
-            brand_names=brands,
+            brand_names=matching_names(db, prompt.brand_id),
         ),
     )
 
@@ -106,15 +115,7 @@ def process_job(db: Session, job: CrawlJob) -> Optional[RawResponse]:
 
     try:
         provider = _build_provider(db, job, prompt)
-        settings = get_settings()
-        # hard cap slightly above provider timeout so zombies cannot stick job forever
-        timeout_sec = max(60, int(settings.crawl_timeout_ms / 1000) + 45)
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(provider.search, prompt.text)
-            try:
-                result = fut.result(timeout=timeout_sec)
-            except FuturesTimeout:
-                raise RuntimeError(f"crawl timed out after {timeout_sec}s")
+        result = run_with_timeout(provider, prompt.text, get_settings())
         return persist_result(db, job, prompt, result)
     except DeepSeekLoginRequired as exc:
         # 单独接住只为了不打印整条 traceback —— 登录墙不是异常情况，是凭证过期，

@@ -199,3 +199,60 @@ def test_worse_of_picks_the_more_severe():
     assert worse_of(REGION_MISMATCH, EXPIRED) == REGION_MISMATCH
     assert worse_of(MISSING, REGION_MISMATCH) == MISSING
     assert worse_of(OK, OK) == OK
+
+
+# ------------------------------------------------- 采集节点侧的收集（P2-34）
+#
+# HTTP worker 模式下，判级仍然在**节点**上算（storage_state 文件在那儿，
+# api 读不到），只是结果改成 POST 上报而不是直接写库。
+# 所以「读文件 + 判级」这一段必须能脱离数据库单独跑。
+
+
+class _Settings:
+    def __init__(self, **kw):
+        self.crawl_node_label = "changsha-home"
+        self.crawl_expected_credential_region = "cn"
+        self.crawl_credential_max_age_days = 0
+        self.deepseek_storage_state = ""
+        self.doubao_storage_state = ""
+        self.tongyi_storage_state = ""
+        for k, v in kw.items():
+            setattr(self, k, v)
+
+
+def test_collect_reports_needs_no_database(tmp_path):
+    """节点没有数据库 —— 这一段必须能自己跑完。"""
+    import inspect
+
+    from app.services.credential_health import collect_reports
+
+    assert "db" not in inspect.signature(collect_reports).parameters
+
+    path = _write(tmp_path, [("HWWAFSESID", "chat.deepseek.com", 0)])
+    rows = collect_reports(_Settings(deepseek_storage_state=path))
+
+    ds = {r["platform"]: r for r in rows}["deepseek"]
+    assert ds["issuer_region"] == "cn"
+    assert ds["waf_kind"] == "huawei"
+    assert ds["node_label"] == "changsha-home"
+    assert ds["cookie_names"] == ["HWWAFSESID"]
+
+
+def test_collect_reports_covers_every_platform_even_unconfigured(tmp_path):
+    """没配登录态的平台也要报 —— `missing` 是结论，漏报是沉默。"""
+    from app.services.credential_health import MISSING, collect_reports
+
+    rows = {r["platform"]: r for r in collect_reports(_Settings())}
+
+    assert set(rows) == {"deepseek", "doubao", "tongyi"}
+    assert all(r["status"] == MISSING for r in rows.values())
+
+
+def test_collect_reports_never_carries_a_cookie_value(tmp_path):
+    """红线：上报的东西里不能有值 —— 它接下来要走一条 HTTP 链路。"""
+    from app.services.credential_health import collect_reports
+
+    path = _write(tmp_path, [("ds_session_id", "chat.deepseek.com", 0)])
+    rows = collect_reports(_Settings(deepseek_storage_state=path))
+
+    assert "SECRET-绝不该被读出来" not in repr(rows)
