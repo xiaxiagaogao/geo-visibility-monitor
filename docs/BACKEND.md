@@ -556,7 +556,10 @@ source 常见：`deepseek_web`（另有历史 `chrome_bridge` / fake，默认计
 | 出口 | `GET /v1/health/credentials`（仅超管/运营），见 `API.md` |
 
 **为什么要经数据库中转**：`storage_state` 在采集节点上，而 api 跑在 VPS ——
-api 读不到那个文件。P2-34 worker 化之后改成 POST 上报，表不用动。
+api 读不到那个文件。**P2-34 之后（2026-08-20）已改成 POST 上报，表确实没动** ——
+判级仍在节点算（`collect_reports`，纯函数），落库走 `POST /v1/worker/credentials`
+到共用的 `store_report`。⚠️ `checked_at` 由**服务端**盖章，不接受节点上报：
+它是「多久没听到节点动静」的信号，用节点的时钟，钟一歪这个信号就说假话。
 
 四条：
 
@@ -710,7 +713,10 @@ run 215 vs run 27/54），而 VPS 在新加坡、服务对象是大陆用户、�
    2026-08-14 起 `deploy/deploy.sh` 对停止态的它走 `compose create --build`
    （重建但不启动，见 §10.2）；**在那之前每推一次代码都会把冷备静默拉起来** ——
    旧判断是「容器存在就 `up -d`」，而 `docker ps -a` 连停止的容器一起匹配。
-4. **截图当前是关闭的**（节点写的截图 VPS 读不到，留着只会 404）。
+4. **截图已恢复**（2026-08-20，P2-34）。节点跑 HTTP worker 模式，截图随
+   `POST /v1/worker/jobs/{id}/result` 的 multipart 传回 VPS，由 api 落到自己那边的
+   `SCREENSHOT_DIR`。⚠️ **两种模式对这个变量的要求正好相反**：隧道模式必须为空
+   （节点写的图 VPS 读不到，留着只会 404），worker 模式必须非空。
 
 ### 10.2 部署 hook 是两个文件（2026-08-14 起）
 
