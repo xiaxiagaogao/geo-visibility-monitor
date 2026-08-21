@@ -21,9 +21,11 @@
 
 ## 这一轮刻意不做的两件
 
-- **不截图。** 采集节点上 ``SCREENSHOT_DIR`` 是空的（api 在 VPS，读不到节点上的
-  截图目录，留着只会让证据页 404）。`CrawlResult.screenshot_path` 契约保留，
-  P2-34 worker 化之后随结果传回即可恢复。
+- ~~**不截图。**~~ **2026-08-20 起截图由 ``SCREENSHOT_DIR`` 决定**（P2-34）：
+  worker 模式下截图随结果 multipart 传回 VPS，隧道模式下那个变量为空、不截。
+  **原先这里是把 ``screenshot_path=None`` 写死在代码里的** —— 千问那句一模一样的
+  写死，让 P2-34 的回传链路整条做完之后仍然一张图都没有，而没有任何地方报错。
+  教训：**「暂时关掉」要关在配置上，不要关在代码里。**
 - **不碰联网搜索。** 实测输入区没有联网开关（工具栏全是技能，「快速」是模型
   选择器），大概率豆包自动判断。生产要开联网这件事已拍板，但**单列成 P2-37** ——
   一次只动一个变量。见 `PHASE2` §4.0.1。
@@ -35,7 +37,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from app.providers.base import BaseProvider, CitationData, CrawlResult
-from app.providers.browser import launch_persistent, seed_storage_state
+from app.providers.browser import capture_evidence, launch_persistent, seed_storage_state
 
 logger = logging.getLogger("geo.doubao_web")
 
@@ -159,7 +161,12 @@ class DoubaoWebProvider(BaseProvider):
                         citations=[],          # 未开联网，见模块 docstring 与 P2-37
                         raw_json=raw_json,
                         latency_ms=latency,
-                        screenshot_path=None,  # 节点上截图关闭
+                        # 只认 screenshot_dir。**别再把「关闭」写死在这里** ——
+                        # 千问那边一模一样的一句写死，让 P2-34 的回传链路整条做完
+                        # 之后仍然一张图都没有，而没有任何地方报错
+                        screenshot_path=capture_evidence(
+                            page, self.screenshot_dir, platform="doubao"
+                        ),
                     )
                 finally:
                     try:

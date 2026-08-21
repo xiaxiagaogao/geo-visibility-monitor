@@ -168,14 +168,26 @@ def test_doubao_issuer_region_is_unknown_and_that_is_fine():
 # ------------------------------------------------------------ 这一轮不做的
 
 
-def test_provider_does_not_produce_screenshots():
-    """采集节点上 `SCREENSHOT_DIR` 是空的（api 在 VPS，读不到节点的截图目录）。
-    证据页那个按钮是条件渲染的，没有 path 就不显示 —— 降级是干净的。"""
+def test_screenshot_is_decided_by_config_not_by_code():
+    """**这条 2026-08-20 反过来了，是有意的。**
+
+    原先它断言的是 `screenshot_path=None` **在**源码里 —— 那时截图被刻意关掉
+    （api 在 VPS，读不到节点的截图目录，留着只会让证据页 404），
+    而关的方式是把 None 写死进 provider。
+
+    P2-34 之后截图能随结果传回 VPS 了，那句写死就从「刻意的降级」变成了
+    **一个骗人的开关**：千问那边同样一句，让回传链路整条做完之后仍然一张图都没有，
+    配置说开着、代码说关着，中间没有任何地方报错。
+
+    所以现在断言相反的事：**开关只有 `SCREENSHOT_DIR` 一个**。
+    隧道模式把它置空 → 不截，降级照样是干净的。
+    """
     import inspect
     from app.providers import doubao_web
 
     src = inspect.getsource(doubao_web.DoubaoWebProvider.search)
-    assert "screenshot_path=None" in src
+    assert "screenshot_path=None" not in src
+    assert "capture_evidence" in src
 
 
 def test_provider_does_not_touch_a_search_toggle():
@@ -282,3 +294,23 @@ def test_completed_answer_is_still_returned():
     page = _FakePage(bubbles=["问题", "这是一段完整的回答正文。"], streaming=False)
 
     assert _wait_for_answer(page, timeout_ms=5_000, poll_ms=1) == "这是一段完整的回答正文。"
+
+
+# --------------------------------------------- 截图不再写死（P2-34 / 2026-08-20）
+#
+# 千问那边踩过一次：`screenshot_path=None,  # 节点上截图关闭` 把一个临时的运维
+# 决定焊进了代码。于是 P2-34 把回传链路整条做完之后仍然一张图都没有 ——
+# **配置说开着、代码说关着，中间没有任何地方报错。**
+# 豆包这句一模一样，趁现在一起改掉，别等接回豆包时再踩第二次。
+
+
+def test_doubao_screenshot_follows_the_configured_dir():
+    """开关只有一个：``SCREENSHOT_DIR``。空 = 不截，非空 = 截。"""
+    from app.providers.browser import capture_evidence
+
+    class _Page:
+        def __init__(self): self.calls = 0
+        def screenshot(self, **kw): self.calls += 1
+
+    p = _Page()
+    assert capture_evidence(p, "", platform="doubao") is None and p.calls == 0
