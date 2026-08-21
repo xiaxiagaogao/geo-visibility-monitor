@@ -48,6 +48,24 @@ from app.services.failure_kinds import classify_failure
 
 logger = logging.getLogger("geo.worker_http")
 
+#: 我们自己的标识，**不伪装成浏览器**。作用是让采集流量在访问日志里认得出来。
+#:
+#: ⚠️ **它过不了 Cloudflare 的 Bot 检查，这是有意接受的。** 2026-08-21 从采集
+#: 节点容器里实测三条路：
+#:
+#: =============================  ==========================
+#: tailnet (`100.64.240.17:8200`)  200 · **0.22s**
+#: `https://geo.xg22.top` 默认 UA   **403 `error code: 1010`**
+#: `https://geo.xg22.top` 浏览器 UA  200 · 3.0s（慢 14 倍；390KB 上传要 16s）
+#: =============================  ==========================
+#:
+#: 也就是说，走公网的前提是**让采集器谎称自己是浏览器，绕过我们自己域名上的
+#: Bot 保护** —— 还慢一个数量级。所以链路留在 tailnet。
+#:
+#: 将来真要走公网，正确的做法是在 Cloudflare 上给 `/v1/worker/*` 加一条
+#: WAF skip 规则：**在 CF 那边开门，而不是在这边伪装。**
+USER_AGENT = "geo-crawler/1.0 (+P2-34 worker)"
+
 
 def http_mode_enabled(settings) -> bool:
     """**只加不改的那道闸**：没配 ``WORKER_API_BASE`` 就还是隧道模式。"""
@@ -105,6 +123,7 @@ class WorkerClient:
     def _call(self, method: str, path: str, *, body=None, ctype=None) -> Any:
         req = urllib.request.Request(self.base + path, method=method, data=body)
         req.add_header("X-API-Key", self.key)
+        req.add_header("User-Agent", USER_AGENT)
         if ctype:
             req.add_header("Content-Type", ctype)
         try:

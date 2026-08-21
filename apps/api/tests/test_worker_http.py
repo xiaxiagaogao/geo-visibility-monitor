@@ -222,3 +222,26 @@ def test_blank_database_url_does_not_kill_the_container(monkeypatch):
         assert db_mod._make_engine() is not None
     finally:
         get_settings.cache_clear()
+
+
+def test_client_identifies_itself_honestly():
+    """请求带一个**诚实**的 User-Agent，不是伪装成浏览器。
+
+    2026-08-21 实测（从采集节点容器里发）：
+
+        走 tailnet                     200 · 0.22s
+        走 https://geo.xg22.top 默认UA  **403 error code: 1010**（CF Bot 检查）
+        走 https://geo.xg22.top 浏览器UA 200 · 3.0s（慢 14 倍）
+        390KB multipart 走 CF           16s
+
+    **所以公网那条路没有采用**：要过去就得让采集器谎称自己是浏览器，
+    那是在绕过我们自己域名上的 Bot 保护，而且慢一个数量级。
+    将来真要走公网，正确的做法是在 Cloudflare 上给 `/v1/worker/*` 加一条
+    WAF skip 规则 —— **在 CF 那边开门，而不是在这边伪装。**
+
+    这个 UA 的价值是让我们的流量在访问日志里认得出来。
+    """
+    from app.worker_http import USER_AGENT
+
+    assert "geo-crawler" in USER_AGENT
+    assert "Mozilla" not in USER_AGENT, "别伪装成浏览器"
