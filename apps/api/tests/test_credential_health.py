@@ -256,3 +256,132 @@ def test_collect_reports_never_carries_a_cookie_value(tmp_path):
     rows = collect_reports(_Settings(deepseek_storage_state=path))
 
     assert "SECRET-绝不该被读出来" not in repr(rows)
+
+
+# ------------------------------------------- 短命 cookie 不该触发过期告警（P2-39）
+#
+# **这条告警撒了两个月的谎。** 千问每天在成功抓取，`/v1/health/credentials`
+# 却一直报 `expired` —— 因为判据是「最早过期的那个 cookie」，而它抓到的是
+# 一批**出生就短命**的辅助 cookie。
+#
+# 2026-08-20 在采集节点上把三份真 storage_state 的签发寿命全量导出来看
+# （只取名字和过期时间，不碰值），结论毫无歧义：
+#
+#   千问 87 个：已过期的 8 个签发寿命是 0.02 / 0.23 / 0.5 / 1 / 1.33 / 3 天；
+#              真正扛登录的 `arms_uid` / `__itrace_wid` 是 **180 天**，还剩 175 天
+#   豆包 27 个：已过期的 1 个是 1 天；`uid_tt` / `x-tt-multi-sids` 是 **30 天**
+#   DeepSeek 5 个：一个都没过期，签发寿命 385 天
+#
+# **3 天和 30 天之间是一条干净的鸿沟**，阈值放 7 天，两边都离得很远。
+# 判据用「签发寿命」（expires − file_mtime）而不是「还剩多久」——
+# 前者描述这个 cookie 被设计成什么，后者只说现在几点了。
+
+
+def _mixed(tmp_path, mtime):
+    """一份真实形状的登录态：一个短命的 + 一个长效的。"""
+    day = 86400
+    return _write(
+        tmp_path,
+        [
+            # 签发时只给了 1 天 —— 辅助 cookie，天天过期，与登录态死活无关
+            ("passport_csrf_token", "chat.deepseek.com", int(mtime.timestamp()) + day),
+            # 签发时给了 180 天 —— 这才是扛登录的
+            ("arms_uid", "chat.deepseek.com", int(mtime.timestamp()) + 180 * day),
+        ],
+        mtime=mtime,
+    )
+
+
+def test_an_expired_short_lived_cookie_is_not_an_expiry_alarm(tmp_path):
+    """**P2-39 的核心。** 短命 cookie 过期是常态，不是登录态失效。"""
+    from app.services.credential_health import OK, derive_status, inspect_storage_state
+
+    mtime = NOW - timedelta(days=10)          # 10 天前导出：1 天那个早过期了
+    info = inspect_storage_state(_mixed(tmp_path, mtime))
+    status, issues = derive_status(info, expected_region="", max_age_days=0, now=NOW)
+
+    assert status == OK, f"短命 cookie 过期不该报警，却报了 {status}: {issues}"
+    assert issues == []
+
+
+def test_earliest_expiry_reports_the_load_bearing_cookie(tmp_path):
+    """`earliest_expiry` 要回答「这份登录态还能活多久」，不是「哪个字段最先到期」。
+
+    它和 `status` 必须是同一套口径 —— 否则界面上会出现
+    「状态 ok，但最早过期时间是 5 天前」这种自相矛盾的一行。
+    """
+    from app.services.credential_health import inspect_storage_state
+
+    mtime = NOW - timedelta(days=10)
+    info = inspect_storage_state(_mixed(tmp_path, mtime))
+
+    assert info["earliest_expiry"] > NOW, "取的应该是那个 180 天的，不是 1 天的"
+
+
+def test_a_long_lived_cookie_expiring_is_still_a_real_alarm(tmp_path):
+    """**别把告警修成永远不响。** 长效 cookie 过期了仍然要报。"""
+    from app.services.credential_health import EXPIRED, derive_status, inspect_storage_state
+
+    day = 86400
+    mtime = NOW - timedelta(days=400)
+    path = _write(
+        tmp_path,
+        [("arms_uid", "chat.deepseek.com", int(mtime.timestamp()) + 180 * day)],
+        mtime=mtime,
+    )
+    status, issues = derive_status(
+        inspect_storage_state(path), expected_region="", max_age_days=0, now=NOW
+    )
+
+    assert status == EXPIRED and "已过期" in issues[0]
+
+
+def test_short_lived_expiry_is_still_recorded_as_context(tmp_path):
+    """不报警**不等于**不记录 —— 排查时要看得见它们确实过期了。"""
+    from app.services.credential_health import inspect_storage_state
+
+    info = inspect_storage_state(_mixed(tmp_path, NOW - timedelta(days=10)))
+
+    assert info["ephemeral_expired"] == 1
+
+
+def test_without_a_file_mtime_we_do_not_guess(tmp_path):
+    """算不出签发寿命时退回旧口径 —— 宁可保守，也不要凭空放行一个真过期的。"""
+    from app.services.credential_health import inspect_storage_state
+
+    info = inspect_storage_state(_mixed(tmp_path, NOW - timedelta(days=10)))
+    info["file_mtime"] = None
+    from app.services.credential_health import classify_expiry
+
+    # 没有 mtime 就没法分辨长效/短命，全部参与判断
+    assert classify_expiry(info["cookie_expiries"], None)[1] == 0
+
+
+def test_a_cookie_already_dead_at_export_time_is_the_loudest_signal(tmp_path):
+    """**这条是 P2-39 差点改错的地方**（真库全量当场抓到）。
+
+    到期时间早于文件 mtime 的 cookie，签发寿命是**负的**。第一版判据写的是
+    `lifetime <= 7 天`，负数当然也满足 —— 于是它被当成「短命辅助 cookie」划掉了。
+
+    但两者方向恰好相反：
+      · 寿命为正且短 → 辅助 cookie，天天过期，与登录态死活无关
+      · 寿命为负     → **导出这份登录态时它就已经死了**
+
+    后者正是 2026-08-15 事故的形状（新加坡导出的 `aws-waf-token` 已过期 11 天），
+    是最响的一个信号。修成「短命」必须 `mtime < expires <= mtime + 7 天`。
+    """
+    from app.services.credential_health import EXPIRED, derive_status, inspect_storage_state
+
+    mtime = NOW - timedelta(days=1)
+    path = _write(
+        tmp_path,
+        # 导出时它已经过期 11 天了
+        [("aws-waf-token", ".deepseek.com", int((NOW - timedelta(days=12)).timestamp()))],
+        mtime=mtime,
+    )
+    info = inspect_storage_state(path)
+    status, issues = derive_status(info, expected_region="", max_age_days=0, now=NOW)
+
+    assert info["ephemeral_expired"] == 0, "它不是短命 cookie，是一份死掉的凭证"
+    assert status == EXPIRED
+    assert any("已过期" in i for i in issues)

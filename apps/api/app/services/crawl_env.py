@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import logging
 import re
+import time
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -70,23 +72,35 @@ def compute_fingerprint(fields: Dict[str, Any]) -> str:
     return "|".join(parts)
 
 
-def probe_exit_ip(timeout: float = 8.0) -> Optional[str]:
-    """探一次容器的出口 IP。失败返回 ``None``，**绝不抛异常**。
+def probe_exit_ip(
+    timeout: float = 8.0, attempts: int = 3, retry_sleep: float = 2.0
+) -> Optional[str]:
+    """探容器的出口 IP。失败返回 ``None``，**绝不抛异常**。
 
     **刻意不禁用代理。** 我们要记的是这个环境**实际**从哪儿出去的 ——
     如果有人给容器设了 proxy 环境变量，那出口就真的变成了代理的落地，
     该被如实记下来。（`deploy.sh verify` 另有一条硬检查会直接拦住这种情况，
     见 `scripts/crawl-node/README.md`。）
-    """
-    try:
-        import urllib.request
 
-        with urllib.request.urlopen(_EXIT_IP_URL, timeout=timeout) as resp:
-            ip = (resp.read().decode("utf-8") or "").strip()
-        return ip if _IP_RE.match(ip) else None
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("探不到出口 IP（环境指纹会缺这一维）: %s", type(exc).__name__)
-        return None
+    **重试是 P2-39 加的。** 探测失败的代价不再是「指纹缺一维」（那会造出幻影
+    环境，见 ``upsert_environment``），而是「这一轮整个不记」—— 代价变大了，
+    所以值得为一次网络抖动多试两下。家宽本来就会抖。
+    """
+    for i in range(max(1, attempts)):
+        try:
+            with urllib.request.urlopen(_EXIT_IP_URL, timeout=timeout) as resp:
+                ip = (resp.read().decode("utf-8") or "").strip()
+            if _IP_RE.match(ip):
+                return ip
+            logger.warning("出口 IP 探测返回了不像 IP 的内容，重试")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "探出口 IP 失败（第 %s/%s 次）: %s", i + 1, attempts, type(exc).__name__
+            )
+        if i + 1 < attempts and retry_sleep > 0:
+            time.sleep(retry_sleep)
+    logger.warning("出口 IP 探不到，本轮不记录采集环境（那批 job 会留 NULL）")
+    return None
 
 
 def describe_environment(
@@ -119,11 +133,29 @@ def describe_environment(
 
 
 def upsert_environment(db, fields: Dict[str, Any]) -> Optional[int]:
-    """按指纹取回环境 id，没有就建一行。返回 ``None`` 表示这轮记不上（不阻断采集）。"""
+    """按指纹取回环境 id，没有就建一行。返回 ``None`` 表示这轮记不上（不阻断采集）。
+
+    **``exit_ip`` 探不到时直接不记（P2-39）。** 这是本模块 docstring 那条
+    「探不到就留 NULL，不编默认值」的兑现 —— 而在此之前实现是自相矛盾的：
+    探测失败会让指纹里那一维变成 ``-``，于是 upsert 出**一行新环境**，于是
+    ``SELECT DISTINCT environment_id`` 大于 1，于是告警说
+    「这次 run 混了两个出口」。**而出口根本没混，只是那一次探测失败了。**
+    （run 298 实际发生过；库里 fingerprint 带 ``|-|`` 的那行就是那次留下的。）
+
+    宁可这批 job 标成「没记」，也不要记成「另一种环境」：
+    **前者是事实，后者是一句会触发告警的假话。**
+
+    ⚠️ 只有 ``exit_ip`` 享受这个待遇，因为只有它会**间歇性**失败。
+    别的维度缺失（比如没配 ``CRAWL_NODE_LABEL``）是稳定的配置状态，
+    不会一会儿有一会儿没有，也就造不出幻影。
+    """
     from app.models import CrawlEnvironment
 
     fp = fields.get("fingerprint")
     if not fp:
+        return None
+    if not fields.get("exit_ip"):
+        logger.warning("出口 IP 未知，本轮不记录采集环境（避免造出幻影环境）")
         return None
     try:
         from sqlalchemy import func, select

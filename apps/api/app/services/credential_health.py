@@ -46,6 +46,26 @@ WAF_SIGNATURES: Tuple[Tuple[str, str, str], ...] = (
 
 REGION_UNKNOWN = "unknown"
 
+#: **签发寿命**低于这个天数的 cookie 不参与「过期」判断（P2-39）。
+#:
+#: 判据是「签发时被给了多长寿命」（``expires − file_mtime``），
+#: **不是「还剩多久」** —— 前者描述这个 cookie 被设计成什么，后者只说现在几点。
+#:
+#: 阈值不是拍的，是 2026-08-20 在采集节点上把三份真 storage_state 全量导出来看的
+#: （只取名字与过期时间，不碰值）：
+#:
+#: ===========  ==========================================  ==========================
+#: 平台          已过期的那些，签发寿命                        真正扛登录的，签发寿命
+#: ===========  ==========================================  ==========================
+#: 千问 (87)     0.02 / 0.23 / 0.5 / 1 / 1.33 / 3 天          **180 天**（还剩 175）
+#: 豆包 (27)     1 天                                        **30 天**
+#: DeepSeek (5)  一个都没过期                                 **385 天**
+#: ===========  ==========================================  ==========================
+#:
+#: **3 天与 30 天之间是一条干净的鸿沟**，7 天放在中间，两边都离得很远。
+#: 接新平台时如果发现某家的会话 cookie 签发寿命就是几天，回来调这个数并补一行实测。
+EPHEMERAL_LIFETIME_DAYS = 7
+
 # 状态，**按严重程度从高到低**。`status` 取最严重的那个，
 # 但 `issues` 会把命中的全列出来 —— 只报一个会让第二个问题在修完第一个之前不可见。
 MISSING = "missing"            # 文件不在 / 空 / 解析不了
@@ -74,6 +94,41 @@ def classify_waf(cookie_names: List[str]) -> Tuple[str, str]:
     return "none", REGION_UNKNOWN
 
 
+def classify_expiry(
+    expiries: List[float], file_mtime: Optional[datetime], now: Optional[datetime] = None
+) -> Tuple[Optional[datetime], int]:
+    """把过期时间分成「长效」与「短命」两拨（P2-39）。
+
+    返回 ``(最早过期的长效 cookie, 已过期的短命 cookie 个数)``。
+
+    **为什么要分**：这条告警撒了两个月的谎 —— 千问天天在成功抓取，
+    健康度却一直报 ``expired``，因为判据取的是「最早过期的那个」，
+    而它抓到的是 ``alipay`` / ``xlly_s`` 这类签发时就只给了几小时到几天的辅助 cookie。
+    **它们过期是常态，与登录态死活无关。**
+
+    ``file_mtime`` 拿不到时**退回旧口径**（全部参与判断）——
+    算不出签发寿命就分辨不了，那时宁可保守报警，也不要凭空放行一个真过期的。
+    """
+    now = now or _utcnow()
+    if not expiries:
+        return None, 0
+    if file_mtime is None:
+        return datetime.fromtimestamp(min(expiries), tz=timezone.utc), 0
+
+    born = file_mtime.timestamp()
+    cutoff = born + EPHEMERAL_LIFETIME_DAYS * 86400
+    # **「短命」必须是正的寿命。** 到期时间早于文件本身的 cookie
+    # **不是**短命辅助 cookie，而是「导出这份登录态时它就已经死了」——
+    # 那正是 2026-08-15 事故的形状（从新加坡导出的 aws-waf-token 已过期 11 天）。
+    # 两者方向相反：前者该忽略，后者是最响的一个信号，绝不能一起划掉。
+    ephemeral = [e for e in expiries if born < e <= cutoff]
+    load_bearing = [e for e in expiries if not (born < e <= cutoff)]
+    earliest = (
+        datetime.fromtimestamp(min(load_bearing), tz=timezone.utc) if load_bearing else None
+    )
+    return earliest, sum(1 for e in ephemeral if e < now.timestamp())
+
+
 def inspect_storage_state(path: Optional[str], *, setting_name: str = "") -> Dict[str, Any]:
     """读一份 ``storage_state``，只取元信息。**返回值里没有任何 cookie 的值。**
 
@@ -92,6 +147,10 @@ def inspect_storage_state(path: Optional[str], *, setting_name: str = "") -> Dic
         "waf_kind": "none",
         "issuer_region": REGION_UNKNOWN,
         "earliest_expiry": None,
+        #: 原始过期时间戳，给 classify_expiry 用（不含任何 cookie 的值）
+        "cookie_expiries": [],
+        #: 已过期的**短命** cookie 个数。是上下文，不是告警（P2-39）
+        "ephemeral_expired": 0,
         "file_mtime": None,
         "parse_error": None,
     }
@@ -121,8 +180,13 @@ def inspect_storage_state(path: Optional[str], *, setting_name: str = "") -> Dic
     # 会话 cookie（expires <= 0）没有过期时间，不参与「最早过期」——
     # 它们随浏览器关闭失效，和「令牌到期」是两回事
     expiries = [c.get("expires") for c in cookies if (c.get("expires") or -1) > 0]
-    if expiries:
-        out["earliest_expiry"] = datetime.fromtimestamp(min(expiries), tz=timezone.utc)
+    out["cookie_expiries"] = expiries
+    # P2-39：只用**长效** cookie 判「这份登录态还能活多久」。
+    # 短命的照样数出来（``ephemeral_expired``），只是不触发告警 ——
+    # **不报警不等于不记录**，排查时要看得见它们确实过期了
+    out["earliest_expiry"], out["ephemeral_expired"] = classify_expiry(
+        expiries, out["file_mtime"]
+    )
     return out
 
 

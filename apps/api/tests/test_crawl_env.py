@@ -88,7 +88,9 @@ def test_probe_never_raises_on_network_failure(monkeypatch):
         raise OSError("network down")
 
     monkeypatch.setattr(urllib.request, "urlopen", boom)
-    assert probe_exit_ip(timeout=0.1) is None
+    # retry_sleep=0：P2-39 给探测加了重试，默认会真 sleep。
+    # 这条用例验的是「不抛异常」，不是退避时长 —— 别让它凭空慢 4 秒
+    assert probe_exit_ip(timeout=0.1, retry_sleep=0) is None
 
 
 def test_probe_rejects_a_non_ip_body(monkeypatch):
@@ -106,4 +108,88 @@ def test_probe_rejects_a_non_ip_body(monkeypatch):
             return False
 
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
-    assert probe_exit_ip() is None
+    assert probe_exit_ip(retry_sleep=0) is None
+
+
+# ------------------------------------------- 探不到出口 IP 时不许造幻影（P2-39）
+#
+# `probe_exit_ip` 失败会返回 None，于是指纹里那一维变成 `-`，
+# 于是 upsert 出一行**新**环境，于是
+# `SELECT DISTINCT environment_id FROM crawl_jobs WHERE run_id=?` 大于 1，
+# 于是 P2-36 告警说「这次 run 混了两个出口」—— **而出口根本没混，
+# 只是那一次探测失败了**（run 298 实际发生过，库里的 id=2 就是那次留下的）。
+#
+# 这和本模块 docstring 里写的规矩是矛盾的：「探不到就留 NULL，不编默认值」——
+# 而 `-` 恰恰就是编了一个值。
+
+
+class _ExplodingSession:
+    """碰一下就炸 —— 用来证明「压根没走到数据库」。"""
+
+    def scalars(self, *a, **k):
+        raise AssertionError("探不到出口 IP 时不该碰数据库")
+
+    def scalar(self, *a, **k):
+        raise AssertionError("探不到出口 IP 时不该碰数据库")
+
+
+class _Settings:
+    crawl_node_label = "changsha-home"
+    crawl_timezone_id = "Asia/Shanghai"
+    crawl_mode = "real"
+
+
+def test_a_failed_ip_probe_records_nothing_at_all():
+    """**宁可这批 job 标成「没记」，也不要记成「另一种环境」。**
+
+    前者是事实（我们确实不知道），后者是一句会触发告警的假话。
+    """
+    from app.services.crawl_env import describe_environment, upsert_environment
+
+    fields = describe_environment(_Settings(), credential_region="cn",
+                                  waf_kind="huawei", exit_ip=None)
+
+    assert upsert_environment(_ExplodingSession(), fields) is None
+
+
+def test_a_successful_probe_still_records_normally():
+    """别把它修成永远不记 —— 探到了就要照常落库。"""
+    from app.services.crawl_env import describe_environment
+
+    fields = describe_environment(_Settings(), credential_region="cn",
+                                  waf_kind="huawei", exit_ip="120.228.64.174")
+
+    assert fields["exit_ip"] == "120.228.64.174"
+    assert "120.228.64.174" in fields["fingerprint"]
+
+
+def test_probe_retries_before_giving_up(monkeypatch):
+    """一次抖动就放弃的话，会有一大批 job 白白变成「没记」。"""
+    from app.services import crawl_env
+
+    calls = {"n": 0}
+
+    def _flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise OSError("transient")
+        class _R:
+            def __enter__(self_): return self_
+            def __exit__(self_, *e): return False
+            def read(self_): return b"120.228.64.174\n"
+        return _R()
+
+    monkeypatch.setattr(crawl_env.urllib.request, "urlopen", _flaky)
+    assert crawl_env.probe_exit_ip(timeout=0.01, retry_sleep=0) == "120.228.64.174"
+    assert calls["n"] == 3
+
+
+def test_probe_gives_up_quietly_and_never_raises(monkeypatch):
+    """健康检查自己不能成为故障源。"""
+    from app.services import crawl_env
+
+    def _dead(*a, **k):
+        raise OSError("no network")
+
+    monkeypatch.setattr(crawl_env.urllib.request, "urlopen", _dead)
+    assert crawl_env.probe_exit_ip(timeout=0.01, retry_sleep=0) is None

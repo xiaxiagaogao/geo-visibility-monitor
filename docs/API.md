@@ -421,6 +421,21 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 「几分钟前」—— 抓取确实在成功，只是每次 run 头几条卡在 WAF 挑战上超时。
 **它只能发现「全红」，发现不了「悄悄降级」。**
 
+**⚠️ `earliest_expiry` 只统计「长效」cookie（P2-39，2026-08-20 起）。**
+
+判据是**签发寿命**（`expires − file_mtime`），不是「还剩多久」：
+`mtime < expires ≤ mtime + 7 天` 的算短命辅助 cookie，不参与判断，
+只在 `ephemeral_expired` 里计数。
+
+在此之前这个字段取的是「最早过期的**任何**一个 cookie」，于是
+**千问天天在成功抓取却一直报 `expired`** —— 抓到的是 `alipay` / `xlly_s`
+这类签发时只给了几小时到几天的辅助 cookie。节点实测：千问 87 个 cookie 里
+已过期的 8 个签发寿命是 0.02–3 天，而真正扛登录的是 **180 天**。
+
+**「短命」必须是正的寿命。** 到期时间早于文件 mtime 的 cookie 签发寿命为负，
+它**不是**短命辅助 cookie，而是「导出这份登录态时它就已经死了」——
+那正是 2026-08-15 事故的形状，是最响的一个信号，仍然照报。
+
 三个容易看错的地方：
 
 - **`overall: "unreported"` 不是 ok** —— 那表示 crawler 从没上报过
