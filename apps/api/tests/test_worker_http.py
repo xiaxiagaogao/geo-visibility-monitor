@@ -245,3 +245,29 @@ def test_client_identifies_itself_honestly():
 
     assert "geo-crawler" in USER_AGENT
     assert "Mozilla" not in USER_AGENT, "别伪装成浏览器"
+
+
+def test_the_loop_actually_pauses_when_configured(monkeypatch):
+    """纯函数对不代表接上了 —— 这条钉的是「循环真的调了它」。"""
+    from app import worker_http
+
+    slept = []
+    monkeypatch.setattr(worker_http.time, "sleep", lambda s: slept.append(s))
+
+    s = _Settings()
+    s.crawl_pace_min_sec, s.crawl_pace_max_sec = 20.0, 90.0
+    worker_http._pause(s)
+
+    assert len(slept) == 1 and 20.0 <= slept[0] <= 90.0
+
+
+def test_the_loop_does_not_pause_when_off(monkeypatch):
+    """**默认必须一秒都不多等** —— 否则「只加不改」就不成立。"""
+    from app import worker_http
+
+    slept = []
+    monkeypatch.setattr(worker_http.time, "sleep", lambda s: slept.append(s))
+
+    worker_http._pause(_Settings())      # 没配 crawl_pace_*
+
+    assert slept == []

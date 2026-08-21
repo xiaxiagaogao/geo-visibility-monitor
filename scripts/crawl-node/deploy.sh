@@ -52,6 +52,13 @@ fi
 # timeout 认得准（`grep kind=unknown`），再 `GEO_AUTO_RETRY=true ./deploy.sh start`。
 # 回滚就是改回 false 重跑 start —— 不必 git revert（PHASE2 §6 规矩 1）
 AUTO_RETRY=${GEO_AUTO_RETRY:-false}
+# 两条 job 之间随机等 [PACE_MIN, PACE_MAX] 秒（P2-38 前置）。**默认 0 = 关**。
+# 为什么要有它：run 298 量出来的起点间隔是 46/46/42/40/52/42/53/43 秒 ——
+# 固定心跳本身就是一个行为指纹，而 CRAWL-INTEL §4.1 的结论是
+# 「被盯上的不是量，是规律性」。回滚 = 去掉这两个变量重跑 start。
+# ⚠️ 它会**拉长一次 run 的总时长**：49 条 job 配 20–90 秒 ≈ 多花 45 分钟。
+PACE_MIN=${GEO_PACE_MIN:-0}
+PACE_MAX=${GEO_PACE_MAX:-0}
 # 浏览器上报的时区 + 期望的登录态签发地。
 # **这两个和「crawler 跑在哪台机器上」是同一件事的三个面**：
 # 切到 VPS 冷备（新加坡出口）时，两个都要跟着改，否则只是把一种不一致
@@ -199,6 +206,8 @@ do_start() {
       -e TONGYI_USER_DATA_DIR=/data/tongyi_profile \
       -e SCREENSHOT_DIR='$SHOT_DIR' \
       -e CRAWL_AUTO_RETRY_ENABLED='$AUTO_RETRY' \
+      -e CRAWL_PACE_MIN_SEC='$PACE_MIN' \
+      -e CRAWL_PACE_MAX_SEC='$PACE_MAX' \
       -e CRAWL_TIMEZONE_ID='$TZ_ID' \
       -e CRAWL_EXPECTED_CREDENTIAL_REGION='$EXPECT_REGION' \
       -e CRAWL_NODE_LABEL='$NODE_LABEL' \

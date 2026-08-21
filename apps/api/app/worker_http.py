@@ -45,6 +45,7 @@ from app.services.crawl_env import FINGERPRINT_FIELDS, describe_environment, pro
 from app.services.crawl_runner import run_with_timeout
 from app.services.credential_health import collect_reports
 from app.services.failure_kinds import classify_failure
+from app.services.pacing import next_pause_sec
 
 logger = logging.getLogger("geo.worker_http")
 
@@ -274,6 +275,14 @@ def _refresh_self_report(client, settings) -> Optional[int]:
     return env_id
 
 
+def _pause(settings) -> None:
+    """按配置随机停一下（P2-38 前置）。默认 0 秒 = 什么都不做。"""
+    sec = next_pause_sec(settings)
+    if sec > 0:
+        logger.info("节奏打散：等 %.1f 秒", sec)
+        time.sleep(sec)
+
+
 def run_forever(settings) -> None:
     """HTTP 模式主循环。结构与隧道模式的 ``worker_main.main()`` 一一对应。"""
     client = WorkerClient(
@@ -296,10 +305,18 @@ def run_forever(settings) -> None:
                 env_id = _refresh_self_report(client, settings)
 
             jobs = client.lease(settings.fake_worker_batch_size, environment_id=env_id)
-            for job in jobs:
+            for i, job in enumerate(jobs):
                 process_leased_job(client, settings, job)
+                # P2-38 前置：**把固定心跳变成一个分布**。默认 0 = 不等。
+                # 最后一条之后不等 —— 那段等待没有意义，下一轮的 lease
+                # 本来就要隔 fake_worker_interval_sec
+                if i + 1 < len(jobs):
+                    _pause(settings)
             if jobs:
                 logger.info("processed %s", [j["job_id"] for j in jobs])
+                # batch_size=1 时上面那个循环内的间隔永远不生效（只有一条），
+                # 所以真正起作用的是这里 —— 领完一批之后再打散一次
+                _pause(settings)
         except Exception:  # noqa: BLE001
             # 领不到就下一轮再来。api 重启 / 家宽抖一下都会走到这里，
             # 不该让容器退出（它是 restart: unless-stopped，退出反而更慢）

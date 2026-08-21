@@ -86,6 +86,13 @@ class Settings(BaseSettings):
     worker_api_base: str = ""
     # 单次 worker 请求的超时。要大于一次截图上传的时间（家宽上行不快）
     worker_http_timeout_sec: float = 60.0
+    # 两条 job 之间随机等 [min, max] 秒（P2-38 前置）。**默认 0 = 关**，
+    # 行为与加它之前一个字节不差。
+    # 为什么要有它：run 298 量出来的起点间隔是 46/46/42/40/52/42/53/43 秒 ——
+    # 固定心跳本身就是一个行为指纹，而 CRAWL-INTEL §4.1 的结论是
+    # 「被盯上的不是量，是规律性」。见 services/pacing.py
+    crawl_pace_min_sec: float = 0.0
+    crawl_pace_max_sec: float = 0.0
     deepseek_storage_state: str = ""
     # 豆包（P2-06a）。**没有 user_data_dir 时用临时 profile** ——
     # 每次干净，代价是每次重灌 storage_state
