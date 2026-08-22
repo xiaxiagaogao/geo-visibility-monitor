@@ -440,3 +440,52 @@ def test_worker_callbacks_require_write(fn_name, path):
 
     assert path in {r.path for r in worker_api.router.routes}
     assert "require_write" in inspect.getsource(getattr(worker_api, fn_name))
+
+
+# ─────────────────────────────────────────── 四、联网标注 search_used（P2-37）
+#
+# §4.0.1 拍板的口径是「**记录 search 是否激活；无搜索输出是结果，不是废样本**」。
+# 所以它要能分桶报告，而分桶的前提是三态分得开：
+#
+#   True  = 这次联网了      False = 确认没联网      None = 我们不知道
+#
+# **None 和 False 混起来就是把「没记」说成「没联网」** —— 老样本、别的平台、
+# 解析失败全都会落在 None 上，把它们算进「没联网」那一桶，报告里就多一条假结论。
+# 一个 `or False` 或者一句 `bool(x)` 就够把三态压成两态，而且不会报错。
+
+
+@behaviour
+@pytest.mark.parametrize("value", [True, False, None])
+def test_search_used_survives_the_whole_round_trip(client, db, running_job, value):
+    """provider → HTTP → 库 → 读回来，三个取值都要原样活着。"""
+    from app.models import RawResponse
+
+    rid = _post_result(
+        client, running_job.id, result=dict(RESULT, search_used=value)
+    ).json()["response_id"]
+
+    db.expire_all()
+    assert db.get(RawResponse, rid).search_used is value
+
+
+@behaviour
+def test_search_used_defaults_to_unknown_not_to_false(client, db, running_job):
+    """老版本节点不带这个字段时必须是 `None` —— 默认成 False 等于凭空断言没联网。"""
+    from app.models import RawResponse
+
+    payload = {k: v for k, v in RESULT.items()}
+    rid = _post_result(client, running_job.id, result=payload).json()["response_id"]
+
+    db.expire_all()
+    assert db.get(RawResponse, rid).search_used is None
+
+
+@behaviour
+def test_search_used_is_exposed_on_the_response_api(client, db, running_job):
+    """报告要按它分桶，取不到就等于没做。"""
+    rid = _post_result(
+        client, running_job.id, result=dict(RESULT, search_used=True)
+    ).json()["response_id"]
+
+    body = client.get(f"/v1/responses/{rid}").json()
+    assert body["search_used"] is True

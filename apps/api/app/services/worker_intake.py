@@ -112,6 +112,7 @@ def record_result(
         ],
         raw_json=payload.raw_json,
         latency_ms=payload.latency_ms,
+        search_used=payload.search_used,
         # 落盘放在幂等判断**之后** —— 重复回传不该再写一份文件
         screenshot_path=save_screenshot(job, screenshot) if screenshot else None,
     )

@@ -139,6 +139,10 @@ class RawResponse(Base):
     raw_json: Mapped[Optional[Any]] = mapped_column(JSONB)
     latency_ms: Mapped[Optional[int]] = mapped_column(Integer)
     answer_status: Mapped[Optional[str]] = mapped_column(Text)  # ok|empty|too_short|error
+    #: P2-37 这次回答有没有联网检索。**三态，NULL 不等于 False**：
+    #: True=联网了 · False=**确认**没联网 · NULL=我们不知道（老样本/别的平台/解析失败）。
+    #: 它要拿去分桶报告，把 NULL 当成 False 就是凭空断言「没联网」
+    search_used: Mapped[Optional[bool]] = mapped_column(Boolean)
     annotator_version: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

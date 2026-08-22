@@ -45,6 +45,7 @@ def _to_out(row: RawResponse) -> RawResponseOut:
         latency_ms=row.latency_ms,
         answer_status=row.answer_status,
         annotator_version=row.annotator_version,
+        search_used=row.search_used,
         created_at=row.created_at,
         citations=[CitationOut.model_validate(c) for c in row.citations],
         mentions=[MentionOut.model_validate(m) for m in row.mentions],
@@ -196,6 +197,9 @@ def _summary_columns():
         RawResponse.latency_ms,
         RawResponse.answer_status,
         RawResponse.annotator_version,
+        # P2-37 联网标注。**加在这里而不是只加在 out 模型上** —— 这个投影是
+        # 显式列清单，漏一列不会报错，只会在构造 out 时 AttributeError
+        RawResponse.search_used,
         RawResponse.created_at,
     )
 
@@ -276,6 +280,7 @@ def list_response_summaries(
                 latency_ms=r.latency_ms,
                 answer_status=r.answer_status,
                 annotator_version=r.annotator_version,
+                search_used=r.search_used,
                 created_at=r.created_at,
                 mentions=[
                     MentionOut.model_validate(m) for m in by_response.get(r.id, [])

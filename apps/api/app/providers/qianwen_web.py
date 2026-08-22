@@ -29,23 +29,29 @@ stream/generat/loading 字样的属性是图片的 ``loading=lazy``。
   误删的是用户的私人对话，代价不可逆。所以 ``session_deleted`` 如实报
   ``False``，不写 True 骗自己。**代价是会话会堆积**（豆包 bug B 的同款），
   已记进 PHASE2 待办。
-- **不碰联网/引用。** 千问回答有时带「N 篇来源」有时没有（实测：匿名问
-  「介绍杭州」有 8 篇，登录问「国产运动鞋品牌」没有）——
-  **说明联网是按 query 触发的，不是常开**。这正是 P2-37 要处理的问题，
-  一次只动一个变量，这里先 ``citations=[]``。
+- ~~**不碰联网/引用。**~~ **P2-37 已接（2026-08-21）**：引用从 SSE 流里抽
+  （``qianwen_sse.parse_stream``），同时记录 ``search_used``。
+  **不强制开联网** —— 千问根本没有联网开关（枚举过输入区全部 24 个按钮），
+  且联网是按 query 触发的：时效性问题触发，而监测集全是品牌对比类，实测不触发。
+  §4.0.1 的口径是「**记录 search 是否激活；无搜索输出是结果，不是废样本**」。
 """
 from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.providers.base import BaseProvider, CrawlResult
 from app.providers.browser import capture_evidence, launch_persistent, seed_storage_state
+from app.providers.qianwen_sse import parse_stream
 
 logger = logging.getLogger("geo.qianwen_web")
 
 QIANWEN_URL = "https://www.qianwen.com/"
+
+#: 流式对话接口（P2-37）。**引用只在这条流里，DOM 里一条外链都没有** ——
+#: 2026-08-17 节点实测，见 `PHASE2.md` §4.0.1 第五节与 `qianwen_sse.py`。
+CHAT_API_HINT = "/api/v2/chat"
 
 #: 输入框是 Slate 编辑器的 contenteditable，**页面上没有 textarea**。
 INPUT_SELECTOR = "[contenteditable='true']"
@@ -217,6 +223,23 @@ class QianwenWebProvider(BaseProvider):
                         seed_storage_state(context, self.storage_state)
 
                     page = context.pages[0] if context.pages else context.new_page()
+
+                    # P2-37：引用只在流里，DOM 里一条外链都没有（§4.0.1 第五节）。
+                    # 只在内存里攒着解析，**不落库** —— 与 DeepSeek/豆包同一条纪律
+                    sse_bodies: List[str] = []
+
+                    def _on_response(response):
+                        try:
+                            if CHAT_API_HINT not in response.url:
+                                return
+                            body = response.text()
+                            if body:
+                                sse_bodies.append(body)
+                        except Exception:  # noqa: BLE001
+                            # 取不到流不该让一条已经拿到答案的 job 失败
+                            logger.debug("千问 SSE 取不到正文（引用会缺）")
+
+                    page.on("response", _on_response)
                     page.goto(QIANWEN_URL, wait_until="domcontentloaded",
                               timeout=self.timeout_ms)
                     page.wait_for_timeout(4000)
@@ -250,11 +273,19 @@ class QianwenWebProvider(BaseProvider):
                     }
 
                     # **L0 存原文**，只 strip，不做任何规则清洗
+                    # P2-37：从流里抽引用与「有没有联网」。解析器绝不抛异常
+                    trace = parse_stream("\n".join(sse_bodies))
+                    raw_json["match_num"] = trace.match_num
+                    # 站点名与发布时间在 Citation 表里没有列，原样留在 raw_json 里 ——
+                    # 那是实测多拿到的东西，丢掉等于把一次真机产出扔了
+                    raw_json["sources"] = trace.raw
+
                     return CrawlResult(
                         platform="tongyi",
                         prompt=prompt,
                         full_text=text.strip(),
-                        citations=[],          # 见模块 docstring 与 P2-37
+                        citations=trace.citations,
+                        search_used=trace.search_used,
                         raw_json=raw_json,
                         latency_ms=latency,
                         # P2-34：截图回来了。**这里原先写死 None**（注释是

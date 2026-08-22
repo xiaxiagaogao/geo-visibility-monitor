@@ -128,6 +128,7 @@ def get_crawl_job(
                 latency_ms=row.latency_ms,
                 answer_status=row.answer_status,
                 annotator_version=row.annotator_version,
+                search_used=row.search_used,
                 created_at=row.created_at,
                 citations=[CitationOut.model_validate(c) for c in row.citations],
                 mentions=[MentionOut.model_validate(m) for m in row.mentions],

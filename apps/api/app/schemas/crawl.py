@@ -98,6 +98,9 @@ class RawResponseOut(BaseModel):
     latency_ms: Optional[int] = None
     answer_status: Optional[str] = None
     annotator_version: Optional[str] = None
+    #: P2-37 三态：True=联网了 · False=确认没联网 · None=不知道。
+    #: **前端分桶时 None 必须单独一桶**，并到 False 里就是把「没记」说成「没联网」
+    search_used: Optional[bool] = None
     created_at: datetime
     citations: List[CitationOut] = Field(default_factory=list)
     mentions: List[MentionOut] = Field(default_factory=list)
@@ -133,6 +136,9 @@ class RawResponseSummaryOut(BaseModel):
     latency_ms: Optional[int] = None
     answer_status: Optional[str] = None
     annotator_version: Optional[str] = None
+    #: P2-37 三态：True=联网了 · False=确认没联网 · None=不知道。
+    #: **前端分桶时 None 必须单独一桶**，并到 False 里就是把「没记」说成「没联网」
+    search_used: Optional[bool] = None
     created_at: datetime
     #: 逐品牌标注照常给全 —— 它是列表里唯一有结论的东西，且体量比 full_text 小两个量级
     mentions: List[MentionOut] = Field(default_factory=list)
@@ -187,6 +193,9 @@ class WorkerResultIn(BaseModel):
     citations: List[WorkerCitationIn] = Field(default_factory=list)
     raw_json: Optional[dict] = None
     latency_ms: Optional[int] = None
+    #: P2-37 这次有没有联网检索。**默认 None = 不知道**，绝不能默认成 False ——
+    #: 老版本节点不带这个字段时，把它记成「没联网」是凭空造一条结论
+    search_used: Optional[bool] = None
 
 
 class WorkerResultOut(BaseModel):

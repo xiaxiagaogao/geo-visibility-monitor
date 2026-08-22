@@ -23,6 +23,8 @@ class CrawlResult:
     raw_json: Optional[Dict[str, Any]] = None
     latency_ms: Optional[int] = None
     screenshot_path: Optional[str] = None
+    #: P2-37 这次有没有联网检索。**None = 不知道**，不是「没联网」
+    search_used: Optional[bool] = None
 
 
 class BaseProvider(ABC):

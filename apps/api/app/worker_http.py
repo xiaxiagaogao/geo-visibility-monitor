@@ -153,6 +153,7 @@ class WorkerClient:
             "full_text": result.full_text,
             "latency_ms": result.latency_ms,
             "raw_json": result.raw_json,
+            "search_used": result.search_used,
             "citations": [
                 {
                     "url": c.url,

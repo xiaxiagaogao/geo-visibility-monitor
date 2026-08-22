@@ -79,6 +79,8 @@ def persist_result(db: Session, job: CrawlJob, prompt: Prompt, result: CrawlResu
         latency_ms=result.latency_ms,
         screenshot_path=(Path(result.screenshot_path).name if result.screenshot_path else None),
         html_path=None,
+        # P2-37：原样传，**不要写成 `or False`** —— 那会把「不知道」变成「没联网」
+        search_used=result.search_used,
     )
     db.add(resp)
     db.flush()

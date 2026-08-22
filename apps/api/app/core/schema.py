@@ -201,6 +201,27 @@ _MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_crawl_jobs_environment ON crawl_jobs(environment_id);
         """,
     ),
+    (
+        "010_search_used",
+        """
+        -- P2-37 联网标注。§4.0.1 重新拍板后的口径是
+        -- 「**记录 search 是否激活；无搜索输出是结果，不是废样本**」——
+        -- 不强制开联网（三家里只有 DeepSeek 有开关），改成记录并分桶报告。
+        --
+        -- **必须可空，而且 NULL 与 FALSE 含义不同：**
+        --   TRUE  = 这次联网了
+        --   FALSE = **确认**没联网（品牌对比类提问的常态，run 296 十条全 0）
+        --   NULL  = 我们不知道（本次迁移之前的全部样本、别的平台、解析失败）
+        --
+        -- 把 NULL 默认成 FALSE 就是把「没记」说成「没联网」，而这一列
+        -- 要拿去分桶 —— 分错桶等于报告里多一条假结论。
+        -- 与 P2-36 那条「探不到就留 NULL，不编默认值」是同一条规矩，
+        -- **所以这里刻意不写 DEFAULT**。
+        ALTER TABLE raw_responses ADD COLUMN IF NOT EXISTS search_used BOOLEAN;
+        CREATE INDEX IF NOT EXISTS idx_raw_responses_search_used
+            ON raw_responses(search_used);
+        """,
+    ),
 ]
 
 
