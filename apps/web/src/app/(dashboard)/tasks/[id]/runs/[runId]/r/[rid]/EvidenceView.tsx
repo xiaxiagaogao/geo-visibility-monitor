@@ -24,7 +24,8 @@ import { ApiError } from '@/lib/api/client'
 import { getResponse } from '@/lib/api/responses'
 import { getRun, getTask } from '@/lib/api/tasks'
 import { buildHighlights, mentionOrder } from '@/lib/l3/evidence'
-import type { Mention, RawResponse, RunDetail, Task } from '@/lib/types'
+import { citationState, searchUsedLabel } from '@/lib/l3/search-used'
+import type { Citation, Mention, RawResponse, RunDetail, Task } from '@/lib/types'
 
 const STATUS_LABEL: Record<string, string> = {
   ok: '有效',
@@ -159,6 +160,16 @@ export function EvidenceView({
           ) : (
             <Degraded>未判定</Degraded>
           )}
+          {/* P2-37 联网标注。**三态**，判定在 lib/l3/search-used.ts ——
+              `null` 走 Degraded 而不是 Badge，因为它是「不知道」不是一个结论 */}
+          {(() => {
+            const s = searchUsedLabel(sample.search_used)
+            return s.degraded ? (
+              <Degraded>{s.text}</Degraded>
+            ) : (
+              <Badge tone={s.tone}>{s.text}</Badge>
+            )
+          })()}
         </div>
       </div>
 
@@ -253,21 +264,101 @@ export function EvidenceView({
         <MentionTable mentions={sample.mentions} ownBrandId={ownBrandId} nameOf={nameOf} />
       </Panel>
 
-      <Panel title="引用来源">
-        {/* 降级态 ≠ 空态：这里不是「这条回答没引用」，是整库都没有 */}
-        <EmptyState>
-          <strong style={{ color: 'var(--text-secondary)' }}>当前无法提供</strong>
-          <span>
-            引用数据全库为 0 行，根因是采集时从未开启联网搜索 —— 不是解析错误，
-            也不是这条样本没引用。要有数据需开联网并重抓，而重抓会破坏与现有基线的可比性。
-          </span>
-        </EmptyState>
+      <Panel
+        title="引用来源"
+        subtitle="千问的引用来自 SSE 流，不是页面 —— 页面上那块只有站点图标，一条外链都没有"
+        right={
+          sample.citations.length > 0 ? (
+            <span className={ui.numeric} style={{ color: 'var(--text-secondary)' }}>
+              {sample.citations.length} 条
+            </span>
+          ) : null
+        }
+      >
+        <CitationList citations={sample.citations} searchUsed={sample.search_used} />
       </Panel>
 
       <PanelNote>
         这是 L0 原文，未经改写。上面每一个百分比都能顺着这里的标注回溯到这一条。
       </PanelNote>
     </div>
+  )
+}
+
+/* ══════ 引用来源（P2-37）══════ */
+
+/**
+ * **「没有引用」有四种完全不同的原因，这里必须分得开。**
+ *
+ * 最要紧的是别把 `search_used === null`（P2-37 之前的样本，我们不知道）
+ * 显示成「没联网」—— 库里躺着 55 条那样的历史样本。判定走
+ * `lib/l3/search-used.ts` 的纯函数，组件只管画。
+ */
+function CitationList({
+  citations,
+  searchUsed,
+}: {
+  citations: Citation[]
+  searchUsed: boolean | null
+}) {
+  const state = citationState(citations.length, searchUsed)
+
+  if (state === 'none-no-search') {
+    return (
+      <EmptyState>
+        <strong style={{ color: 'var(--text-secondary)' }}>这次回答没有检索网页</strong>
+        <span>
+          所以没有引用来源 —— <b>这是结果，不是缺陷</b>。模型靠自身知识作答，
+          该样本照常进分母。
+        </span>
+      </EmptyState>
+    )
+  }
+
+  if (state === 'unknown') {
+    return (
+      <EmptyState>
+        <strong style={{ color: 'var(--text-secondary)' }}>这条样本没有记录联网情况</strong>
+        <span>
+          它采集于联网标注（P2-37）上线之前，所以「有没有检索网页」是<b>未知</b>，
+          不是「没有」。此后采的样本都会带这个标注。
+        </span>
+      </EmptyState>
+    )
+  }
+
+  if (state === 'none-despite-search') {
+    // 这条是**我们这边的异常**，不是平台行为 —— 所以用告警而不是空态
+    return (
+      <div className={evidence.mismatch} role="alert">
+        <strong style={{ color: 'var(--danger)' }}>标注说联网了，却一条引用都没抽到。</strong>
+        <div>
+          这两件事对不上，多半是流解析出了问题或平台改了结构 ——
+          <b>不要当成「这次没引用」</b>。请查采集端 <span className="mono">qianwen_sse</span> 的解析。
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <ol className={evidence.cites}>
+      {citations.map((c) => (
+        <li key={c.id} className={evidence.cite}>
+          <a href={c.url} target="_blank" rel="noopener noreferrer nofollow" className={ui.rowLink}>
+            {c.title ?? c.url}
+          </a>
+          {/* 域名单独显示：GEO 分析真正关心的是「哪些站被引用」，
+              而标题会随媒体改版变，域名不会 */}
+          <div className={evidence.citeMeta}>
+            <span className={ui.numeric}>{c.domain}</span>
+            {c.cite_index !== null ? (
+              <span className={evidence.citeIndex}>#{c.cite_index}</span>
+            ) : null}
+          </div>
+          {c.snippet ? <p className={evidence.citeSnippet}>{c.snippet}</p> : null}
+        </li>
+      ))}
+    </ol>
   )
 }
 

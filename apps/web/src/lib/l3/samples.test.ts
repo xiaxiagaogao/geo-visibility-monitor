@@ -32,6 +32,10 @@ const sample = (over: Partial<RawResponseSummary> = {}): RawResponseSummary => (
   latency_ms: 1200,
   answer_status: 'ok',
   annotator_version: 'l1-2026.02',
+  // P2-37 起多了这个字段。**替身默认 null 而不是 false** —— null 是
+  // 「我们不知道」，正好是这些用例不关心它时该有的值；给 false 等于让
+  // 每条替身样本都断言「确认没联网」，那是一句用例并不想说的话
+  search_used: null,
   created_at: '2026-08-06T10:00:00Z',
   mentions: [mention(OWN)],
   ...over,

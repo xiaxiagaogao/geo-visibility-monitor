@@ -98,3 +98,42 @@
   font-size: var(--fs-xs);
   color: var(--text-tertiary);
 }
+
+/* ══════ 引用来源（P2-37）══════ */
+
+.cites {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding-left: var(--sp-5);
+}
+
+.cite {
+  line-height: 1.5;
+}
+
+/* 域名单独一行且用等宽：GEO 分析真正关心的是「哪些站被引用」，
+   而标题会随媒体改版变、域名不会。所以域名要一眼扫得出来。 */
+.citeMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.citeIndex {
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.citeSnippet {
+  margin: 4px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  /* 摘要是平台给的，长度不可控 —— 截断而不是把版面撑破 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

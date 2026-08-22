@@ -133,6 +133,13 @@ export interface RawResponse {
   latency_ms: number | null
   answer_status: string | null
   annotator_version: string | null
+  /**
+   * P2-37 联网标注。**三态，`null` 不是 `false`**：
+   * `true`=联网了 · `false`=**确认**没联网 · `null`=我们不知道
+   * （P2-37 上线前的样本、别的平台、解析失败）。
+   * 展示口径统一走 `lib/l3/search-used.ts`，别在组件里自己判。
+   */
+  search_used: boolean | null
   created_at: string
   citations: Citation[]
   mentions: Mention[]
@@ -164,6 +171,8 @@ export interface RawResponseSummary {
   answer_status: string | null
   /** 为 null 表示这条**还没跑过 L1 标注** —— 和「标注过但没提及」是两回事 */
   annotator_version: string | null
+  /** P2-37 三态，语义同 `RawResponse.search_used`（`null` ≠ `false`） */
+  search_used: boolean | null
   created_at: string
   mentions: Mention[]
 }
