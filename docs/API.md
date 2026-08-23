@@ -175,6 +175,31 @@ SoV         = m_本品 / (m_本品 + Σ m_竞品)
 3. **`competitors[]` 按 `brand_id` 关联，不许按数组下标** —— 顺序不保证。
 4. **凡显示比率，必须同时显示 `m / n`。** 孤零零的百分比在这个产品里没有可信度。
 
+### `GET /v1/citations/domains` —— 哪些站正在被 AI 引用（P2-37 之后）
+
+参数与 `/v1/counts` 同套：`brand_id`(必填) · `platform` · `prompt_id` · `run_id` ·
+`from`/`to` · `limit`(≤200)。
+
+```jsonc
+{
+  "n_citations": 147, "n_domains": 38,
+  "items": [
+    { "domain": "www.bitauto.com", "n_citations": 23, "n_samples": 6 },
+    { "domain": "36kr.com",        "n_citations": 9,  "n_samples": 8 }
+  ]
+}
+```
+
+**口径：按引用次数累加** —— 一个域名在一条回答里被引 3 次就计 3。
+
+⚠️ **`n_samples` 是诊断字段，不参与排序。** 这个口径对聚合型站点有偏向：
+上例里 bitauto 23 次只来自 6 条样本，而 36kr 9 次分布在 8 条样本 ——
+**后者的覆盖面其实更广**。没有 `n_samples` 的话这两行在榜单上只能比大小。
+
+**只数 `answer_status='ok'` 的样本**，与 `/v1/counts` 共用同一个分母定义 ——
+这个项目只允许有一个分母口径，让引用榜单跑在另一套样本集合上，
+等于同一个页面上两个数字来自两个宇宙。
+
 ---
 
 ## 5. 配置接口（防前端硬编码）

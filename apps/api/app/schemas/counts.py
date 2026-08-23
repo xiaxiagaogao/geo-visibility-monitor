@@ -61,3 +61,20 @@ class CountsResponse(BaseModel):
 
 
 # MetricsConfigOut 已移至 app/schemas/config.py（与 PlatformOut 同处），URL 未变。
+
+
+class CitationDomainRow(BaseModel):
+    domain: str
+    #: 被引用的**次数**（口径：一条回答里引 3 次就计 3，用户 2026-08-22 拍板）
+    n_citations: int
+    #: **诊断字段，不参与排序。** 出现在几条不同样本里 ——
+    #: 没有它，「4 次」和「4 条样本各引 1 次」在榜单上长得一模一样，
+    #: 而聚合型站点很容易在单条回答里占掉一大半引用
+    n_samples: int
+
+
+class CitationDomainsOut(BaseModel):
+    filters: Dict[str, Any]
+    n_citations: int
+    n_domains: int
+    items: List[CitationDomainRow]

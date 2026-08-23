@@ -22,6 +22,7 @@ from app.api import crawl_jobs as crawl_jobs_router
 from app.api import health_credentials as health_credentials_router
 from app.api import prompts as prompts_router
 from app.api import responses as responses_router
+from app.api import citations as citations_router
 from app.api import counts as counts_router
 from app.api import auth as auth_router
 from app.api import config as config_router
@@ -76,6 +77,7 @@ app.include_router(prompts_router.router)
 app.include_router(crawl_jobs_router.router)
 app.include_router(responses_router.router)
 app.include_router(counts_router.router)
+app.include_router(citations_router.router)
 app.include_router(config_router.router)
 app.include_router(auth_router.router)
 app.include_router(users_router.router)

@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Citation,
     CompetitorLink,
     CrawlJob,
     Mention,
@@ -170,6 +171,81 @@ def _base_response_query(
     if dt_to is not None:
         q = q.where(RawResponse.created_at <= dt_to)
     return q
+
+
+def domain_counts(
+    db: Session,
+    *,
+    brand_id: int,
+    platform: Optional[str] = None,
+    prompt_id: Optional[int] = None,
+    run_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 50,
+) -> dict:
+    """引用域名聚合 —— **哪些站正在被 AI 引用**（P2-37 之后的新需求）。
+
+    ## 口径（2026-08-22 用户拍板）
+
+    **按引用次数累加**：一个域名在一条回答里被引 3 次就计 3。
+
+    ⚠️ **这个口径有已知偏向**：聚合型站点会把榜单刷高（实测 job 638 的 7 条引用里
+    ``bitauto.com`` 独占 5 条）。所以每行**另给一个 ``n_samples``**
+    （出现在几条不同样本里）作为诊断 —— 它不参与排序，
+    只是让「23 次里 20 次来自同一条样本」这种情况暴露出来，
+    而不是藏在一个大数字后面。
+
+    ## 只数有效样本
+
+    与 ``compute_counts`` **共用同一个分母定义**（``answer_status='ok'``）。
+    这个项目只允许有一个分母口径 —— 让引用榜单跑在另一套样本集合上，
+    就等于同一个页面上两个数字来自两个宇宙，而没人看得出来。
+
+    过滤条件复用 ``_base_response_query``，不另写一套：那正是
+    「同一份约束不许有两处实现」。
+    """
+    dt_from = _parse_dt(date_from)
+    dt_to = _parse_dt(date_to, end=True)
+
+    valid_ids = (
+        _base_response_query(
+            db, brand_id=brand_id, platform=platform, prompt_id=prompt_id,
+            run_id=run_id, dt_from=dt_from, dt_to=dt_to,
+        )
+        .where(RawResponse.answer_status == "ok")
+        .with_only_columns(RawResponse.id)
+    )
+
+    rows = db.execute(
+        select(
+            Citation.domain,
+            func.count().label("n_citations"),
+            func.count(distinct(Citation.response_id)).label("n_samples"),
+        )
+        .where(Citation.response_id.in_(valid_ids))
+        .group_by(Citation.domain)
+        # 次数降序；**同次数按域名升序兜底** —— 不定序的话同分的行每次刷新
+        # 都在跳，用户会以为数据变了（同 platforms.ts 那条纪律）
+        .order_by(func.count().desc(), Citation.domain.asc())
+        .limit(limit)
+    ).all()
+
+    items = [
+        {"domain": d or "unknown", "n_citations": int(n), "n_samples": int(m)}
+        for d, n, m in rows
+    ]
+    return {
+        "filters": {
+            "brand_id": brand_id, "platform": platform, "prompt_id": prompt_id,
+            "run_id": run_id, "from": date_from, "to": date_to,
+        },
+        # **总数从行里加出来，不另跑一次 count(*)** —— 两个查询迟早会在
+        # 某个过滤条件上分叉，而那时页面上「总数」和「行的和」对不上
+        "n_citations": sum(i["n_citations"] for i in items),
+        "n_domains": len(items),
+        "items": items,
+    }
 
 
 def _accumulate_denominator(den: Dict[str, int], status: Optional[str]) -> None:
