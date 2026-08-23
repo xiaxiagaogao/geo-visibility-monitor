@@ -798,6 +798,31 @@ select(CrawlJob).where(status == "pending").with_for_update(skip_locked=True)
 **只加不改**：隧道模式保持能用，两种模式并存，回滚 = 把 `GEO_API_BASE` 去掉、
 补回 `GEO_DB_URL`、`deploy.sh start`，**不动代码、不必重传镜像**（新镜像两种模式都支持）。
 
+#### run 300：第一批带引用的真实基线（2026-08-22）
+
+21 条千问、samples=3、节奏打散开着。**18 成功 / 3 失败，又是第 13 条起**（三次复现）。
+
+**分桶**：18 条有效样本 `search_used` **全是 `true`** —— 一条 `false` 都没有。
+
+**引用**：85 条引用 / 12 个域名。
+
+```text
+www.163.com            12 次 / 12 样本   ← 覆盖面最广
+best.pconline.com.cn   11 次 /  8 样本
+www.toutiao.com         9 次 /  4 样本   ← 集中在 4 条里
+www.xfrb.com.cn         9 次 /  9 样本   ← 同样 9 次，覆盖 9 条
+www.brooksrunning.com   6 次 /  3 样本
+www.rei.com             6 次 /  3 样本
+```
+
+**`n_samples` 这个诊断字段在第一批数据上就派上用场了**：`toutiao` 与 `xfrb`
+都是 9 次，按「引用次数」口径并列 —— 但一个只出现在 4 条回答里、另一个 9 条。
+**含义完全不同，而只看次数这两行分不开。**
+
+> **一条可执行的情报**：`brooksrunning.com` / `rei.com` / `underarmour.co.uk` /
+> `runrepeat.com` —— **千问在回答「国产运动鞋」时大量引用国外品牌站与国外测评站**。
+> 这是产品层面的发现，不是技术细节。
+
 ### 一、采集能力
 
 | ID | 任务 | 现状 → 目标 |
