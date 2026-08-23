@@ -27,7 +27,14 @@ def get_counts(
     run_id: Optional[int] = Query(None, description="按某次 run 过滤(用冻结快照口径)"),
     date_from: Optional[str] = Query(None, alias="from", description="ISO datetime"),
     date_to: Optional[str] = Query(None, alias="to", description="ISO datetime"),
-    group_by: str = Query("none", description="none|day|platform|prompt"),
+    group_by: str = Query(
+        "none",
+        description=(
+            "none|day|platform|prompt|search_used。"
+            "search_used 分三桶 true/false/unknown —— unknown 是「我们不知道」，"
+            "不是「没联网」（P2-37）"
+        ),
+    ),
     include_fake: bool = Query(
         False,
         description="默认 false：排除 raw_json.source=fake* / 【假数据】样本",

@@ -115,7 +115,7 @@ fetch(url, { method: 'POST', credentials: 'include',
 | `prompt_id` | | |
 | `run_id` | | **同时把竞品集切到该 run 的快照**，见 §8.5.2 |
 | `from` / `to` | | ISO 日期或时间；`to` **含当天末**（纯日期自动补到 23:59:59） |
-| `group_by` | | `none`(默认) \| `day` \| `platform` \| `prompt` |
+| `group_by` | | `none`(默认) \| `day` \| `platform` \| `prompt` \| **`search_used`** |
 | `include_fake` | | 默认 `false` |
 | `source` | | 如 `deepseek_web` |
 
@@ -140,6 +140,17 @@ fetch(url, { method: 'POST', credentials: 'include',
 ```
 
 **全是整数，永远不返回比率。**
+
+#### `group_by=search_used`：按联网标注分桶（P2-37）
+
+`series[].key` 是 **三个字符串**：`"true"` / `"false"` / **`"unknown"`**。
+
+⚠️ **`unknown` 不是「没联网」，是「我们不知道」** —— P2-37 之前采的样本
+（库里有 55 条）全落在这一桶。把它并进 `false` 去算「未联网占比」，
+就是在报告里凭空断言一件没测过的事。
+
+**三桶不重不漏地覆盖全集**：`Σ series[].denominator.n_valid == denominator.n_valid`，
+所以三桶的占比能加到 100%。用例钉着这条。
 
 ### 4.1 前端自己算
 

@@ -210,6 +210,16 @@ def _accumulate_mention(bc: Dict[str, int], m: Mention) -> None:
         bc["m_first"] += 1
 
 
+#: `group_by` 的合法取值。**只有这一处** ——
+#:
+#: 加 search_used 时才发现这个文件里原本有两份清单：一份在 compute_counts 的
+#: 入口校验，一份在 _bucket_key 的兜底 raise。改了后者、忘了前者，表现是
+#: 「新取值一律 400，而报错信息里还列着旧清单」。收成一个元组，两处都引它。
+GROUP_BY_VALUES = ("none", "day", "platform", "prompt", "search_used")
+
+_GROUP_BY_ERROR = f"group_by must be one of: {', '.join(GROUP_BY_VALUES)}"
+
+
 def _bucket_key(resp: RawResponse, group_by: str, prompt_id_by_job: Dict[int, int]) -> str:
     if group_by == "none":
         return "all"
@@ -225,9 +235,17 @@ def _bucket_key(resp: RawResponse, group_by: str, prompt_id_by_job: Dict[int, in
         return resp.platform or "unknown"
     if group_by == "prompt":
         return str(prompt_id_by_job.get(resp.job_id, "unknown"))
+    if group_by == "search_used":
+        # P2-37 §4.0.1：「记录 search 是否激活；无搜索输出是结果，不是废样本」。
+        # **三桶，不是两桶。** `None` 是「我们不知道」——库里那 55 条 P2-37 之前的
+        # 样本全在这一桶，把它们并进 "false" 就是在报告里凭空断言「确认没联网」。
+        # 桶名用 "unknown" 而不是 "no_search"，是为了让口径写在 key 上。
+        if resp.search_used is None:
+            return "unknown"
+        return "true" if resp.search_used else "false"
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail="group_by must be one of: none, day, platform, prompt",
+        detail=_GROUP_BY_ERROR,
     )
 
 
@@ -248,10 +266,10 @@ def compute_counts(
     if run_id is not None:
         _assert_run_belongs_to_brand(db, run_id, brand_id)
     group_by = (group_by or "none").lower()
-    if group_by not in ("none", "day", "platform", "prompt"):
+    if group_by not in GROUP_BY_VALUES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="group_by must be one of: none, day, platform, prompt",
+            detail=_GROUP_BY_ERROR,
         )
 
     dt_from = _parse_dt(date_from)
