@@ -269,6 +269,18 @@
     border-right: none;
     border-bottom: 1px solid var(--edge);
     overflow-x: auto;
+    /* 全局滚动条是 11px 的，压在这条 48px 高的横轨下面太抢眼。
+       **不隐藏它** —— 它是「右边还有」的唯一提示，只是收细。 */
+    scrollbar-width: thin;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb {
+    border: none;
+    background: var(--edge-strong);
   }
 
   .sidebar::after {

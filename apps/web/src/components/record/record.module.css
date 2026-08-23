@@ -63,7 +63,8 @@
   height: 100%;
   background: var(--tick-on);
   border-radius: var(--r-xs);
-  transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  /* 刻意不给 width 加过渡：动 width 会触发布局重排，而这条宽度只在数据
+     重取时变、没有交互会去动它 —— 那个动画纯属装饰，代价却是真的。 */
 }
 
 .scale[data-tone='other'] .denseFill {

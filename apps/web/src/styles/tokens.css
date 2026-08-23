@@ -60,7 +60,10 @@
 
   --ink: #1a1815; /* 15.4:1 */
   --ink-2: #55524b; /* 6.78:1 */
-  --ink-3: #6a655c; /* 5.03:1 —— 三级文字也必须过 4.5，不许更淡 */
+  /* 三级文字。**三种底色都要过 4.5**：ground 5.11 · sheet 5.86 · sunken 5.40。
+     上一个取值 #6A655C 只对着 sheet 验过（5.03），漏了 ground ——
+     而页头的 meta 正好坐在 ground 上，实测只有 4.38。不许再调淡。 */
+  --ink-3: #605b52;
 
   /* ── 两支铅笔 ──
      地震台的真实做法：一支蓝、一支红。全站只有这两个彩色。 */
@@ -74,7 +77,9 @@
   --pencil-red-wash: color-mix(in srgb, var(--pencil-red) 7%, var(--sheet));
 
   /* ── 状态：只配文字或形状出现，绝不单独承载信息 ── */
-  --amber: #8a5a0e; /* 5.15:1 · 部分成功 / 需留意 */
+  /* ground 4.80 · sheet 5.50 · 自身 wash 4.87。同样是 ground 最紧 ——
+     旧值 #8A5A0E 对 ground 只有 4.48。 */
+  --amber: #84560c; /* 部分成功 / 需留意 */
   --amber-wash: color-mix(in srgb, var(--amber) 9%, var(--sheet));
   --pine: #3d6b4a; /* 5.37:1 · 有效 / 成功 */
   --pine-wash: color-mix(in srgb, var(--pine) 9%, var(--sheet));
