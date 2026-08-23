@@ -1,4 +1,6 @@
+@import './fonts.css';
 @import './tokens.css';
+@import './legacy-aliases.css'; /* ⚠️ 改版收尾时删掉，见该文件头 */
 
 *,
 *::before,
@@ -13,12 +15,13 @@ body {
 }
 
 body {
-  background: var(--bg-app);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-text);
   font-size: var(--fs-body);
-  line-height: 1.6;
+  line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -32,15 +35,64 @@ button {
   cursor: pointer;
 }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* ── 浏览器自己那部分也归这套设计管 ──
+   选中色、光标、滚动条、焦点圈的默认样式不属于任何设计系统。 */
+
+::selection {
+  background: var(--pencil-blue);
+  color: var(--pencil-blue-on);
 }
 
-/* 数字一律等宽对齐 */
-.mono {
-  font-family: var(--font-mono);
+:root {
+  caret-color: var(--pencil-blue);
+  scrollbar-color: var(--edge-strong) transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--edge-strong);
+  border: 3px solid var(--ground);
+  border-radius: var(--r-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
+
+:focus-visible {
+  outline: 2px solid var(--pencil-blue);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* ── 三种声音 ── */
+
+/* 仪器读数：等宽 + 定宽数字。凡是要成列对齐、要能比长短的数字都戴它。 */
+.mono,
+.readout {
+  font-family: var(--font-instrument);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* 面板上刻的那种小标 —— 只用于数据标签（列头、刻度注记），
+   **不用作标题上方的 eyebrow**。 */
+.stamp {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--tr-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .srOnly {
@@ -50,25 +102,30 @@ button {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
 
 code {
-  font-family: var(--font-mono);
-  font-size: 0.92em;
-  background: var(--bg-subtle);
+  font-family: var(--font-instrument);
+  font-size: 0.9em;
+  background: var(--sheet-sunken);
   border-radius: var(--r-xs);
   padding: 1px 5px;
 }
 
-@keyframes geo-shimmer {
-  0% {
-    background-position: -400px 0;
+/* 触针落位：一次授权过的动作，用在记录纸首次画出来的时候。
+   指数缓出，从**已经可见**的状态出发 —— 不做「淡入」那种会让人
+   以为元素不存在的入场。 */
+@keyframes stylus-settle {
+  from {
+    transform: scaleX(0.985);
+    opacity: 0.55;
   }
-  100% {
-    background-position: 400px 0;
+  to {
+    transform: scaleX(1);
+    opacity: 1;
   }
 }
 
@@ -79,5 +136,6 @@ code {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -1,0 +1,83 @@
+/**
+ * ⚠️ 过渡层 —— 改版完成后整个文件删掉。
+ *
+ * 这一轮只重做四个页面（任务列表 / 任务详情 / 证据页 / 新增引用榜）。
+ * 其余七个路由的 CSS Module 还在引用旧 token 名（--bg-app / --accent / --border …）。
+ * 没有这层别名，改 tokens.css 的那一刻它们会一起变成无样式的裸页面。
+ *
+ * 这里**只做名字映射，不引入任何新取值** —— 每一行右边都是新世界里已经存在、
+ * 且已经过验证的 token。所以旧页面会跟着换成新配色（不再是青绿 SaaS），
+ * 但版式仍是旧的，看起来会和新页面不是一套。**这是预期中的中间态，不是 bug。**
+ *
+ * 删除条件：`grep -rl "var(--bg-app\|var(--accent\|var(--text-primary" apps/web/src`
+ * 返回空的时候。
+ */
+
+:root,
+[data-theme='dark'] {
+  /* 面与线 */
+  --bg-app: var(--ground);
+  --bg-surface: var(--sheet);
+  --bg-elevated: var(--sheet-raised);
+  --bg-subtle: var(--sheet-sunken);
+  --bg-hover: var(--sheet-sunken);
+  --border: var(--edge);
+  --border-strong: var(--edge-strong);
+
+  /* 墨 */
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-tertiary: var(--ink-3);
+
+  /* 主色 —— 旧的 teal 全部换成蓝铅笔 */
+  --accent: var(--pencil-blue);
+  --accent-hover: var(--pencil-blue-hover);
+  --accent-press: var(--pencil-blue-press);
+  --accent-contrast: var(--pencil-blue-on);
+  --accent-soft: var(--pencil-blue-wash);
+
+  /* 状态 */
+  --success: var(--pine);
+  --warning: var(--amber);
+  --danger: var(--pencil-red);
+
+  /* 情感：本期仍全部走降级态，取值只是为了别让旧样式取到 undefined */
+  --sentiment-positive: var(--pine);
+  --sentiment-neutral: var(--ink-3);
+  --sentiment-negative: var(--pencil-red);
+
+  /* 平台 */
+  --platform-deepseek: var(--plat-deepseek);
+  --platform-doubao: var(--plat-doubao);
+  --platform-yuanbao: var(--plat-yuanbao);
+  --platform-qwen: var(--plat-tongyi);
+  --platform-wenxin: var(--plat-wenxin);
+  --platform-kimi: var(--plat-kimi);
+
+  /* 图元 */
+  --bar-own: var(--trace-own);
+  --bar-other: var(--trace-other);
+  --bar-track: var(--trace-bed);
+  /* 旧矩阵把数值印在色块里 —— 新色阶明确不支持那种用法（见 tokens.css ②）。
+     这里给的 ink 是能读的组合，但旧矩阵一旦改到新版就该整个换掉。 */
+  --seq-1-ink: var(--ink);
+  --seq-2-ink: var(--ink);
+  --seq-3-ink: var(--sheet);
+
+  /* 字与形 */
+  --font-sans: var(--font-text);
+  --font-mono: var(--font-instrument);
+
+  --fs-data: var(--fs-readout-sm);
+  --fs-h1: var(--fs-title);
+  --fs-h2: var(--fs-body);
+  --fs-xs: var(--fs-label);
+  --fs-2xs: var(--fs-micro);
+
+  --r-lg: var(--r-md);
+  --sidebar-w: var(--rail-w);
+
+  --shadow-sm: var(--lift-1);
+  --shadow-md: var(--lift-2);
+  --shadow-lg: var(--lift-3);
+}
