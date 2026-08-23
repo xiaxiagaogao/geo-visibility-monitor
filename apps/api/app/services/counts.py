@@ -228,10 +228,10 @@ def domain_counts(
         # 次数降序；**同次数按域名升序兜底** —— 不定序的话同分的行每次刷新
         # 都在跳，用户会以为数据变了（同 platforms.ts 那条纪律）
         .order_by(func.count().desc(), Citation.domain.asc())
-        .limit(limit)
+        # **不在 SQL 里 limit。** 见下面对总数的说明 —— 截断要发生在算完总数之后
     ).all()
 
-    items = [
+    every = [
         {"domain": d or "unknown", "n_citations": int(n), "n_samples": int(m)}
         for d, n, m in rows
     ]
@@ -240,11 +240,20 @@ def domain_counts(
             "brand_id": brand_id, "platform": platform, "prompt_id": prompt_id,
             "run_id": run_id, "from": date_from, "to": date_to,
         },
-        # **总数从行里加出来，不另跑一次 count(*)** —— 两个查询迟早会在
-        # 某个过滤条件上分叉，而那时页面上「总数」和「行的和」对不上
-        "n_citations": sum(i["n_citations"] for i in items),
-        "n_domains": len(items),
-        "items": items,
+        # ⚠️ **两个总数描述的是全集，不是返回的那几行。**
+        #
+        # 第一版是「先 SQL limit，再把返回行加起来」，于是 limit=3 时
+        # n_citations 变成了前三行的和 —— 而界面上那个数字看起来就是
+        # 「一共多少条引用」。拿它当百分比的分母会算出偏大的占比，
+        # 且永远不报错（2026-08-23 在生产上一查才露馅：run 300 单独 85 条，
+        # 而带 limit 的全历史查询回 33）。
+        #
+        # 现在先算全量再切片。**仍然只有一个查询** —— 域名数是几十的量级，
+        # 全取回来再切比跑第二个 count(*) 更省，也不会让两个查询在某个
+        # 过滤条件上分叉。
+        "n_citations": sum(i["n_citations"] for i in every),
+        "n_domains": len(every),
+        "items": every[:limit],
     }
 
 

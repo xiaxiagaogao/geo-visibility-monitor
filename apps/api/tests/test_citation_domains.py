@@ -151,11 +151,27 @@ def test_sorted_by_citation_count_desc(client, db, cited):
 
 
 @behaviour
-def test_totals_are_consistent_with_the_rows(client, db, cited):
-    """总数对不上行的话，用户会拿榜单去凑那个总数然后发现少了一截。"""
+def test_totals_describe_the_whole_set_not_just_the_page(client, db, cited):
+    """**头部的总数说的是全集，不是当前这一页。**
+
+    第一版把 `n_citations` 写成「返回行的和」，于是 `limit=3` 时它变成了
+    前三行的和 —— 而界面上那个数字看起来就是「一共多少条引用」。
+    在生产上一查就露馅：run 300 单独有 85 条引用，而带 limit 的全历史查询回 33。
+
+    拿它当百分比的分母会算出一个偏大的占比，而且**永远不会报错**。
+    第一版的用例（`n_citations == sum(items)`）恰好把这个 bug 钉成了正确行为 ——
+    **一条只验「内部自洽」而不验「和现实一致」的断言，是会保护 bug 的。**
+    """
     body = _items(client, cited)
-    assert body["n_citations"] == sum(i["n_citations"] for i in body["items"])
-    assert body["n_citations"] == 6
+    assert body["n_citations"] == 6      # 全部引用次数
+    assert body["n_domains"] == 3        # 全部域名数
+
+    # 截断之后：行少了，但两个总数不变 —— 它们描述的是全集
+    top1 = _items(client, cited, limit=1)
+    assert len(top1["items"]) == 1
+    assert top1["n_citations"] == 6, "总数不该跟着 limit 缩水"
+    assert top1["n_domains"] == 3, "域名总数不该跟着 limit 缩水"
+    assert sum(i["n_citations"] for i in top1["items"]) < top1["n_citations"]
 
 
 @behaviour
