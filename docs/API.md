@@ -764,7 +764,7 @@ failed   全部失败
 |--------|------|-----------|
 | `sentiment` / `sentiment_score` 恒 `NULL` | 情感 pill、正面率、风险问题 | 显示「暂无情感数据」 |
 | `is_recommended` 恒 `False`，counts 无 `m_recommended` | 推荐率 | 算不出，不要做这个指标 |
-| **`citations` 全库 0 行** | 引用分析整页 | **这页现在做不了**。根因是抓取时从未开联网搜索，不是解析 bug；要做需先开联网 + 重抓（会破坏现有基线可比性） |
+| ~~`citations` 全库 0 行~~ **已推翻（P2-37）** | — | 千问的 SSE 引用抽取打通后，库里现在有 **144 条引用 / 40 个域名**。前端已在 `/citations` 用上，见 §4 的 `GET /v1/citations/domains` |
 | 只有 DeepSeek 一个平台 | 多平台对比 | 维度留着，可用性读 `/v1/config/platforms` |
 | counts 无**顺位分布**（只有 `m_first` 这一个计数） | 命中矩阵格里的 `#N`（该品牌在这几次采样里的中位出场顺位） | 矩阵格**只显示 `m/n`，不显示 `#`**。设计稿本来就允许省掉它 —— 拿 `m_first` 反推名次是编数据 |
 

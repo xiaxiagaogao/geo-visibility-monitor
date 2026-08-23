@@ -1,8 +1,9 @@
 # GEO 监测台 · 前端
 
-> **状态：已部署在 https://geo.xg22.top。A1–A8 主线已闭合**，配置页在补 ——
-> 登录 · 任务 · 任务详情 · 证据页 · 首页分流 · 品牌管理都在了。
-> 页面层已经齐了；剩下的是验证欠账与技术债，见 §10。
+> **状态：已部署在 https://geo.xg22.top。A1–A8 主线已闭合，配置页也已完成。**
+> 2026-08-23 起在做**视觉改版**：任务列表 / 任务详情 / 证据页 / 新增引用榜
+> 已换成新设计系统，其余 7 个路由还在旧原语上（靠 `legacy-aliases.css` 撑着，
+> 看起来会和新页面不是一套 —— 这是预期的中间态）。进度与欠账见 §10。
 > 接口契约看 [`docs/API.md`](../../docs/API.md)（唯一权威，本文不重复字段）。
 > 后端职责看 [`docs/BACKEND.md`](../../docs/BACKEND.md)。
 
@@ -14,22 +15,33 @@
 
 ```text
 src/
-  styles/tokens.css      设计 token（浅色为主 + 深色可切，色阶跑过对比度验证器）
-  components/ui/         Panel Badge Kpi* Table Tabs EmptyState Degraded ErrorState Skeleton
-  components/charts/     EmphasisBars · HitMatrix（手写 SVG/CSS，不引图表库）
+  styles/tokens.css      设计 token —— 熏烟纸地震图。**改色前先读文件头那三条**
+  styles/fonts.css       自托管 Martian Mono + 得意黑（子集）
+  styles/legacy-aliases.css  ⚠️ 过渡层，第二批路由改造完就整份删掉
+
+  components/record/     **新原语**：TickScale（签名）· Plate · Instrument/Readout* ·
+                         Mark · Notation · Table · Blank/Fault/Pending ·
+                         RecordStrip（纸带）· TraceBars · HitGrid
+  components/ui/         ⚠️ **旧原语**，只剩第二批那 7 个路由在用，之后整目录删掉
   components/runs/       RunSwitcher · RunNowButton · GapList · SampleTable（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText（按 first_offset 切片，不自己搜正文）
+
   lib/l3/                rates gaps matrix samples evidence brands prompts users
-                         home run-status + 138 个测试（不碰 fetch/React）
+                         home run-status platforms search-used csv gap-export
+                         **trend citations** + 共 238 个测试（不碰 fetch/React）
   lib/api/               client.ts（唯一取数出口）· auth · brands · prompts · users ·
-                         tasks · counts · responses · crawl-jobs + 18 个测试
+                         tasks · counts · responses · crawl-jobs · **citations**
   lib/auth-context.tsx   AuthProvider / useAuth / useRequireAuth
   lib/types.ts           照 API 契约定的类型
+
   app/(dashboard)/       /tasks · /tasks/new · /tasks/[id] · …/runs/[runId] · …/r/[rid]
-                         /brands · /brands/new · /brands/[id] · /users
+                         **/citations** · /brands · /brands/new · /brands/[id] · /users
   app/login/             已打通
 ```
+
+`components/charts/`（EmphasisBars · HitMatrix）**已被 `components/record/` 取代**，
+改版第二批收尾时删除。
 
 **取数一律走 `lib/api/`**，没有第二个出口；派生一律走 `lib/l3/`，组件只吃 props。
 **刻意还没有的：** 状态管理库 —— 每个页面自己 `useEffect` 取数就够，
@@ -94,13 +106,21 @@ Task「命名的监测定义」── 平台 · 采样数 · 提问集选择
 ### 2.3 任务详情页
 
 ```text
-┌ 任务头  任务名 · 品牌徽章 · 平台 chip
-│         run 切换器 [2026-08-02 ✓ 35条 ▾]        [立即运行]
-├ KPI ×4  有效样本 │ 提及率 │ 首位提及率 │ 覆盖缺口
-├ 面板    逐提问 emphasis 条 —— 让 KPI 里那个总提及率当场自我解释
-├ 面板    覆盖缺口清单（完整）
-└ Tab     命中矩阵 │ 样本列表
+┌ 任务头   任务名 · 品牌记号 · 平台 · 采样数 · 共几次运行
+│          run 切换器 [2026-08-23 · 21 个采样 ▾]   [编辑] [立即运行]
+├ 纸带     ★ 全部运行沿真实时间轴排开。本品一道线、竞品一条区间带，
+│          平台集变过处**断开不连线**并标出每段的平台集。点任意一次即可切 run
+├ 仪器面板  **一块面**四个读数（不是四张卡），中间用刻线分隔：
+│          有效样本 │ 提及率 │ 首位提及率 │ 覆盖缺口
+│          每个比率读数下面是**按分母切格的刻度尺**
+├ 面板     逐提问 —— 让总提及率当场自我解释；每道的格数就是那条提问采了几次
+├ 面板     覆盖缺口清单（完整）
+└ Tab      命中矩阵 │ 样本列表
 ```
+
+**为什么纸带排在读数前面：** 一个孤零零的「66.7%」说不清自己处在什么位置。
+得先知道它在这条记录上的位置、以及中间有没有换过口径。
+这 12 次的平台集换过 4 次 —— 不标断口就是把口径变化伪装成表现变化。
 
 **为什么缺口不进 tab：** 它是这个产品里最接近「告诉我该干什么」的东西，
 输出可以直接交给推流团队。藏进第三个 tab 等于把唯一可执行的产出降级成附录。
@@ -136,7 +156,7 @@ lib/api/      不许算比率
 lib/l3/       不许碰 fetch 和 React
 ```
 
-三层各自可单独读懂、单独测。`lib/l3` 的 138 个测试就是这条边界的产物 ——
+三层各自可单独读懂、单独测。`lib/l3` 的那 200 多个测试就是这条边界的产物 ——
 它们不需要浏览器、不需要 mock fetch，因为那一层压根碰不到这两样。
 
 ---
@@ -149,10 +169,13 @@ lib/l3/       不许碰 fetch 和 React
 |----|------|---------|
 | 情感 | 后端 `sentiment` 恒 NULL，等接 LLM | 「暂无情感数据」 |
 | 推荐率 | `is_recommended` 恒 False，counts 无 `m_recommended` | **整个指标不做**，不是降级 |
-| 引用分析 | citations 全库 0 行，根因是采集时从未开联网搜索 | **整页不做**。要有数据需开联网 + 重抓，而重抓会破坏与现有基线的可比性 |
+| ~~引用分析~~ | ~~citations 全库 0 行~~ | **已推翻，整页已做**：P2-37 打通千问 SSE 之后有 144 条引用 / 40 个域名，落在 `/citations` |
 
-第三条尤其要注意措辞：它不是「还没接」，是「当前无法提供」。
+前两条仍然成立，措辞要注意：它们不是「还没接」，是「当前无法提供」。
 写成「尚未接入」会让人以为在排队上线。
+
+第三条**已经过期并被删除** —— 留着一条已经不成立的「不做」比没有更糟：
+它会让下一个接手的人绕开一个其实已经可用的能力。
 
 ---
 
@@ -160,11 +183,11 @@ lib/l3/       不许碰 fetch 和 React
 
 | 项 | 理由 |
 |----|------|
-| 跨 run 趋势图 | Run 成为一等实体后结构上支持了，但目前只有一个采集日，画出来是假的。等跑出三次以上再加 |
+| ~~跨 run 趋势图~~ | **已推翻，已做**。「只有一个采集日」那条理由在 2026-08-23 不再成立：任务 27 有 12 次运行（08-08 ~ 08-23）。做成了任务详情页顶部那条**纸带**，重点不是画线是**标断口** —— 这 12 次的平台集换过 4 次，连成平滑一条就是把口径变化伪装成表现变化。判据与限度见 `lib/l3/trend.ts` |
 | Share of Voice | 需要显著度加权 + 时序，两样都缺 |
-| 平台引用分布环形图 | 只有 DeepSeek，单平台构成比是一根 100% 的条，画出来是假装有多样性 |
+| 平台引用分布环形图 | 仍然不做，但**理由换了**：不再是「只有 DeepSeek」（现在跑的是千问），而是**当前任务仍是单平台**。单平台构成比是一根 100% 的条，画出来是假装有多样性 |
 | 检测报告（叙述性） | LLM 生成的报告现在做就是编数据 |
-| 图表库 | 只有 emphasis 条与矩阵两种图元，全是矩形和文本，手写 SVG/CSS 即可 |
+| 图表库 | 图元只有刻度尺、纸带、矩阵三种，全是矩形、线和文本，手写 SVG/CSS 即可。改版后仍然成立 |
 | Tailwind / UI 框架 | 设计稿产出是原生 CSS，CSS Modules 逐段搬运零翻译成本 |
 
 ---
@@ -295,7 +318,7 @@ http://geo.xg22.top, https://geo.xg22.top {
 
 ### 现在到哪儿了（2026-08-23）
 
-**页面主线全部完成，下一阶段是视觉改版。**
+**页面主线全部完成。视觉改版已完成 4/11 个路由。**
 
 | 阶段 | 状态 |
 |---|---|
@@ -306,40 +329,68 @@ http://geo.xg22.top, https://geo.xg22.top {
 | A8 客户首页分流 | ✅ 判定在 `lib/l3/home` |
 | **A2/A3/A4 品牌 / 提问词 / 用户管理** | ✅ **已完成**（提问词做在 `brands/[id]/PromptsPanel`，不是独立路由） |
 | **P2-37 联网标注 + 引用来源** | ✅ 证据页渲染引用；样本表加「联网」列 + 四档筛选 |
+| **视觉改版 · 第一批** | ✅ 任务列表 / 任务详情 / 证据页 / **新增引用榜** |
+| **视觉改版 · 第二批** | ⬜ 品牌 · 品牌详情 · 新建品牌 · 新建任务 · 用户 · 登录 · 首页分流 |
 
-### 下一阶段：视觉改版（门面）
+---
 
-用户要把这个项目**用于求职**，所以下一步是把前端当门面重做，可以华丽高端。
-**开工前必读 `~/.claude/CLAUDE.md` 的「前端/UI 活」那节** ——
-先调 `frontend-design` 定方向 → `impeccable` 落设计系统 → 写 → **自己截图验过**。
-图表配色走 `dataviz`。**不要用 UI UX Pro Max**（刻意排除）。
+### 视觉改版：已落地的部分
 
-改版时需要知道的五件事：
+**视觉世界是「熏烟纸地震图记录」**（impeccable seed `e13eab31` · direction · operate ·
+code-led）。方向契约写在 `src/app/layout.tsx` 顶部，以 HTML 注释形式活到生产构建之后
+（`grep 'seed e13eab31' .next/` 能找到 —— 一份构建擦掉的契约没人能审）。
+设计系统的完整记录见仓库根 **`DESIGN.md`**；产品事实见 **`PRODUCT.md`**。
 
-1. **技术栈是 Next 16 + React 19，没有 Tailwind、没有组件库，纯手写 CSS Modules。**
-   `web-artifacts-builder`（React+Tailwind+shadcn）的产物**不能直接塞进来**，
-   它只适合做一次性原型。
-2. **设计 token 已经存在**：`src/styles/tokens.css`，取值源自 Claude Design 的
-   「GEO 分析仪表盘」稿，**图表色阶跑过 `dataviz` 的验证器**（原稿那套亮度非单调、
-   中段数值读不出来）。改色前先读它顶部那段说明，别绕过验证器。
-   「在它上面演进」还是「另起一套」是改版第一个要定的事。
-3. **⚠️ 招聘方打不开这个站。** 所有页面都要登录 —— 简历链接发出去，
-   看的人没有账号。**这可能比视觉本身更影响效果**，要么做只读演示模式/演示账号，
-   要么准备截图与录屏。这条至今没有解决。
-4. **前端只有 204 条纯函数测试（`lib/l3` + `lib/api`），没有任何组件级 / 端到端测试。**
-   大改版没有这层网兜着，容易改出看不见的回归 —— 值得在改版时一并补上。
-5. **本机能跑的只有前端**：`.claude/launch.json` 里 dev server 叫 `web`、端口 3100
-   （`preview_start {name: "web"}`）。后端仍然只在 VPS 上跑。
+**为什么是这个世界**（不是审美选择，是数据形态）：
+12 次 run 是时间轴；采集条件变过的地方是纸带上一道**断口**；
+「空白」（161 条 `search_used=unknown`）与「走平的线」（0% 提及）
+在同一张纸上从来不会混淆；**增益即分母** —— 一条没标增益的地震道是废的，
+和「孤零零的百分比没有可信度」是同一句话。
 
-### 后端已就绪但前端还没用的
+**签名元素是刻度尺**（`components/record/TickScale.tsx`）：
+轨道宽度固定、按分母切成 n 格、命中的 m 格上墨。填充比例 = 比率（可扫读），
+格数与格宽 = 分母。于是「比率永远跟着 m/n」不再只是一条文字纪律，**成了图形本身** ——
+提及率 18 格、首位提及率 12 格，一眼看出这两个百分比的分母不一样。
 
-| 能力 | 端点 | 说明 |
-|---|---|---|
-| **引用域名榜** | `GET /v1/citations/domains` | 「哪些站正在被 AI 引用」。**界面上完全没有** —— 现在只能打接口看。见 `API.md` §4 |
-| **按联网分桶** | `GET /v1/counts?group_by=search_used` | 三桶 `true`/`false`/`unknown`。后端能分，前端没用 |
+**三处一定要读代码注释再动的地方：**
 
-这两个是改版时最值得做进去的新内容 —— 它们是这个产品**唯一同行没有**的数据
-（公开圈没人从 `qianwen.com` 抽出过引用，见 `CRAWL-INTEL.md`）。
+1. `src/styles/tokens.css` 文件头 —— 色阶跑过 `dataviz` 验证器（浅色与深色各一次，
+   四项全 PASS）。里面写清了一个**实测出来的死区**：三档色阶的中段，
+   白字 3.92:1、墨字 3.93:1，两边都够不到 4.5。所以**色阶只用于不承载文字的填充，
+   格内数值一律 ink-on-sheet**。
+2. `src/styles/legacy-aliases.css` —— **过渡层，第二批做完就整份删掉**。
+   删除条件写在文件头。没有它，还没改造的 7 个路由会一起变成裸页面。
+3. `scripts/fonts/README.md` —— 得意黑是**子集**，只含仓库里出现过的汉字。
+   **改了界面文案要重跑 `bash scripts/fonts/build-cjk-subset.sh`**，
+   否则漏掉的字会单独掉回系统字，一个词里两种字形。
+
+**新增的两个 L3 模块**（口径逻辑仍然全部在纯函数里，组件只吃 props）：
+`lib/l3/trend.ts`（跨 run 序列 + 断点判据，19 条测试）、
+`lib/l3/citations.ts`（榜单派生，12 条测试）。测试从 204 涨到 **238**。
+
+### 还欠的账
+
+1. **⚠️ 招聘方打不开这个站。** 所有页面都要登录 —— 简历链接发出去，看的人没有账号。
+   2026-08-23 明确**不做**演示模式/演示账号（「按正常项目做，不要因为演示就乱改」），
+   所以这条靠截图与录屏解决。**它仍然没有被解决。**
+2. **仍然没有组件级 / 端到端测试。** 238 条全是纯函数。改版第一批的回归全靠
+   `pnpm lint` + 手工截图 + 浏览器里跑的对比度/溢出审计接住 —— 那不是网。
+   `webapp-testing` 这个 skill 就是干这个的。
+3. **375px 没有直接验过。** 检查轮里那台 Chrome 窗口最小只能到 489px。
+   489px 下四页横向溢出为 0，CSS 里的 min-width 也逐条复查过，
+   但这不等于在真机上验过。
+4. **旧原语 `components/ui/` 还活着**，被第二批那 7 个路由用着。
+   impeccable 检测器在它上面还有 2 条命中（`.kpi::before` 的 3px 彩色左边条、
+   `transition: width`）—— 那批路由改造时一并清掉，然后删掉整个目录。
+
+### 本机怎么跑
+
+```bash
+cd apps/web && pnpm test && pnpm lint && pnpm build
+```
+
+dev server 在 `.claude/launch.json` 里叫 `web`、端口 3100（`preview_start {name: "web"}`），
+`/v1` 由 `next.config.ts` 的 rewrites 代理到线上。**后端仍然只在 VPS 上跑。**
 
 ### 改版时别优化掉的东西
 
@@ -398,36 +449,62 @@ full_text.slice(first_offset, first_offset + matched_term.length) === matched_te
 
 ### 视觉来源
 
-风格不是从零发明的，来自两个 Claude Design 项目：
+~~风格来自两个 Claude Design 项目（GeoMonitor / L3 设计系统 v2）。~~
+**已被 2026-08-23 的改版整体替换。** 那两稿现在只是历史，别再照它们加新页面。
 
-```text
-9ca76cf2-9244-48e3-bff9-e74c6e8284c3   GEO 分析仪表盘设计（GeoMonitor）—— 视觉与信息架构
-56a8ae49-0114-40c9-9e35-9b63372f0e14   GEO 监测台 · L3 设计系统 —— v2 四屏全稿
-```
+现在的来源是一次 impeccable 方向轮：seed `e13eab31`，从 7 个候选里由骰子
+分配到「纸带记录仪」，用户确认留下。完整记录见仓库根 `DESIGN.md`；
+方向契约在 `src/app/layout.tsx` 顶部，能活到生产构建之后。
 
-**`styles/tokens.css` 与 `components/ui/` 就是这套设计的代码化版本**，
-新页面照它们来即可，不要另起一套。色阶跑过对比度验证器；
-GeoMonitor 原热力图亮度非单调（中段深字压近黑底读不出来），**没有照搬**。
+旧稿留下的一条结论仍然成立、且被新色阶继承：
+**GeoMonitor 原热力图亮度非单调（中段深字压近黑底读不出来），没有照搬。**
+新色阶重新跑过 `dataviz` 验证器，并且发现了同一个问题的更一般形式 ——
+三档色阶的中段本来就是个死区，所以规矩改成「色阶不承载文字」。
 
 ### 开发闭环
 
-**本机不起服务**（这是既定工作方式，不是限制）。改完推 main，
-post-receive 自动 build `geo-web`，在 https://geo.xg22.top 上看效果。
+~~本机不起服务。~~ **这条已经不成立**：前端在本机跑得起来，
+改版第一批全程是在 `localhost:3100` 上截图验收的。
 
 ```bash
-cd apps/web && pnpm test && pnpm lint && pnpm build   # 本机只做这三件
+cd apps/web && pnpm test && pnpm lint && pnpm build
 ```
 
+dev server 在 `.claude/launch.json` 里叫 `web`、端口 3100，
+`/v1` 由 `next.config.ts` 的 rewrites 代理到线上 —— 浏览器眼里全是同源，
+**和生产行为一致**（生产是 Caddy 按路径分流，也是同源）。
+登录态会落到 localhost 名下，所以本机能看到真实数据。
+
+推 main 之后 post-receive 仍会自动 build `geo-web`，
+在 https://geo.xg22.top 上看线上效果。
 后端需要真库的测试在 VPS 容器里跑，详见 `docs/BACKEND.md` §10。
 
 ### 现网可联调的真实数据
 
+⚠️ 下面这组是 **2026-08-23 重新实测的**。上一版这里写的是 run 27 的
+`n_valid 35 · m_mentioned 21`，那是 2026-08-06 的快照，早就不是最新一次运行了。
+
 ```text
-task 27「安踏监测集」· brand 34 安踏 + 7 个竞品 · run 27
-counts?brand_id=34&run_id=27  →  n_valid 35 · m_mentioned 21 · head 15
-首位提及率 #1×6 → 6/21 = 28.6%      （counts 的 m_first，2026-08-11 补的）
+task 27「安踏监测集」· brand 34 安踏 + 7 个竞品 · 共 12 次运行（08-08 ~ 08-23）
+
+最新一次 run 300（partial）：
+  counts?brand_id=34&run_id=300  →  n_valid 18 · m_mentioned 12 · m_first 1
+  21 个采样只回来 18 条 —— 分母少一截，比率偏高
+
+全时段累计（跨 run，只有引用榜与联网分桶该用它）：
+  n_total_responses 191 · n_valid 180（11 条 too_short）
+  m_mentioned 112 · head 71 / middle 30 / tail 7 · m_first 25 · citation_only 4
+
+引用：144 条 / 40 个域名
+  www.163.com      12 次 / 12 条样本   ← 覆盖面广
+  www.toutiao.com   9 次 /  4 条样本   ← 集中引用，榜单上挨着但不是一回事
+联网分桶：**只有两桶** true=19 · unknown=161，**false 桶不存在**
+  （界面不能假设三桶都在，但要把三档都画出来）
+
 另有 brand 1 土巴兔：本品 0 提及、6 个竞品有命中 —— 零状态的真实用例
 ```
+
+> 重抓后会变。对数前先跑一次 `/v1/counts` 确认，别照抄这里的数字。
 
 ### 最容易踩的三个坑
 
