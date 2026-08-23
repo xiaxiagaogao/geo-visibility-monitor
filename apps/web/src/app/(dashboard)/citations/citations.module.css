@@ -1,0 +1,183 @@
+/* 引用榜 */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--ink);
+}
+
+.lede {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+  color: var(--ink-2);
+  max-width: 68ch;
+}
+
+.headline {
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* ═══ 联网分桶 ═══ */
+
+.buckets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--sp-5);
+}
+
+.bucket {
+  min-width: 0;
+}
+
+.bucketLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--tr-label);
+  color: var(--ink-2);
+}
+
+.bucketValue {
+  font-family: var(--font-instrument);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-readout-sm);
+  font-weight: 500;
+  letter-spacing: var(--tr-readout);
+  line-height: var(--lh-tight);
+  margin: var(--sp-2) 0 var(--sp-3);
+  color: var(--ink);
+}
+
+/* 「不知道」那一档整体压成次要色 —— 它不是一个成就，是一段缺口 */
+.bucket[data-void] .bucketValue {
+  color: var(--ink-2);
+}
+
+.bucketDenom {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-label);
+  color: var(--ink-3);
+}
+
+.bucketAbsent {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  color: var(--ink-3);
+  border-left: 1px dashed var(--edge-strong);
+  padding-left: var(--sp-2);
+}
+
+/* ═══ 域名榜 ═══ */
+
+.board {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 200px) minmax(80px, 1fr) 42px 78px 96px;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rank {
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.domain {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barCell {
+  display: block;
+  height: var(--tick-h);
+  background: var(--trace-bed);
+  border-radius: var(--r-xs);
+  overflow: hidden;
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  background: var(--trace-own);
+  border-radius: var(--r-xs);
+}
+
+.count {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--ink);
+  text-align: right;
+}
+
+.samples {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+}
+
+.samplesUnit {
+  font-family: var(--font-text);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+}
+
+.flagCell {
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 22px minmax(0, 1fr) 40px 70px;
+    row-gap: var(--sp-1);
+  }
+
+  .barCell {
+    grid-column: 1 / -1;
+  }
+
+  .flagCell {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

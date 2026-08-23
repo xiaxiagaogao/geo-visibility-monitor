@@ -1,0 +1,50 @@
+/* 任务列表 —— 页标题归页面自己，不在顶栏 */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--ink);
+}
+
+.lede {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+
+.taskName {
+  font-size: var(--fs-body);
+  color: var(--ink);
+  border-bottom: 1px solid var(--edge-strong);
+  transition: border-color 140ms ease;
+}
+
+.taskName:hover {
+  border-bottom-color: var(--pencil-blue);
+  color: var(--pencil-blue);
+}
+
+.cellMeta {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  color: var(--ink-3);
+}
