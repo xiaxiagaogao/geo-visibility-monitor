@@ -76,6 +76,9 @@ def _sql(**overrides) -> str:
         prompt_id=None,
         brand_id=None,
         run_id=None,
+        # P2-37 起 _scoped 多了这个条件。默认 None = 不筛，
+        # 这些用例盯的是 run_id 的 join 行为，不关心联网标注
+        search_used=None,
         allowed_brands=None,
     )
     kw.update(overrides)
@@ -107,6 +110,7 @@ def test_count_query_takes_the_same_filters():
         prompt_id=None,
         brand_id=None,
         run_id=128,
+        search_used=None,
         allowed_brands=None,
     )
     sql = str(
@@ -114,3 +118,12 @@ def test_count_query_takes_the_same_filters():
     )
     assert "crawl_jobs.run_id" in sql
     assert "count(" in sql
+
+    # P2-37：新加的条件同样两边都要进，否则筛过之后 total 还是全量 ——
+    # 翻页器会给出一个永远翻不到的页数
+    counted = str(
+        responses_api._scoped(
+            select(func.count()).select_from(RawResponse), **{**kw, "search_used": "unknown"}
+        )
+    )
+    assert "search_used IS NULL" in counted

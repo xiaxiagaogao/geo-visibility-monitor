@@ -221,3 +221,26 @@
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+
+/* ══════ 样本列表的筛选条（P2-37）══════ */
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  margin-right: var(--sp-1);
+}
+
+/* 选中态用 aria-pressed 而不是另加一个 class：
+   状态本来就要给读屏软件，样式跟着同一个属性走就不会两边不一致 */
+.filterBar button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}

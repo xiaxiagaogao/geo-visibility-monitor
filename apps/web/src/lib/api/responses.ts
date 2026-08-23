@@ -31,6 +31,14 @@ export async function listRunSamples(params: {
   /** `ok` | `empty` | `too_short` | `error`；不传 = 全要（含不进分母的） */
   answerStatus?: string
   platform?: string
+  /**
+   * P2-37 联网标注筛选。**三个取值，不是布尔**：
+   * `true` 联网了 · `false` 确认没联网 · `unknown` 我们不知道。
+   *
+   * **必须在服务端筛。** 这个列表是服务端分页的 —— 在前端筛只会筛当前这一页，
+   * 用户点「已联网」看到 3 条，而第 2 页还有 5 条，他不会知道。
+   */
+  searchUsed?: 'true' | 'false' | 'unknown'
 }): Promise<SampleListResult> {
   return apiFetch<SampleListResult>('/v1/responses/summary', {
     query: {
@@ -39,6 +47,7 @@ export async function listRunSamples(params: {
       offset: params.offset,
       answer_status: params.answerStatus,
       platform: params.platform,
+      search_used: params.searchUsed,
     },
   })
 }

@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { Badge, Degraded, Table, ui, type BadgeTone } from '@/components/ui'
 import { isPreviewTruncated, ownHit, type SampleHitKind } from '@/lib/l3/samples'
+import { searchUsedLabel } from '@/lib/l3/search-used'
 import type { RawResponseSummary } from '@/lib/types'
 
 import styles from './runs.module.css'
@@ -63,6 +64,7 @@ export function SampleTable({
           <th>提问</th>
           <th>平台</th>
           <th>回答</th>
+          <th>联网</th>
           <th>本品</th>
           <th>命中处</th>
         </tr>
@@ -106,6 +108,19 @@ export function SampleTable({
                 {status && status !== 'ok' ? (
                   <div className={styles.sampleNote}>不进分母</div>
                 ) : null}
+              </td>
+
+              {/* P2-37 联网标注。三态判定在 lib/l3/search-used.ts ——
+                  `null` 走 Degraded：它是「不知道」，不是「没联网」 */}
+              <td>
+                {(() => {
+                  const label = searchUsedLabel(s.search_used)
+                  return label.degraded ? (
+                    <Degraded>未记录</Degraded>
+                  ) : (
+                    <Badge tone={label.tone}>{label.text}</Badge>
+                  )
+                })()}
               </td>
 
               <td>

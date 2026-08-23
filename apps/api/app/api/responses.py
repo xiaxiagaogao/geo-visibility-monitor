@@ -90,6 +90,13 @@ def _resolve_scope(
     return None
 
 
+#: `search_used` 筛选的三个合法取值（P2-37）。
+#:
+#: **必须是三个而不是两个布尔值** —— `null` 是「我们不知道」，
+#: 它既不属于「联网了」也不属于「没联网」，得能单独筛出来。
+SEARCH_USED_FILTERS = ("true", "false", "unknown")
+
+
 def _scoped(
     stmt,
     *,
@@ -98,6 +105,7 @@ def _scoped(
     prompt_id: Optional[int],
     brand_id: Optional[int],
     run_id: Optional[int],
+    search_used: Optional[str],
     allowed_brands: Optional[List[int]],
 ):
     """把过滤条件拼到一个以 ``RawResponse`` 为主表的 select 上。
@@ -123,6 +131,15 @@ def _scoped(
         stmt = stmt.where(RawResponse.platform == platform)
     if answer_status:
         stmt = stmt.where(RawResponse.answer_status == answer_status)
+    if search_used == "true":
+        stmt = stmt.where(RawResponse.search_used.is_(True))
+    elif search_used == "false":
+        # **用 IS false，别用 coalesce(search_used, false) = false。**
+        # SQL 里 NULL 不参与比较，所以这样写天然把「不知道」排除在外 ——
+        # 而那正是我们要的：55 条历史样本不该被算进「未联网」（P2-37）
+        stmt = stmt.where(RawResponse.search_used.is_(False))
+    elif search_used == "unknown":
+        stmt = stmt.where(RawResponse.search_used.is_(None))
     if prompt_id is not None:
         stmt = stmt.where(CrawlJob.prompt_id == prompt_id)
     if run_id is not None:
@@ -143,6 +160,15 @@ def list_responses(
         None, description="只看这一次运行的样本（任务详情页的样本列表用它）"
     ),
     answer_status: Optional[str] = None,
+    search_used: Optional[str] = Query(
+        None,
+        pattern="^(true|false|unknown)$",
+        description=(
+            "P2-37 联网标注筛选。**三个取值，不是布尔** —— "
+            "unknown 是「我们不知道」（P2-37 之前的样本），"
+            "它既不属于 true 也不属于 false，必须能单独筛"
+        ),
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, description="跳过前 N 条；与 total 配合翻页"),
     db: Session = Depends(get_db),
@@ -160,6 +186,7 @@ def list_responses(
         prompt_id=prompt_id,
         brand_id=brand_id,
         run_id=run_id,
+        search_used=search_used,
         allowed_brands=allowed_brands,
     )
     q = _scoped(
@@ -213,6 +240,15 @@ def list_response_summaries(
         None, description="只看这一次运行的样本（任务详情页的样本列表用它）"
     ),
     answer_status: Optional[str] = None,
+    search_used: Optional[str] = Query(
+        None,
+        pattern="^(true|false|unknown)$",
+        description=(
+            "P2-37 联网标注筛选。**三个取值，不是布尔** —— "
+            "unknown 是「我们不知道」（P2-37 之前的样本），"
+            "它既不属于 true 也不属于 false，必须能单独筛"
+        ),
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, description="跳过前 N 条；与 total 配合翻页"),
     db: Session = Depends(get_db),
@@ -243,6 +279,7 @@ def list_response_summaries(
         prompt_id=prompt_id,
         brand_id=brand_id,
         run_id=run_id,
+        search_used=search_used,
         allowed_brands=allowed_brands,
     )
     q = (
