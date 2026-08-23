@@ -57,7 +57,7 @@ export interface CountsBucket {
 export interface CountsResponse {
   brand_id: number
   filters: Record<string, unknown>
-  group_by: 'none' | 'day' | 'platform' | 'prompt'
+  group_by: 'none' | 'day' | 'platform' | 'prompt' | 'search_used'
   denominator: DenominatorCounts
   brand: BrandMentionCounts
   competitors: BrandMentionCounts[]
@@ -295,4 +295,31 @@ export interface BarDatum {
   m: number
   n: number
   own?: boolean
+}
+
+/**
+ * `apps/api/app/schemas/counts.py :: CitationDomainOut`（docs/API.md §4）
+ *
+ * ⚠️ **`n_samples` 是诊断字段，不参与排序。** 按引用次数排会偏向聚合型站点：
+ * 实测数据里 `www.toutiao.com` 9 次只来自 **4** 条样本，
+ * 而 `www.163.com` 12 次分布在 **12** 条 —— 后者的覆盖面其实更广。
+ * 没有 `n_samples` 的话这两行在榜单上只能比大小。
+ */
+export interface CitationDomain {
+  domain: string
+  n_citations: number
+  n_samples: number
+}
+
+/**
+ * `GET /v1/citations/domains` 的响应。
+ *
+ * ⚠️ **`n_citations` / `n_domains` 描述的是全集，不是 `items` 那几行。**
+ * 带 `limit` 时 `Σ items[].n_citations < n_citations` 是正常的 ——
+ * 前者是 Top N 的和，后者是总量。**别拿 items 的和当分母。**
+ */
+export interface CitationDomainsResult {
+  n_citations: number
+  n_domains: number
+  items: CitationDomain[]
 }
