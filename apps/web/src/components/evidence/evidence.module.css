@@ -1,139 +1,276 @@
-/* ═══ L0 全文 ═══ */
-.fullText {
-  font-size: var(--fs-body);
-  line-height: 1.9;
-  color: var(--text-primary);
-  /* 后端存的是纯文本，换行是内容的一部分 —— 不保留的话整段会挤成一坨 */
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: var(--sp-4);
-  background: var(--bg-subtle);
-  border-radius: var(--r-sm);
-}
+/* ══════════════════════════════════════════════════════════════════
+   证据页 —— 这一页展示的是**记录本身**，不是它的派生数字
+   ══════════════════════════════════════════════════════════════════ */
 
-/* 竞品命中：统一一种底色。八个品牌不需要八种颜色 ——
-   读者只关心「我在哪」，给每个竞品配色只会让主角淹掉 */
-.mark {
-  background: color-mix(in srgb, var(--text-tertiary) 26%, transparent);
-  color: inherit;
-  border-radius: 3px;
-  padding: 1px 2px;
-}
-
-/* 本品命中：主色。和竞品的区别必须靠底色**加**字重，
-   不能只靠颜色 —— 色觉障碍下两者会糊成一样 */
-.markOwn {
-  background: var(--accent-soft);
-  color: var(--text-primary);
-  font-weight: 700;
-  border-radius: 3px;
-  padding: 1px 2px;
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-
-.legend {
+.stack {
   display: flex;
-  gap: var(--sp-4);
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: var(--sp-3);
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
+  flex-direction: column;
+  gap: var(--sp-5);
 }
 
-/* ═══ 提问 ═══ */
-.prompt {
-  font-size: var(--fs-h2);
-  font-weight: 600;
-  line-height: 1.5;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-/* ═══ 出场顺序 ═══ */
-.order {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.orderSep {
-  color: var(--text-tertiary);
-  font-size: var(--fs-xs);
-}
-
-/* ═══ 不变量对不上的告警 ═══ */
-.mismatch {
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-sm);
-  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--bg-surface));
-  background: color-mix(in srgb, var(--danger) 7%, var(--bg-surface));
-  font-size: var(--fs-xs);
-  line-height: 1.7;
-  color: var(--text-secondary);
-}
-
-.mismatchRow {
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-  margin-top: 4px;
-}
-
-/* ═══ 截图 ═══ */
-.shot {
-  max-width: 100%;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  display: block;
-}
+/* ═══ 面包屑 ═══ */
 
 .head {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
   flex-wrap: wrap;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
+  gap: var(--sp-2) var(--sp-3);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  color: var(--ink-3);
 }
 
-/* ══════ 引用来源（P2-37）══════ */
+.headSep {
+  opacity: 0.45;
+}
+
+/* ═══ 提问 —— 这是输入变量，给它展示字号 ═══
+   上一版它是一行 15px 的正文，比它派生出来的百分比还小。 */
+
+.prompt {
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 0;
+  max-width: 30em;
+}
+
+.promptStamp {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--tr-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: block;
+  margin-bottom: var(--sp-3);
+}
+
+/* ═══ 回答原文 ═══
+   这是一张摊开的记录：内陷的纸、左边一道装订线、可读的行宽。
+
+   ⚠️ **行宽是硬约束**：上一版这段中文正文铺满 1140px，一行 80 个汉字，
+   读到行尾找不回行首。中文的舒适行宽是 35–45 字。 */
+
+.sheet {
+  position: relative;
+  background: var(--sheet-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  padding: var(--sp-5) var(--sp-6) var(--sp-5) var(--sp-7);
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+/* 装订线：纸的左边缘那道竖线 */
+.sheet::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule-strong);
+  opacity: 0.5;
+}
+
+.fullText {
+  font-family: var(--font-text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 42em; /* ≈ 42 个汉字一行 */
+  margin: 0;
+}
+
+/* ═══ 标注 —— 铅笔划的线，不是荧光笔的块 ═══ */
+
+.mark {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border-bottom: 2px solid var(--ink-3);
+  border-radius: 2px 2px 0 0;
+  padding: 1px 2px;
+  color: inherit;
+}
+
+/* 本品：蓝铅笔。它是这一页要找的东西 */
+.markOwn {
+  background: var(--pencil-blue-wash);
+  border-bottom: 2px solid var(--pencil-blue);
+  border-radius: 2px 2px 0 0;
+  padding: 1px 2px;
+  color: inherit;
+  font-weight: 600;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-5);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-micro);
+  color: var(--ink-2);
+}
+
+.legend mark {
+  margin-right: 5px;
+}
+
+.order {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.orderSep {
+  color: var(--ink-3);
+}
+
+/* ═══ 不变量对不上 —— 红笔画的告警 ═══
+   静默画错比空着糟得多：用户会拿一段错的原文去跟客户解释结论。 */
+
+.mismatch {
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
+  background: var(--pencil-red-wash);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.mismatchLead {
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  color: var(--pencil-red);
+  display: block;
+  margin-bottom: var(--sp-2);
+}
+
+.mismatchRow {
+  margin-top: var(--sp-2);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+  padding-left: var(--sp-3);
+  border-left: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
+}
+
+/* ═══ 截图 ═══ */
+
+.shot {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--r-sm);
+}
+
+/* ═══ 引用来源 ═══ */
 
 .cites {
-  display: grid;
-  gap: var(--sp-3);
   margin: 0;
-  padding-left: var(--sp-5);
+  padding: 0;
+  list-style: none;
+  counter-reset: cite;
 }
 
 .cite {
-  line-height: 1.5;
+  position: relative;
+  counter-increment: cite;
+  padding: var(--sp-3) 0 var(--sp-3) var(--sp-6);
+  border-bottom: 1px solid var(--rule);
 }
 
-/* 域名单独一行且用等宽：GEO 分析真正关心的是「哪些站被引用」，
-   而标题会随媒体改版变、域名不会。所以域名要一眼扫得出来。 */
+.cite:last-child {
+  border-bottom: none;
+}
+
+.cite::before {
+  content: counter(cite);
+  position: absolute;
+  left: 0;
+  top: var(--sp-3);
+  font-family: var(--font-instrument);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  width: var(--sp-5);
+  text-align: right;
+}
+
+.citeTitle {
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--pencil-blue);
+  border-bottom: 1px solid transparent;
+}
+
+.citeTitle:hover {
+  border-bottom-color: currentColor;
+}
+
 .citeMeta {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  margin-top: 2px;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
+  gap: var(--sp-3);
+  margin-top: 3px;
+  font-family: var(--font-instrument);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
 }
 
 .citeIndex {
-  color: var(--text-tertiary, var(--text-secondary));
+  color: var(--ink-3);
 }
 
 .citeSnippet {
-  margin: 4px 0 0;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  /* 摘要是平台给的，长度不可控 —— 截断而不是把版面撑破 */
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-label);
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-width: 46em;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ═══ 逐品牌标注表里的窄列 ═══ */
+
+.snippetCell {
+  max-width: 30ch;
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.metaCell {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+}
+
+@media (max-width: 900px) {
+  .sheet {
+    padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-6);
+    max-height: none;
+  }
+
+  .sheet::before {
+    left: 14px;
+  }
+
+  .prompt {
+    font-size: 19px;
+  }
 }

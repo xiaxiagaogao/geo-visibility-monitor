@@ -21,14 +21,11 @@ export interface Highlight {
 /**
  * L0 全文，命中处内联高亮。
  *
- * ⚠️ `highlights` 现在恒为空数组，但**原因已经不是后端给不出**：
- * 写这个组件时 `mentions` 表确实没有 offset 列，后来后端补上了 ——
- * `MentionOut` 现在有 `first_offset` 与 `matched_term`（API.md §7）。
- * 空数组只是因为本轮还吃固定数据，接上 API 就有值。
- *
- * 接的时候按 API.md §7.1 那条不变量自检，错位会立刻暴露：
+ * `highlights` **已经接上真实数据**（这段注释原来写着「恒为空数组」，
+ * 那是接 API 之前的状态，早就不成立了）。位置由 `lib/l3/evidence` 的
+ * `buildHighlights` 算出来，它按 API.md §7.1 那条不变量逐处自检：
  *   full_text.slice(first_offset, first_offset + matched_term.length) === matched_term
- * 后端在全库 179 条命中上验过 179/179。
+ * 对不上的那一处**不画**，改由证据页渲染成一条红色告警。
  * 注意字段名要映射：后端 `first_offset` / `matched_term` → 这里的 `offset` / `matchedTerm`。
  *
  * 这里**故意不做**「前端按 matched_term 自己在 full_text 里找」的兜底：

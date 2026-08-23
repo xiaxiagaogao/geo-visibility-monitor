@@ -5,20 +5,19 @@ import { useEffect, useMemo, useState } from 'react'
 
 import evidence from '@/components/evidence/evidence.module.css'
 import { HighlightedText, type Highlight } from '@/components/evidence/HighlightedText'
-import runs from '@/components/runs/runs.module.css'
 import {
-  Badge,
+  Aside,
+  Blank,
   Button,
-  Degraded,
-  EmptyState,
-  ErrorState,
-  Panel,
-  PanelNote,
-  Skeleton,
+  Fault,
+  Mark,
+  markTone,
+  Pending,
+  Plate,
+  rec,
   Table,
-  ui,
-  type BadgeTone,
-} from '@/components/ui'
+  type MarkTone,
+} from '@/components/record'
 import { brandNameMap, listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
 import { getResponse } from '@/lib/api/responses'
@@ -34,15 +33,20 @@ const STATUS_LABEL: Record<string, string> = {
   error: '抓取出错',
 }
 
-const STATUS_TONE: Record<string, BadgeTone> = {
+const STATUS_TONE: Record<string, MarkTone> = {
   ok: 'ok',
-  empty: 'warning',
-  too_short: 'warning',
-  error: 'danger',
+  empty: 'warn',
+  too_short: 'warn',
+  error: 'fault',
 }
 
 /**
  * 单条回答证据（A7）。路由 `/tasks/[id]/runs/[runId]/r/[rid]`。
+ *
+ * 这一页展示的是**记录本身**，不是它的派生数字 —— 所以版式和别处不同：
+ * 提问用展示字号（它是输入变量，上一版把它排得比派生出来的百分比还小），
+ * 回答原文摊在一张内陷的纸上、带装订线、**行宽限死 42 个汉字**
+ * （上一版铺满 1140px，一行 80 字，读到行尾找不回行首）。
  *
  * **`runId` 在这一页只用来生成返回链接，不参与任何数字。** 样本本身由 `rid`
  * 唯一确定，`/v1/responses/{id}` 也不回传它属于哪个 run —— 所以这里刻意不
@@ -97,7 +101,7 @@ export function EvidenceView({
 
   if (error) {
     return (
-      <ErrorState
+      <Fault
         status={error instanceof ApiError ? error.status : 0}
         message={
           error instanceof ApiError && error.status === 404
@@ -113,9 +117,10 @@ export function EvidenceView({
 
   if (!sample || !task || !run) {
     return (
-      <div style={{ display: 'grid', gap: 12 }}>
-        <Skeleton height={28} width="50%" />
-        <Skeleton height={280} />
+      <div className={evidence.stack}>
+        <Pending height={20} width="50%" />
+        <Pending height={92} />
+        <Pending height={300} />
       </div>
     )
   }
@@ -130,6 +135,7 @@ export function EvidenceView({
 
   const status = sample.answer_status ?? ''
   const order = mentionOrder(highlights)
+  const search = searchUsedLabel(sample.search_used)
 
   const marks: Highlight[] = highlights.map((h) => ({
     offset: h.offset,
@@ -139,49 +145,39 @@ export function EvidenceView({
   }))
 
   return (
-    <div className={runs.panelStack}>
-      <div>
-        <div className={evidence.head}>
-          <Link href={`/tasks/${taskId}/runs/${runId}`} className={ui.rowLink}>
-            ← 回到这次运行
-          </Link>
-          <span>·</span>
-          <span>{task.name}</span>
-          <span>·</span>
-          <span className={ui.numeric}>样本 #{sample.id}</span>
-          <span>·</span>
-          <span>{sample.platform}</span>
-          <span>·</span>
-          <span className={ui.numeric}>{sample.created_at.slice(0, 16).replace('T', ' ')}</span>
-          {status ? (
-            <Badge tone={STATUS_TONE[status] ?? 'neutral'}>
-              {STATUS_LABEL[status] ?? status}
-            </Badge>
-          ) : (
-            <Degraded>未判定</Degraded>
-          )}
-          {/* P2-37 联网标注。**三态**，判定在 lib/l3/search-used.ts ——
-              `null` 走 Degraded 而不是 Badge，因为它是「不知道」不是一个结论 */}
-          {(() => {
-            const s = searchUsedLabel(sample.search_used)
-            return s.degraded ? (
-              <Degraded>{s.text}</Degraded>
-            ) : (
-              <Badge tone={s.tone}>{s.text}</Badge>
-            )
-          })()}
-        </div>
+    <div className={evidence.stack}>
+      <div className={evidence.head}>
+        <Link href={`/tasks/${taskId}/runs/${runId}`} className={rec.link}>
+          ← 回到这次运行
+        </Link>
+        <span className={evidence.headSep}>·</span>
+        <span>{task.name}</span>
+        <span className={evidence.headSep}>·</span>
+        <span>样本 #{sample.id}</span>
+        <span className={evidence.headSep}>·</span>
+        <span>{sample.platform}</span>
+        <span className={evidence.headSep}>·</span>
+        <span>{sample.created_at.slice(0, 16).replace('T', ' ')}</span>
+        {status ? (
+          <Mark tone={STATUS_TONE[status] ?? 'plain'}>{STATUS_LABEL[status] ?? status}</Mark>
+        ) : (
+          <Mark tone="void">未判定</Mark>
+        )}
+        {/* P2-37 联网标注。**三态**，判定在 lib/l3/search-used.ts ——
+            `null` 走空心虚线而不是实心记号：它是「不知道」，不是一个结论 */}
+        <Mark tone={search.degraded ? 'void' : markTone(search.tone)}>{search.text}</Mark>
       </div>
 
-      <Panel title="提问">
+      <Plate ruled>
+        <span className={evidence.promptStamp}>提问</span>
         <p className={evidence.prompt}>{sample.prompt_text}</p>
-      </Panel>
+      </Plate>
 
       {/* 不变量没成立时**必须显示**，不能吞掉。静默画错比空着糟得多：
           用户会拿一段错的原文去跟客户解释结论。 */}
       {mismatches.length > 0 ? (
         <div className={evidence.mismatch} role="alert">
-          <strong style={{ color: 'var(--danger)' }}>
+          <strong className={evidence.mismatchLead}>
             有 {mismatches.length} 处标注与原文对不上，已不画高亮。
           </strong>
           <div>
@@ -199,9 +195,9 @@ export function EvidenceView({
         </div>
       ) : null}
 
-      <Panel
+      <Plate
         title="回答原文"
-        subtitle="高亮位置直接来自 L1 标注的 first_offset，不是前端搜出来的 —— UI 上标的就是计数时数的那一处"
+        subtitle="高亮位置直接来自 L1 标注的 first_offset，不是前端搜出来的 —— 页面上标的就是计数时数的那一处"
         right={
           sample.screenshot_path ? (
             <Button onClick={() => setShowShot((v) => !v)}>
@@ -211,15 +207,19 @@ export function EvidenceView({
         }
       >
         {sample.full_text.trim() === '' ? (
-          <EmptyState>
-            <strong style={{ color: 'var(--text-secondary)' }}>这条回答是空的</strong>
-            <span>
-              采到了但正文为空（`answer_status` = {status || '未判定'}），所以它不进分母。
-            </span>
-          </EmptyState>
+          <Blank lead="这条回答是空的">
+            采到了但正文为空（<span className="mono">answer_status</span> ={' '}
+            {status || '未判定'}），所以它不进分母。
+          </Blank>
         ) : (
           <>
-            <HighlightedText text={sample.full_text} highlights={marks} className={evidence.fullText} />
+            <div className={evidence.sheet}>
+              <HighlightedText
+                text={sample.full_text}
+                highlights={marks}
+                className={evidence.fullText}
+              />
+            </div>
             <div className={evidence.legend}>
               <span>
                 <mark className={evidence.markOwn}>本品</mark> {nameOf(ownBrandId)}
@@ -231,7 +231,7 @@ export function EvidenceView({
                 <span className={evidence.order}>
                   <span className={evidence.orderSep}>出场顺序：</span>
                   {order.map((bid, i) => (
-                    <span key={bid} className={ui.numeric}>
+                    <span key={bid}>
                       {i > 0 ? ' › ' : ''}
                       {nameOf(bid)}
                     </span>
@@ -255,32 +255,32 @@ export function EvidenceView({
             />
           </div>
         ) : null}
-      </Panel>
+      </Plate>
 
-      <Panel
+      <Plate
         title="逐品牌标注"
-        subtitle="这条样本上，L1 对每个被监测品牌记了什么。矩阵与 KPI 的每一个整数都由这些行累加而来"
+        subtitle="这条样本上，L1 对每个被监测品牌记了什么。矩阵与读数里的每一个整数都由这些行累加而来"
       >
         <MentionTable mentions={sample.mentions} ownBrandId={ownBrandId} nameOf={nameOf} />
-      </Panel>
+      </Plate>
 
-      <Panel
+      <Plate
         title="引用来源"
         subtitle="千问的引用来自 SSE 流，不是页面 —— 页面上那块只有站点图标，一条外链都没有"
         right={
           sample.citations.length > 0 ? (
-            <span className={ui.numeric} style={{ color: 'var(--text-secondary)' }}>
+            <span className="mono" style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-label)' }}>
               {sample.citations.length} 条
             </span>
           ) : null
         }
       >
         <CitationList citations={sample.citations} searchUsed={sample.search_used} />
-      </Panel>
+      </Plate>
 
-      <PanelNote>
+      <Aside>
         这是 L0 原文，未经改写。上面每一个百分比都能顺着这里的标注回溯到这一条。
-      </PanelNote>
+      </Aside>
     </div>
   )
 }
@@ -305,25 +305,19 @@ function CitationList({
 
   if (state === 'none-no-search') {
     return (
-      <EmptyState>
-        <strong style={{ color: 'var(--text-secondary)' }}>这次回答没有检索网页</strong>
-        <span>
-          所以没有引用来源 —— <b>这是结果，不是缺陷</b>。模型靠自身知识作答，
-          该样本照常进分母。
-        </span>
-      </EmptyState>
+      <Blank lead="这次回答没有检索网页">
+        所以没有引用来源 —— <strong>这是结果，不是缺陷</strong>。模型靠自身知识作答，
+        该样本照常进分母。
+      </Blank>
     )
   }
 
   if (state === 'unknown') {
     return (
-      <EmptyState>
-        <strong style={{ color: 'var(--text-secondary)' }}>这条样本没有记录联网情况</strong>
-        <span>
-          它采集于联网标注（P2-37）上线之前，所以「有没有检索网页」是<b>未知</b>，
-          不是「没有」。此后采的样本都会带这个标注。
-        </span>
-      </EmptyState>
+      <Blank lead="这条样本没有记录联网情况">
+        它采集于联网标注（P2-37）上线之前，所以「有没有检索网页」是<strong>未知</strong>，
+        不是「没有」。此后采的样本都会带这个标注。
+      </Blank>
     )
   }
 
@@ -331,10 +325,11 @@ function CitationList({
     // 这条是**我们这边的异常**，不是平台行为 —— 所以用告警而不是空态
     return (
       <div className={evidence.mismatch} role="alert">
-        <strong style={{ color: 'var(--danger)' }}>标注说联网了，却一条引用都没抽到。</strong>
+        <strong className={evidence.mismatchLead}>标注说联网了，却一条引用都没抽到。</strong>
         <div>
           这两件事对不上，多半是流解析出了问题或平台改了结构 ——
-          <b>不要当成「这次没引用」</b>。请查采集端 <span className="mono">qianwen_sse</span> 的解析。
+          <strong>不要当成「这次没引用」</strong>。请查采集端{' '}
+          <span className="mono">qianwen_sse</span> 的解析。
         </div>
       </div>
     )
@@ -344,13 +339,18 @@ function CitationList({
     <ol className={evidence.cites}>
       {citations.map((c) => (
         <li key={c.id} className={evidence.cite}>
-          <a href={c.url} target="_blank" rel="noopener noreferrer nofollow" className={ui.rowLink}>
+          <a
+            href={c.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className={evidence.citeTitle}
+          >
             {c.title ?? c.url}
           </a>
           {/* 域名单独显示：GEO 分析真正关心的是「哪些站被引用」，
               而标题会随媒体改版变，域名不会 */}
           <div className={evidence.citeMeta}>
-            <span className={ui.numeric}>{c.domain}</span>
+            <span>{c.domain}</span>
             {c.cite_index !== null ? (
               <span className={evidence.citeIndex}>#{c.cite_index}</span>
             ) : null}
@@ -375,10 +375,9 @@ function MentionTable({
 }) {
   if (mentions.length === 0) {
     return (
-      <EmptyState>
-        <strong style={{ color: 'var(--text-secondary)' }}>这条样本还没跑过 L1 标注</strong>
-        <span>不是「没有品牌被提到」——是还不知道。它会落进 n_unannotated。</span>
-      </EmptyState>
+      <Blank lead="这条样本还没跑过 L1 标注">
+        不是「没有品牌被提到」—— 是还不知道。它会落进 n_unannotated。
+      </Blank>
     )
   }
 
@@ -407,31 +406,27 @@ function MentionTable({
             <td>
               {nameOf(m.brand_id)}
               {m.brand_id === ownBrandId ? (
-                <span style={{ marginLeft: 6 }}>
-                  <Badge tone="accent">本品</Badge>
+                <span style={{ marginLeft: 8 }}>
+                  <Mark tone="own">本品</Mark>
                 </span>
               ) : null}
             </td>
             <td>
               {!m.mentioned ? (
-                <Badge>未提及</Badge>
+                <Mark>未提及</Mark>
               ) : m.mention_type === 'citation_only' ? (
-                <Badge tone="warning">仅引用</Badge>
+                <Mark tone="warn">仅引用</Mark>
               ) : (
-                <Badge tone="ok">正文命中</Badge>
+                <Mark tone="ok">正文命中</Mark>
               )}
             </td>
-            <td className={ui.numeric}>
+            <td className="mono">
               {/* citation_only 是 null，不是排最后 —— 正文里没出现就没有「出场位置」 */}
               {m.position_rank === null ? '—' : `#${m.position_rank}`}
             </td>
-            <td style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)' }}>
-              {m.position_bucket ?? '—'}
-            </td>
-            <td className={ui.numeric}>{m.matched_term ?? '—'}</td>
-            <td style={{ maxWidth: 320, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
-              {m.evidence_snippet ?? '—'}
-            </td>
+            <td className={evidence.metaCell}>{m.position_bucket ?? '—'}</td>
+            <td className="mono">{m.matched_term ?? '—'}</td>
+            <td className={evidence.snippetCell}>{m.evidence_snippet ?? '—'}</td>
           </tr>
         ))}
       </tbody>
