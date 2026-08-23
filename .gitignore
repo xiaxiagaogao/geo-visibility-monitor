@@ -65,3 +65,7 @@ deploy/deepseek_live_answer.json
 data/deepseek_profile/
 data/*_profile/
 data/*.png
+
+# impeccable 的会话产物：决策页 payload / 截图 / 生成的 mock
+# 只有 PRODUCT.md 与 DESIGN.md 是要长期留在仓库里的设计权威
+.impeccable/
