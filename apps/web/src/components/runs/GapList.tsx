@@ -1,4 +1,4 @@
-import { Badge, EmptyState, type BadgeTone } from '@/components/ui'
+import { Blank, Mark, type MarkTone } from '@/components/record'
 import type { Gap, GapPriority, GapTier } from '@/lib/l3/gaps'
 import { formatFraction } from '@/lib/l3/rates'
 
@@ -9,10 +9,10 @@ const TIER_LABEL: Record<GapTier, string> = {
   trailing: '明显落后',
 }
 
-const PRIORITY_TONE: Record<GapPriority, BadgeTone> = {
-  high: 'danger',
-  mid: 'warning',
-  low: 'neutral',
+const PRIORITY_TONE: Record<GapPriority, MarkTone> = {
+  high: 'fault',
+  mid: 'warn',
+  low: 'plain',
 }
 
 /**
@@ -38,12 +38,9 @@ export function GapList({
 }) {
   if (gaps.length === 0) {
     return (
-      <EmptyState>
-        <strong style={{ color: 'var(--text-secondary)' }}>这次没有覆盖缺口</strong>
-        <span>
-          {totalPrompts} 条提问里，本品都没有出现「自己缺席而竞品在场」的情况。
-        </span>
-      </EmptyState>
+      <Blank lead="这次没有覆盖缺口">
+        {totalPrompts} 条提问里，本品都没有出现「自己缺席而竞品在场」的情况。
+      </Blank>
     )
   }
 
@@ -56,9 +53,7 @@ export function GapList({
               {promptText.get(g.promptId) ?? `提问 #${g.promptId}`}
             </div>
             <div className={styles.taskMeta}>
-              <Badge tone={g.tier === 'absent' ? 'danger' : 'warning'}>
-                {TIER_LABEL[g.tier]}
-              </Badge>
+              <Mark tone={g.tier === 'absent' ? 'fault' : 'warn'}>{TIER_LABEL[g.tier]}</Mark>
               <span className="mono">本品 {formatFraction(g.ownM, g.n)}</span>
             </div>
           </div>
@@ -71,7 +66,7 @@ export function GapList({
           </div>
 
           <div className={styles.gapScore}>
-            <Badge tone={PRIORITY_TONE[g.priority]}>{g.score}</Badge>
+            <Mark tone={PRIORITY_TONE[g.priority]}>{g.score}</Mark>
           </div>
         </div>
       ))}

@@ -1,0 +1,173 @@
+/* 逐提问的道 + 命中矩阵 —— 见各自组件的注释 */
+
+/* ═══ 逐提问 ═══ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 300px) 118px;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+/* 提问原文用正文字号 —— 它是这个产品的输入变量，
+   上一版把它排得比它派生出来的百分比还小 */
+.label {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.scaleCell {
+  min-width: 0;
+}
+
+.figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+}
+
+.rate {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* 挂零是结论，不是缺陷 —— 但要一眼看得出来 */
+.rate[data-zero] {
+  color: var(--pencil-red);
+}
+
+.rate[data-void] {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.frac {
+  font-size: var(--fs-label);
+  color: var(--ink-3);
+}
+
+/* ═══ 命中矩阵 ═══ */
+
+.gridScroll {
+  overflow-x: auto;
+  margin: 0 calc(var(--sp-6) * -1);
+  padding: 0 var(--sp-6);
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gridCorner,
+.gridHead {
+  padding: 0 var(--sp-2) var(--sp-3);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--edge-strong);
+}
+
+.gridCorner {
+  text-align: left;
+  min-width: 220px;
+}
+
+/* 本品那一列：列头用蓝铅笔，整列有极淡的底 —— 它是读这张表的起点 */
+.gridHeadOwn {
+  color: var(--pencil-blue);
+}
+
+.gridRowHead {
+  padding: var(--sp-3) var(--sp-4) var(--sp-3) 0;
+  text-align: left;
+  font-weight: 400;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--rule);
+  min-width: 220px;
+  max-width: 340px;
+}
+
+.gridPrompt {
+  display: block;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.gridRowMeta {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+}
+
+.gridCell {
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+  text-align: center;
+  vertical-align: middle;
+  min-width: 74px;
+}
+
+.gridValue {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* 本品挂零 —— 这个产品的核心结论，整格描红。
+   竞品没出现不用这个样式（那不是结论，是常态）。 */
+.gridCell[data-kind='zeroOwn'] {
+  background: var(--pencil-red-wash);
+  outline: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
+  outline-offset: -1px;
+}
+
+.gridCell[data-kind='zeroOwn'] .gridValue {
+  color: var(--pencil-red);
+  font-weight: 600;
+}
+
+/* 一条有效样本都没有 —— 算不出，不是 0 */
+.gridCell[data-kind='na'] .gridValue {
+  color: var(--ink-3);
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-2);
+  }
+
+  .figures {
+    justify-content: flex-start;
+  }
+
+  .gridScroll {
+    margin: 0 calc(var(--sp-4) * -1);
+    padding: 0 var(--sp-4);
+  }
+}

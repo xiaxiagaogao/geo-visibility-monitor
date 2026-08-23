@@ -190,6 +190,22 @@ const MARK_TONE: Record<MarkTone, string> = {
   void: styles.markVoid,
 }
 
+/**
+ * 把 `lib/l3` 那边的色调名映射到这一套记号。
+ *
+ * L3 的 `Tone`（run-status / search-used 都在用）是照上一套原语的
+ * `BadgeTone` 定的。**不去改 L3** —— 那一层有 238 条测试钉着，
+ * 为了换个设计系统去动纯函数的公开契约，是拿口径层的稳定性换表现层的方便。
+ * 映射放在表现层，这里就是那条边界。
+ */
+export function markTone(tone: 'ok' | 'warning' | 'danger' | 'neutral' | 'accent'): MarkTone {
+  if (tone === 'ok') return 'ok'
+  if (tone === 'warning') return 'warn'
+  if (tone === 'danger') return 'fault'
+  if (tone === 'accent') return 'own'
+  return 'plain'
+}
+
 export function Mark({
   children,
   tone = 'plain',
@@ -250,6 +266,15 @@ export function Button({
       {children}
     </button>
   )
+}
+
+/** 行内输入。整页居中的登录卡片有自己的一份，两者刻意不共用。 */
+export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={`${styles.input} ${props.className ?? ''}`} />
+}
+
+export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={`${styles.select} ${props.className ?? ''}`} />
 }
 
 export function Table({ children }: { children: ReactNode }) {

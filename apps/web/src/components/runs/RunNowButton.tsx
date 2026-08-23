@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, ui } from '@/components/ui'
+import { Button, Input } from '@/components/record'
 
 import styles from './runs.module.css'
 
@@ -59,8 +59,7 @@ export function RunNowButton({
       {/* 口径说明写在这里而不是事后补：发起的这一刻才是最清楚
           「这次和上次有什么不一样」的时候。留空也完全正常 —— 大多数运行
           就是常规的一次，没什么可说的。 */}
-      <input
-        className={ui.input}
+      <Input
         value={note}
         onChange={(e) => onNoteChange(e.target.value)}
         placeholder="口径说明（可选）：这次和以往有什么不同？"

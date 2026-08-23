@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { SampleTable } from '@/components/runs/SampleTable'
 import runs from '@/components/runs/runs.module.css'
-import { Button, EmptyState, ErrorState, PanelNote, Skeleton } from '@/components/ui'
+import { Aside, Blank, Button, Fault, Pending } from '@/components/record'
 import { ApiError } from '@/lib/api/client'
 import { countRunJobs } from '@/lib/api/crawl-jobs'
 import { listRunSamples } from '@/lib/api/responses'
@@ -96,7 +96,7 @@ export function SamplesPanel({
 
   if (error) {
     return (
-      <ErrorState
+      <Fault
         status={error instanceof ApiError ? error.status : 0}
         message={error instanceof ApiError ? error.detail : '加载失败'}
         onRetry={() => setAttempt((a) => a + 1)}
@@ -108,16 +108,18 @@ export function SamplesPanel({
 
   /** 筛选条。**任何状态下都要渲染**，理由见下面那个空态分支 */
   const tabs = (
-    <div className={runs.filterBar}>
+    <div className={runs.filters}>
       <span className={runs.filterLabel}>联网</span>
       {SEARCH_TABS.map((t) => (
-        <Button
+        <button
           key={t.key}
+          type="button"
+          className={runs.chip}
           onClick={() => changeFilter(t.key)}
           aria-pressed={searchFilter === t.key}
         >
           {t.label}
-        </Button>
+        </button>
       ))}
     </div>
   )
@@ -127,9 +129,9 @@ export function SamplesPanel({
       <div>
         {tabs}
         <div style={{ display: 'grid', gap: 8 }}>
-          <Skeleton height={20} />
-          <Skeleton height={20} />
-          <Skeleton height={20} />
+          <Pending height={22} />
+          <Pending height={22} />
+          <Pending height={22} />
         </div>
       </div>
     )
@@ -142,25 +144,19 @@ export function SamplesPanel({
             用户就被困在一个空页面里、没有任何办法退回「全部」——
             而且会把「这一档没有样本」误读成「这次运行没有样本」 */}
         {tabs}
-        <EmptyState>
-          {filtering ? (
-            <>
-              <strong style={{ color: 'var(--text-secondary)' }}>
-                这次运行没有「{SEARCH_TABS.find((t) => t.key === searchFilter)?.label}」的样本
-              </strong>
-              <span>这是筛选的结果，不是这次运行没采到东西 —— 点「全部」看完整列表。</span>
-            </>
-          ) : (
-            <>
-              <strong style={{ color: 'var(--text-secondary)' }}>这次运行没有样本</strong>
-              <span>
-                {failed > 0
-                  ? `${failed} 条采样全部失败，一条回答都没拿到 —— 这是采集出了问题，不是 AI 没提你的品牌。可以在任务头点「立即运行」重跑一次。`
-                  : '还没有采样回来。这次运行可能刚发起，点上面的「刷新」看进度。'}
-              </span>
-            </>
-          )}
-        </EmptyState>
+        {filtering ? (
+          <Blank
+            lead={`这次运行没有「${SEARCH_TABS.find((t) => t.key === searchFilter)?.label}」的样本`}
+          >
+            这是筛选的结果，不是这次运行没采到东西 —— 点「全部」看完整列表。
+          </Blank>
+        ) : (
+          <Blank lead="这次运行没有样本">
+            {failed > 0
+              ? `${failed} 条采样全部失败，一条回答都没拿到 —— 这是采集出了问题，不是 AI 没提你的品牌。可以在任务头点「立即运行」重跑一次。`
+              : '还没有采样回来。这次运行可能刚发起，用右上角重新载入看进度。'}
+          </Blank>
+        )}
       </div>
     )
   }
@@ -170,11 +166,13 @@ export function SamplesPanel({
   return (
     <div>
       {failed > 0 ? (
-        <PanelNote>
-          另有 <strong>{failed}</strong> 条采样失败，没产出回答 ——
-          <strong>它们不在下表里</strong>，也不在任何比率的分母里。
-          分母少一截时所有比率都会偏高，别拿它和一次完整运行直接比。
-        </PanelNote>
+        <div style={{ marginBottom: 'var(--sp-4)' }}>
+          <Aside tone="alert">
+            另有 <strong>{failed}</strong> 条采样失败，没产出回答 ——
+            <strong>它们不在下表里</strong>，也不在任何比率的分母里。
+            分母少一截时所有比率都会偏高，别拿它和一次完整运行直接比。
+          </Aside>
+        </div>
       ) : null}
 
       {tabs}
@@ -182,10 +180,12 @@ export function SamplesPanel({
       {/* 筛过之后必须说清「这不是全部」—— 否则下面那个 total 会被当成
           这次运行的样本总数，而它只是这一档的条数 */}
       {filtering ? (
-        <PanelNote>
-          当前只看「{SEARCH_TABS.find((t) => t.key === searchFilter)?.label}」这一档，
-          <strong>下面的条数不是这次运行的全部样本</strong>。
-        </PanelNote>
+        <div style={{ marginBottom: 'var(--sp-4)' }}>
+          <Aside>
+            当前只看「{SEARCH_TABS.find((t) => t.key === searchFilter)?.label}」这一档，
+            <strong>下面的条数不是这次运行的全部样本</strong>。
+          </Aside>
+        </div>
       ) : null}
 
       <SampleTable samples={samples} ownBrandId={ownBrandId} taskId={taskId} runId={runId} />

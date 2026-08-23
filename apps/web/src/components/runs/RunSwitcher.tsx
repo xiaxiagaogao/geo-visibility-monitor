@@ -1,6 +1,6 @@
 'use client'
 
-import { Badge, ui } from '@/components/ui'
+import { Mark, markTone, Select } from '@/components/record'
 import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
 import type { Run } from '@/lib/types'
 
@@ -32,8 +32,8 @@ export function RunSwitcher({
 
   return (
     <div className={styles.switcher}>
-      <select
-        className={`${ui.input} ${styles.select}`}
+      <Select
+        className={styles.select}
         value={currentRunId}
         onChange={(e) => onChange(Number(e.target.value))}
         disabled={disabled}
@@ -44,12 +44,12 @@ export function RunSwitcher({
             {runLabel(r)}
           </option>
         ))}
-      </select>
+      </Select>
 
       {current ? (
-        <Badge tone={runStatusTone(current.status)} dot>
+        <Mark tone={markTone(runStatusTone(current.status))} dot>
           {runStatusLabel(current.status)}
-        </Badge>
+        </Mark>
       ) : null}
     </div>
   )

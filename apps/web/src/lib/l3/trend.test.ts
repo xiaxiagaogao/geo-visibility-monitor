@@ -14,7 +14,7 @@ function run(
   return { id, task_id: 27, platforms, note, created_at: at, status, n_jobs: 21 }
 }
 
-function counts(m: number, n: number): CountsResponse {
+function counts(m: number, n: number, comps: number[] = []): CountsResponse {
   return {
     brand_id: 34,
     filters: {},
@@ -38,7 +38,16 @@ function counts(m: number, n: number): CountsResponse {
       m_middle: 0,
       m_tail: 0,
     },
-    competitors: [],
+    competitors: comps.map((cm, i) => ({
+      brand_id: 100 + i,
+      m_mentioned: cm,
+      m_body: cm,
+      m_citation_only: 0,
+      m_none: n - cm,
+      m_head: cm,
+      m_middle: 0,
+      m_tail: 0,
+    })),
     series: [],
     note: '',
   }
@@ -206,5 +215,28 @@ describe('incompleteCount', () => {
       map([1, counts(1, 10)], [2, counts(2, 10)], [3, counts(3, 10)]),
     )
     expect(incompleteCount(points)).toBe(2)
+  })
+})
+
+describe('competitorBand', () => {
+  it('取竞品提及率的最低与最高，且与本品共用同一个分母', () => {
+    const points = buildTrend(
+      [run(1, '2026-08-16T00:00:00Z', ['t'])],
+      map([1, counts(5, 10, [2, 8, 6])]),
+    )
+    expect(points[0].competitorBand).toEqual({ min: 0.2, max: 0.8 })
+  })
+
+  it('没有竞品时是 null —— 不画一条贴地的带子冒充「竞品都是 0」', () => {
+    const points = buildTrend([run(1, '2026-08-16T00:00:00Z', ['t'])], map([1, counts(5, 10)]))
+    expect(points[0].competitorBand).toBeNull()
+  })
+
+  it('分母为 0 时是 null，不是 {min:0,max:0}', () => {
+    const points = buildTrend(
+      [run(1, '2026-08-16T00:00:00Z', ['t'])],
+      map([1, counts(0, 0, [0, 0])]),
+    )
+    expect(points[0].competitorBand).toBeNull()
   })
 })

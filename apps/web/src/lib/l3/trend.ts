@@ -46,6 +46,16 @@ export interface TrendPoint {
   n: number
   /** `null` = 分母为 0，不可算。**不是 0** */
   r: number | null
+  /**
+   * 竞品区间：这一次运行里，竞品提及率的最低与最高。
+   *
+   * **画区间带而不是 7 条竞品线**，两个理由：7 条线在 130px 高的带子里
+   * 是一团面条，读不出任何东西；而运营真正要问的是「我在场上处于什么位置」——
+   * 那是一个区间问题，不是七个个体问题。
+   *
+   * 没有竞品、或竞品分母为 0 时是 `null` —— 不画一条贴地的带子冒充「竞品都是 0」。
+   */
+  competitorBand: { min: number; max: number } | null
   platforms: string[]
   note: string | null
   /**
@@ -102,6 +112,12 @@ export function buildTrend(
     // note 是这一次运行自己的说明，第一个点也可以有
     if (run.note && run.note.trim()) breaks.push('note')
 
+    // 竞品区间。**同一个分母** —— counts 的 denominator 对本品与竞品是同一个，
+    // 所以这里不会出现「拿不同分母的比率比大小」。
+    const compRates = c.competitors
+      .map((x) => rate(x.m_mentioned, n))
+      .filter((x): x is number => x !== null)
+
     return {
       runId: run.id,
       at: run.created_at,
@@ -109,6 +125,9 @@ export function buildTrend(
       m,
       n,
       r: rate(m, n),
+      competitorBand: compRates.length
+        ? { min: Math.min(...compRates), max: Math.max(...compRates) }
+        : null,
       platforms: run.platforms,
       note: run.note,
       incomplete: INCOMPLETE.has(run.status),

@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@/components/ui'
+import { Button } from '@/components/record'
 import { safeFileName, toCsv } from '@/lib/l3/csv'
 
 /**

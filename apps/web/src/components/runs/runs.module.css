@@ -1,85 +1,108 @@
+/* ══════════════════════════════════════════════════════════════════
+   任务详情页的版式
+   ══════════════════════════════════════════════════════════════════ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/* ═══ 页头 ═══ */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--ink);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-2);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  color: var(--ink-3);
+}
+
+.metaSep {
+  opacity: 0.5;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.reason {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  max-width: 150px;
+  line-height: 1.4;
+}
+
 /* ═══ run 切换器 ═══ */
+
 .switcher {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
 }
 
-/* 比表单里的输入框窄：它装的是一行固定格式的时间 + 采样数，
-   撑满一行会让旁边的 Badge 飘到很远 */
 .select {
-  width: auto;
-  min-width: 232px;
-  height: 30px;
-  font-size: var(--fs-xs);
+  min-width: 210px;
 }
 
-/* ═══ 立即运行的第二段 ═══ */
+/* ═══ 立即运行的两段式确认 ═══ */
+
 .confirm {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
   flex-wrap: wrap;
-  padding: var(--sp-2) var(--sp-3);
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--amber-wash);
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
   border-radius: var(--r-sm);
-  /* 用 warning 而不是 danger：这不是破坏性操作，是「花钱且撤不回来」。
-     染成红的会和「删除」同一个语气，几次之后用户就不读了。 */
-  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--bg-surface));
-  background: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+  max-width: 720px;
 }
 
 .confirmText {
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
+  font-size: var(--fs-sm);
   line-height: 1.6;
-  max-width: 420px;
+  color: var(--ink);
+  flex-basis: 100%;
 }
 
-/* ═══ 任务头 ═══ */
-.taskHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
-  margin-bottom: var(--sp-5);
-}
+/* ═══ 覆盖缺口 ═══ */
 
-.taskTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  font-size: var(--fs-h1);
-  font-weight: 700;
-  margin: 0;
-}
-
-.taskMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  margin-top: 5px;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-}
-
-.taskActions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-}
-
-/* ═══ 覆盖缺口清单 ═══ */
 .gapRow {
   display: grid;
-  grid-template-columns: 1fr minmax(180px, max-content) 64px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) 54px;
   align-items: center;
-  gap: var(--sp-3);
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .gapRow:last-child {
@@ -87,160 +110,208 @@
 }
 
 .gapPrompt {
-  font-size: var(--fs-sm);
-  color: var(--text-primary);
-  line-height: 1.4;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--ink);
 }
 
 .gapWho {
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  text-align: right;
-  line-height: 1.5;
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  line-height: 1.7;
+  color: var(--ink-2);
 }
 
 .gapScore {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-sm);
-  font-weight: 600;
   text-align: right;
-  color: var(--text-primary);
-}
-
-.panelStack {
-  display: grid;
-  gap: var(--sp-5);
 }
 
 /* ═══ 样本表 ═══ */
+
 .samplePrompt {
   font-size: var(--fs-sm);
-  color: var(--text-primary);
-  line-height: 1.4;
-  /* 提问最多两行：再长也是同一条提问，撑高整行只会让一屏装不下几条 */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--ink);
+  line-height: 1.5;
 }
 
 .samplePreview {
   margin-top: 3px;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  line-height: 1.5;
+  font-size: var(--fs-label);
+  font-family: var(--font-text);
+  color: var(--ink-3);
+  line-height: 1.6;
+  max-width: 52ch;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* 命中处的原文片段。等宽 + 两行截断：它是证据，不是正文 */
-.sampleSnippet {
-  max-width: 320px;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.samplePlatform {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  color: var(--ink-2);
 }
 
 .sampleNote {
-  margin-top: 3px;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
+  margin-top: 4px;
+  font-family: var(--font-instrument);
+  font-size: var(--fs-micro);
+  color: var(--ink-2);
 }
 
 .sampleRank {
   margin-left: 6px;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
 }
 
-/* ═══ 翻页 ═══ */
+.sampleSnippet {
+  font-size: var(--fs-label);
+  color: var(--ink-2);
+  line-height: 1.6;
+  max-width: 26ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ═══ 筛选一行 ═══ */
+
+.filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.filterLabel {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--tr-label);
+  color: var(--ink-3);
+  margin-right: var(--sp-1);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 27px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--edge-strong);
+  background: var(--sheet-raised);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--ink-2);
+  transition:
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--ink-2);
+  color: var(--ink);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--pencil-blue);
+  background: var(--pencil-blue-wash);
+  color: var(--pencil-blue);
+}
+
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ═══ Tab ═══ */
+
+.tabs {
+  display: flex;
+  gap: var(--sp-5);
+  border-bottom: 1px solid var(--edge-strong);
+  margin-bottom: var(--sp-5);
+}
+
+.tab {
+  position: relative;
+  padding: 0 0 10px;
+  background: none;
+  border: none;
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  color: var(--ink-3);
+  transition: color 140ms ease;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tabOn {
+  color: var(--ink);
+}
+
+.tabOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--pencil-blue);
+}
+
+.tabCount {
+  margin-left: 6px;
+  font-family: var(--font-instrument);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-label);
+  color: var(--ink-3);
+}
+
+@media (max-width: 900px) {
+  .gapRow {
+    grid-template-columns: minmax(0, 1fr) 54px;
+  }
+
+  .gapWho {
+    grid-column: 1 / -1;
+  }
+
+  .select {
+    min-width: 0;
+  }
+}
+
+/* ═══ 分页 ═══ */
+
 .pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-  margin-top: var(--sp-3);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
+  gap: var(--sp-4);
+  padding-top: var(--sp-4);
+  margin-top: var(--sp-2);
+  border-top: 1px solid var(--rule);
 }
 
 .pagerInfo {
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
+  font-family: var(--font-instrument);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-label);
+  color: var(--ink-3);
 }
 
 .pagerButtons {
   display: flex;
-  align-items: center;
   gap: var(--sp-2);
-}
-
-/* ═══ 命中矩阵的平台切换（P2-09）═══
-   矩阵强制单平台（PHASE2 §4.0 第 3 条）—— 加一维就是三维，三维矩阵不可读。
-   **只在多平台时渲染**，单平台 run 上多一排按钮只是噪音。 */
-.platformSwitch {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--sp-3);
-}
-
-.platformSwitchLabel {
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-}
-
-.platformSwitchItem {
-  padding: 4px 10px;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-}
-
-.platformSwitchItem:hover {
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
-/* 选中态用 aria-pressed 而不是额外的 class ——
-   可访问性与样式同一个真相源，不会出现「看着选中但读屏说没选」。 */
-.platformSwitchItem[aria-pressed='true'] {
-  color: var(--text-primary);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* ══════ 样本列表的筛选条（P2-37）══════ */
-
-.filterBar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-3);
-  flex-wrap: wrap;
-}
-
-.filterLabel {
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  margin-right: var(--sp-1);
-}
-
-/* 选中态用 aria-pressed 而不是另加一个 class：
-   状态本来就要给读屏软件，样式跟着同一个属性走就不会两边不一致 */
-.filterBar button[aria-pressed='true'] {
-  border-color: var(--accent);
-  color: var(--accent);
 }

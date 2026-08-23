@@ -32,12 +32,21 @@ export function TickScale({
   n,
   size = 'md',
   tone = 'own',
+  zeroMark = true,
 }: {
   m: number
   n: number
   size?: 'sm' | 'md' | 'lg'
   /** own = 本品（蓝铅笔）· other = 竞品（灰）· 两者对比度已跑过 CVD 验证 */
   tone?: 'own' | 'other'
+  /**
+   * 挂零时描红第一格。**默认开，但在矩阵里必须按品牌关掉。**
+   *
+   * 一开始这里是无条件描红的，结果矩阵上每一个竞品的 `0/3` 都带红边 ——
+   * 一屏几十处红色，红色就不再有信息量了。「本品挂零」是这个产品的核心结论，
+   * 「某个竞品这条没出现」是常态。两者用同一个记号，等于把结论稀释成噪音。
+   */
+  zeroMark?: boolean
 }) {
   const r = rate(m, n)
 
@@ -50,7 +59,7 @@ export function TickScale({
     )
   }
 
-  const zero = m === 0
+  const zero = m === 0 && zeroMark
   const dense = n > MAX_DISCRETE
 
   if (dense) {
