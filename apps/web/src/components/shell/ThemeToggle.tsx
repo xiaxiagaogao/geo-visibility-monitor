@@ -35,8 +35,10 @@ export function ThemeToggle() {
     <button
       className={styles.iconBtn}
       onClick={toggle}
+      /* 两套主题是同一份记录的正片与负片，不是「浅色调暗」——
+         tooltip 把这件事说出来，但主语仍是「浅色/深色」，别让人猜 */
       aria-label={dark ? '切换到浅色' : '切换到深色'}
-      title={dark ? '切换到浅色' : '切换到深色'}
+      title={dark ? '切换到浅色（冲印正片）' : '切换到深色（熏烟原片）'}
     >
       {dark ? <SunIcon /> : <MoonIcon />}
     </button>

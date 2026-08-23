@@ -12,18 +12,19 @@ import styles from './shell.module.css'
 /**
  * 导航。**不分组** —— 入口少的时候加分组标题只是噪音。
  *
- * 「引用分析」不会回来：citations 全库 0 行，根因是采集时从未开联网搜索，
- * 不是能补个字段解决的（API.md §9）。
- *
  * 「用户管理」只对超管显示 —— 它是**唯一**一个连读都要超管的入口
  * （`/v1/users/*` 挂 require_superadmin），运营看到了也点不动。
  */
 const NAV = [
-  { href: '/tasks', label: '检测任务', icon: LayersIcon },
+  { href: '/tasks', label: '检测任务', icon: SheetIcon },
+  // 「引用榜」曾经被判定为「不会回来」，理由是 citations 全库 0 行。
+  // **那条结论已经被推翻**：P2-37 打通千问 SSE 之后，库里现在有 144 条引用、
+  // 40 个域名。这是这个产品唯一同行没有的数据，不该只能打接口看。
+  { href: '/citations', label: '引用榜', icon: RankIcon },
   { href: '/brands', label: '品牌', icon: GridIcon },
 ]
 
-const ADMIN_NAV = [{ href: '/users', label: '用户管理', icon: MessageIcon }]
+const ADMIN_NAV = [{ href: '/users', label: '用户管理', icon: PeopleIcon }]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -32,29 +33,15 @@ export function Sidebar() {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
-        <div className={styles.mark}>
-          <svg
-            width="19"
-            height="19"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-        </div>
+        <TraceMark />
         <div className={styles.brandText}>
           <span className={styles.brandName}>GEO 监测台</span>
-          <span className={styles.brandSub}>AI 回答可见度监测</span>
+          <span className={styles.brandSub}>AI 回答可见度记录</span>
         </div>
       </div>
 
       <nav className={styles.nav}>
-        {[...NAV, ...(isSuperadmin(me) ? ADMIN_NAV : [])].map(({ href, label, icon: Icon }) => {
+        {[...NAV, ...(isSuperadmin(me) ? ADMIN_NAV : [])].map(({ href, label, icon: Ico }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
             <Link
@@ -63,7 +50,7 @@ export function Sidebar() {
               className={`${styles.navItem} ${active ? styles.navItemOn : ''}`}
               aria-current={active ? 'page' : undefined}
             >
-              <Icon />
+              <Ico />
               {label}
             </Link>
           )
@@ -92,13 +79,39 @@ export function Sidebar() {
           /qa 还留着，是因为它另有产品前端不覆盖的运维动作（重标注、job 重试、
           触发 worker）。要不要彻底下掉是产品决定，不是「顺手清理」—— 所以
           先留着并按角色藏起来，没有替代品之前拿掉它等于让运维没手可用。 */}
-      <div className={styles.sideFoot}>数据口径 L2 counts</div>
+      <div className={styles.sideFoot}>分母口径 answer_status = ok</div>
     </aside>
   )
 }
 
-/* ── 图标：16px 线性，stroke 跟随 currentColor ──
-   AlertIcon / LinkIcon 暂时没人用，留着给以后的入口，别当死代码删。 */
+/**
+ * 字标 —— 一段触针走出来的记录：走平、一个尖峰、再走平。
+ *
+ * 上一版是个放大镜，那是「搜索」的通用符号，和这个产品没关系。
+ * 这一枚说的是这个产品实际在做的事：持续记录，偶尔出现一次事件。
+ */
+function TraceMark() {
+  return (
+    <svg
+      className={styles.brandMark}
+      viewBox="0 0 30 30"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="1.4" y="1.4" width="27.2" height="27.2" rx="2.5" strokeWidth="1.3" opacity="0.4" />
+      {/* 分钟刻线 */}
+      <path d="M7 5.6v2M12 5.6v2M17 5.6v2M22 5.6v2" strokeWidth="1.1" opacity="0.45" />
+      {/* 触针走过的道 */}
+      <path d="M4 17h4.4l1.9-3.2 2 8.6 2.3-11.9 2.2 6.8 1.7-2.8H26" />
+    </svg>
+  )
+}
+
+/* ── 图标：16px 线性，一致的 1.9 描边，跟随 currentColor ── */
 
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -119,6 +132,27 @@ function Icon({ children }: { children: ReactNode }) {
   )
 }
 
+/** 记录纸：一张带刻线的纸 */
+function SheetIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="3.5" width="18" height="17" rx="2" />
+      <path d="M3 8.5h18" />
+      <path d="M7 3.5v3M12 3.5v3M17 3.5v3" strokeWidth="1.4" />
+      <path d="M6.5 14.5h3l1.4-3 1.6 5 1.5-4h3" />
+    </Icon>
+  )
+}
+
+/** 榜：三道长短不一的横条 */
+function RankIcon() {
+  return (
+    <Icon>
+      <path d="M4 6.5h16M4 12h10.5M4 17.5h6" />
+    </Icon>
+  )
+}
+
 function GridIcon() {
   return (
     <Icon>
@@ -130,36 +164,12 @@ function GridIcon() {
   )
 }
 
-function LayersIcon() {
+function PeopleIcon() {
   return (
     <Icon>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 9h18M9 9v11" />
-    </Icon>
-  )
-}
-
-function AlertIcon() {
-  return (
-    <Icon>
-      <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z" />
-      <path d="M12 9v4M12 17h.01" />
-    </Icon>
-  )
-}
-
-function LinkIcon() {
-  return (
-    <Icon>
-      <path d="M4 6h16M4 12h10M4 18h7" />
-    </Icon>
-  )
-}
-
-function MessageIcon() {
-  return (
-    <Icon>
-      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l2-4.6A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z" />
+      <circle cx="9" cy="8" r="3.4" />
+      <path d="M2.8 20a6.2 6.2 0 0 1 12.4 0" />
+      <path d="M16.2 5.2a3.4 3.4 0 0 1 0 6.6M17.6 14.6A6.2 6.2 0 0 1 21.4 20" />
     </Icon>
   )
 }
