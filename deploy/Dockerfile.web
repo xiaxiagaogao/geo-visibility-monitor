@@ -27,9 +27,15 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 
 # standalone 把 server.js 与运行期需要的那部分 node_modules 一起吐出来；
-# static 与 public 不在里面，要单独拷（Next 的已知行为，漏了就是页面没样式）
+# static 与 public 不在里面，要单独拷（Next 的已知行为）。
+#
+# ⚠️ `public` 那一行是 2026-08-23 补的。**这句注释一直写着「漏了就是页面没样式」，
+# 但底下只拷了 static** —— 因为在自托管字体之前 `public/` 根本不存在，
+# 所以这个洞一直没暴露。上线后实测 /fonts/*.woff2 全 404、排版静默掉回系统字，
+# 才发现注释说的和代码做的不是一回事。
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 # 不用 root 跑
 USER node
