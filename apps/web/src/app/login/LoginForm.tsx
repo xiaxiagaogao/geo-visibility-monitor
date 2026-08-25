@@ -49,61 +49,56 @@ export function LoginForm() {
 
   return (
     <form className={styles.card} onSubmit={onSubmit}>
-      <div className={styles.brand}>
-        <div className={styles.mark}>
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-        </div>
-        <div>
-          <div className={styles.brandName}>GEO 监测台</div>
-          <div className={styles.brandSub}>AI 回答可见度监测</div>
-        </div>
+      <h2 className={styles.cardTitle}>登录</h2>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="email">
+          邮箱
+        </label>
+        <input
+          className={`${styles.input} ${styles.inputMono}`}
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="username"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={busy}
+          required
+        />
       </div>
 
-      <p className={styles.lede}>使用账号登录以查看监测数据。</p>
-
-      <label className={styles.label} htmlFor="email">
-        邮箱
-      </label>
-      <input
-        className={styles.input}
-        id="email"
-        name="email"
-        type="email"
-        autoComplete="username"
-        placeholder="you@example.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={busy}
-        required
-      />
-
-      <label className={styles.label} htmlFor="password">
-        密码
-      </label>
-      <input
-        className={styles.input}
-        id="password"
-        name="password"
-        type="password"
-        autoComplete="current-password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={busy}
-        required
-      />
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="password">
+          密码
+        </label>
+        <input
+          className={styles.input}
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={busy}
+          required
+        />
+      </div>
 
       <button className={styles.submit} type="submit" disabled={busy}>
         {busy ? '登录中…' : '登录'}
       </button>
 
       {error ? (
-        <p className={styles.note} role="alert" style={{ color: 'var(--danger)' }}>
+        <p className={styles.error} role="alert">
           {error}
         </p>
       ) : null}
+
+      {/* 没有「注册」也没有「忘记密码」—— 账号由运营在后台建（API.md §3）。
+          与其放两个点了没用的链接，不如直接说清楚该找谁。 */}
+      <p className={styles.foot}>账号由运营开通，忘记密码请联系管理员重置。</p>
     </form>
   )
 }

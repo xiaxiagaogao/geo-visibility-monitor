@@ -1,114 +1,281 @@
+/* ══════════════════════════════════════════════════════════════════
+   登录页 —— 一张还没开始记录的纸
+
+   这是全站**唯一一个不登录也能看到的页面**，所以它得自己说清楚
+   这个产品是什么。上一版它只有一句「使用账号登录以查看监测数据」。
+
+   「没有记录」在这个产品里就是一条走平的线 —— 未登录状态和这个隐喻
+   是同一件事，不用另编一个。
+   ══════════════════════════════════════════════════════════════════ */
+
 .wrap {
+  position: relative;
   min-height: 100vh;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.85fr);
   align-items: center;
-  justify-content: center;
-  padding: var(--sp-6);
-  background: var(--bg-app);
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-7);
+  background: var(--ground);
+  overflow: hidden;
 }
 
-.card {
-  width: min(400px, 100%);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: var(--sp-6);
-  box-shadow: var(--shadow-lg);
+/* 分钟刻线：整页的纸纹。压得很淡 —— 它是纸的质地，不是装饰图案。 */
+.wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--ruling);
+  background-size: 13px 100%;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* 走平的触针线：横贯整页。**这就是「还没有记录」的样子。**
+   压到 0.28 是因为它在 50% 高度，换个视口高度就会横穿文字 ——
+   一条 1px、0.28 的细线压在铺了刻线的纸上，不会妨碍任何字号的阅读，
+   但把「这是一张纸，针停在这儿」说清楚了。 */
+.flatline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--edge-strong);
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+/* ═══ 左：这个产品在测什么 ═══ */
+
+.pitch {
+  position: relative;
+  max-width: 34em;
+  justify-self: end;
+  padding-right: var(--sp-6);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin-bottom: var(--sp-4);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
 }
 
 .mark {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #2563eb));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent-contrast);
   flex: none;
-  box-shadow: var(--shadow-sm);
+  color: var(--pencil-blue);
 }
 
 .brandName {
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.2px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.15;
+  color: var(--ink);
 }
 
 .brandSub {
-  font-size: var(--fs-2xs);
-  color: var(--text-tertiary);
-  margin-top: 2px;
+  font-family: var(--font-instrument);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  margin-top: 3px;
 }
 
-.lede {
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  line-height: 1.75;
-  margin: 0 0 var(--sp-5);
+.headline {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3.2vw, 40px);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink);
+  margin: 0;
+  max-width: 17em;
+}
+
+.sub {
+  font-size: var(--fs-body);
+  line-height: 1.85;
+  color: var(--ink-2);
+  margin: var(--sp-5) 0 0;
+  max-width: 30em;
+}
+
+/* 这一条是这个产品的灵魂，单独拎出来 —— 左边一道铅笔线 */
+.claim {
+  margin: var(--sp-6) 0 0;
+  padding: var(--sp-3) 0 var(--sp-3) var(--sp-4);
+  border-left: 1px solid var(--pencil-blue);
+  font-size: var(--fs-body);
+  line-height: 1.8;
+  color: var(--ink);
+  max-width: 28em;
+}
+
+/* ═══ 右：登录用的那张纸 ═══ */
+
+.card {
+  position: relative;
+  width: min(400px, 100%);
+  justify-self: start;
+  background: var(--sheet);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-md);
+  padding: var(--sp-6);
+  box-shadow: var(--lift-3);
+}
+
+/* 纸的顶端也有刻线 —— 和站内的 Plate 是同一套语言 */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  background-image: var(--ruling);
+  background-size: 8px 100%;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 400;
+  color: var(--ink);
+  margin: var(--sp-2) 0 var(--sp-5);
 }
 
 .label {
   display: block;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--tr-label);
+  color: var(--ink-2);
   margin-bottom: 6px;
+}
+
+.field {
+  margin-bottom: var(--sp-4);
 }
 
 .input {
   width: 100%;
-  height: 36px;
+  height: 38px;
   padding: 0 12px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-app);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
+  border: 1px solid var(--edge-strong);
+  background: var(--sheet-sunken);
+  color: var(--ink);
+  font-family: var(--font-text);
   font-size: var(--fs-body);
 }
 
+/* 邮箱是标识符不是散文 —— 等宽让它成列、也让拼写错误更容易看出来 */
+.inputMono {
+  font-family: var(--font-instrument);
+  font-size: var(--fs-sm);
+}
+
+.input::placeholder {
+  color: var(--ink-3);
+}
+
 .input:focus {
-  border-color: var(--accent);
+  border-color: var(--pencil-blue);
+  background: var(--sheet);
   outline: none;
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .submit {
   width: 100%;
-  height: 36px;
-  margin-top: var(--sp-4);
+  height: 38px;
+  margin-top: var(--sp-2);
   border-radius: var(--r-sm);
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-size: var(--fs-body);
-  font-weight: 500;
+  border: 1px solid var(--pencil-blue);
+  background: var(--pencil-blue);
+  color: var(--pencil-blue-on);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .submit:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--pencil-blue-hover);
+  border-color: var(--pencil-blue-hover);
 }
 
-/* 接口未对接期间字段与按钮都 disabled —— 看上去也必须是不可用的，
+.submit:active:not(:disabled) {
+  background: var(--pencil-blue-press);
+}
+
+/* 请求在飞的时候：看上去也必须是不可用的，
    否则一个点了没反应的实心按钮比禁用更让人困惑 */
-.input:disabled,
 .submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.note {
-  font-size: var(--fs-2xs);
-  color: var(--text-tertiary);
-  line-height: 1.75;
+/* 失败提示 —— 红铅笔 */
+.error {
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
+  background: var(--pencil-red-wash);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.foot {
   margin: var(--sp-5) 0 0;
   padding-top: var(--sp-4);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-instrument);
+  font-size: var(--fs-micro);
+  line-height: 1.75;
+  color: var(--ink-3);
+}
+
+/* ═══ 窄屏：说明在上、表单在下 ═══ */
+
+@media (max-width: 940px) {
+  .wrap {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: var(--sp-7);
+    padding: var(--sp-7) var(--sp-5);
+  }
+
+  .flatline {
+    display: none; /* 单列时它会横穿文字，读不了 */
+  }
+
+  .pitch {
+    justify-self: stretch;
+    padding-right: 0;
+    max-width: none;
+  }
+
+  .card {
+    justify-self: stretch;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .claim {
+    margin-top: var(--sp-5);
+  }
 }
