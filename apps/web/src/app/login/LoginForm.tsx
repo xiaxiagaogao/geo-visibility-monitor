@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth-context'
 import styles from './login.module.css'
 
 /**
- * 登录表单。
+ * 登录表单。**没有卡片** —— 风格情报 §5.1 把居中白卡片列为开源味最重的反模式。
  *
  * **失败文案一律「邮箱或密码不正确」**，不区分「用户不存在 / 密码错 / 账号停用」——
  * 后端刻意只回一句话，前端再细分就等于把账号枚举接口做到 UI 上（API.md §2）。
@@ -48,12 +48,12 @@ export function LoginForm() {
   }
 
   return (
-    <form className={styles.card} onSubmit={onSubmit}>
-      <h2 className={styles.cardTitle}>登录</h2>
+    <form className={styles.form} onSubmit={onSubmit}>
+      <h2 className={styles.formTitle}>进入监测台</h2>
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor="email">
-          邮箱
+          工作邮箱
         </label>
         <input
           className={`${styles.input} ${styles.inputMono}`}
@@ -61,7 +61,7 @@ export function LoginForm() {
           name="email"
           type="email"
           autoComplete="username"
-          placeholder="you@example.com"
+          placeholder="you@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
@@ -87,7 +87,7 @@ export function LoginForm() {
       </div>
 
       <button className={styles.submit} type="submit" disabled={busy}>
-        {busy ? '登录中…' : '登录'}
+        {busy ? '进入中…' : '进入'}
       </button>
 
       {error ? (
@@ -96,9 +96,10 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      {/* 没有「注册」也没有「忘记密码」—— 账号由运营在后台建（API.md §3）。
-          与其放两个点了没用的链接，不如直接说清楚该找谁。 */}
-      <p className={styles.foot}>账号由运营开通，忘记密码请联系管理员重置。</p>
+      {/* 没有「注册」也没有「忘记密码」链接 —— 账号由运营在后台建（API.md §3）。
+          与其放两个点了没用的链接，不如直接说清楚该找谁。
+          文案按风格情报 §5.3：不写「忘记密码？」，写「重置」该找谁。 */}
+      <p className={styles.foot}>账号由运营开通。需要重置密码时联系管理员。</p>
     </form>
   )
 }

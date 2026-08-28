@@ -1,108 +1,152 @@
 /**
- * 设计 token —— 熏烟纸地震图记录
+ * 设计 token —— 暗色情报终端
  * ══════════════════════════════════════════════════════════════════
  *
- * 视觉世界（seed e13eab31 · scope direction · mode operate）：**地震台的滚筒纸带记录**。
- * 熏烟纸上被触针划出一道亮线，红蓝铅笔在旁边标注 —— 这不是隐喻，是这份数据的原生形态：
+ * 立场（来自 `GEO-前端风格情报.md` §2，逐字采用，不改写）：
  *
- *   · 12 次 run 是时间轴，采集条件变过的地方是纸带上一道**断口**
- *   · 「空白」（161 条 search_used=unknown）与「走平的线」（0% 提及）
- *     在同一张纸上从来不会混淆 —— 这正是本产品的头号原则
- *   · **增益即分母**。一条没标增益的地震道是废的，
- *     和「孤零零的百分比没有可信度」是同一句话
+ *   > 暗色情报终端。一种磷光强调色。回答流是唯一装饰。
+ *   > 登录和监测台共用同一个签名物件。
  *
- * 两套主题是同一份记录的**正片与负片**（地震图真实的存在方式），
- * 不是「浅色再调暗一点」：
- *   浅色 = 冲印出来的正片，中性灰白相纸，墨色触针痕
- *   深色 = 熏烟原片，暖烟炱底，骨白划痕
+ * 路线 A（Linear 语法）做壳，路线 B（密度 / 指挥台）做核心，
+ * 路线 C（衬线）只留给将来的报告封面。
  *
- * ── 改色之前必须知道的三件事 ────────────────────────────────────
+ * **暗色是默认，浅色保留** —— 白天长时间读表、以及将来的导出/打印版需要它。
+ * 代价是每个语义色要维护两套并各跑一遍对比度，下面每一处都标了实测值。
  *
- * ① **顺序色阶跑过 dataviz 验证器，四项全 PASS（浅色与深色各一次）。**
- *      D=<dataviz>/scripts/validate_palette.js
- *      node $D "#8FAAC3,#4A7BA4,#1B4870" --mode light --surface "#F0EFEC" --ordinal
- *      node $D "#A8C6E0,#6193BE,#2C577C" --mode dark  --surface "#1E1915" --ordinal
- *    深色那组**传参顺序是反的**：验证器要求按 light→dark 传，
- *    而深底上的渲染方向是「越亮 = 值越大」（判据是「离底色越远」，不是绝对明暗）。
+ * ── 改任何颜色之前必须知道的四件事 ──────────────────────────────
  *
- * ② **这套色阶只用于不承载文字的填充。格内数值一律 ink-on-sheet。**
- *    原因是实测出来的：三档色阶的中段落在一个死区里 ——
- *    白字 3.92:1、深墨字 3.93:1，**两边都够不到 4.5**。
- *    把数字印进色块必然撞上它。地震图上本来也不把数字写在道里，标注写在道旁边。
+ * ① **文字层级的下沿没有余量。** 情报文档给的「次文字 白 48–62%」，
+ *    48% 在 #08090B 上实测正好 4.98:1 —— 再淡一档（42%）就掉到 4.04，不合格。
+ *    浅色侧同理：黑 58% 是 4.83，55% 就只有 4.36。**三级文字不许再调淡。**
  *
- * ③ **本品/竞品那一对只需要过三项检查，另两项在构造上就不可能过。**
- *      node $D "#1B4870,#8A857C" --mode light --surface "#F0EFEC"
- *      → CVD ΔE 22.2 PASS · 常视觉 ΔE 24.7 PASS · 对比度 ≥3:1 PASS
- *      → 「亮度带」「彩度下限」FAIL —— 这两项是**分类色板专用**
- *        （验证器自己写着 scope: categorical palettes only），
- *        而竞品填充是**刻意做成灰色**的：整个产品讲的就是一个品牌对一片竞品。
- *    历史教训：上一版的竞品色与主色在绿色盲下 ΔE 仅 5.3，实际不可分。
- *    换任何一边都要重跑这条命令，别只看好不好看。
+ * ② **强调色只给数据、高亮与状态，不给大按钮。**
+ *    主 CTA 在暗色上用**白底黑字**（19.92:1），这是情报文档 §7.1 明确指定的，
+ *    也是它和「又一个暗色 shadcn」拉开距离的关键一步。
+ *
+ * ③ **强调色是可切的（`data-accent`）**，因为情报文档把它列成一次 A/B。
+ *    实测差别不只是好看不好看：磷光绿 `#3DFF9A` 与语义绿「上涨」`#4ADE80`
+ *    的色距只有 **44**（基本同色），选它就必须把强调色与语义绿合并；
+ *    冷氰 `#5CE1E6` 与它距离 **104**，两者天然分得开。
+ *
+ * ④ **浅色下的强调色必须另配。** 磷光绿原值在白底上只有 1.5:1，
+ *    压到 `#0A7F48` 才够 4.73；冷氰压到 `#0C6E7A` 是 5.55。
+ *
+ * ── 图表色仍然要跑 dataviz 验证器 ──────────────────────────────
+ *
+ *   node <dataviz>/scripts/validate_palette.js "#hex,#hex,#hex" --mode dark --surface "#0E1013" --ordinal
+ *
+ * 并且沿用上一轮实测出来的那条规矩：**顺序色阶只用于不承载文字的填充，
+ * 格内数值一律 ink-on-surface** —— 三档色阶的中段是个死区，
+ * 白字与深字都够不到 4.5。换了视觉世界，这条物理事实没变。
  */
 
 /* ══════════════════════════════════════════════════════════════════
-   浅色 = 正片（冲印出来的记录）
+   暗色 —— 默认
    ══════════════════════════════════════════════════════════════════ */
 :root {
-  /* ── 纸与墨 ──
-     ground 比 sheet 深，让记录纸读起来是**一张摊在台面上的纸**，
-     而不是一块和背景同色的浮层。 */
-  --ground: #e2e0da;
-  --sheet: #f0efec; /* ← 色阶验证用的就是这个面，别单独改 */
-  --sheet-raised: #f8f7f4;
-  --sheet-sunken: #e8e6e0;
+  /* ── 面 ──
+     情报文档 §7.1：画布近黑且**偏冷**，禁止 #0F172A（一眼 Tailwind slate）；
+     表面比画布亮 4–8%，靠底色微差分层，不靠白边卡片。 */
+  --canvas: #08090b;
+  --surface-1: #0e1013;
+  --surface-2: #15171b;
+  --surface-3: #1c1f24; /* hover / 抬起，仅此一档，不再往上堆 */
 
-  /* 分钟刻线：纸的纹理，不是装饰边框 */
-  --rule: rgba(26, 24, 21, 0.09);
-  --rule-strong: rgba(26, 24, 21, 0.18);
-  --edge: #ccc9c1;
-  --edge-strong: #a8a49a;
+  /* 边框几乎看不见 —— 层级靠底色差，不靠描边 */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
-  --ink: #1a1815; /* 15.4:1 */
-  --ink-2: #55524b; /* 6.78:1 */
-  /* 三级文字。**三种底色都要过 4.5**：ground 5.11 · sheet 5.86 · sunken 5.40。
-     上一个取值 #6A655C 只对着 sheet 验过（5.03），漏了 ground ——
-     而页头的 meta 正好坐在 ground 上，实测只有 4.38。不许再调淡。 */
-  --ink-3: #605b52;
+  /* ── 墨 ──（对比度实测值见文件头 ①） */
+  --text-1: rgba(255, 255, 255, 0.92); /* 16.76:1 */
+  --text-2: rgba(255, 255, 255, 0.62); /* 7.76:1 */
+  --text-3: rgba(255, 255, 255, 0.48); /* 4.98:1 —— 地板，不许再淡 */
 
-  /* ── 两支铅笔 ──
-     地震台的真实做法：一支蓝、一支红。全站只有这两个彩色。 */
-  --pencil-blue: #1b4870; /* 8.27:1 · 本品 / 主操作 / 活动态 */
-  --pencil-blue-hover: #163a5a;
-  --pencil-blue-press: #112c45;
-  --pencil-blue-on: #f0efec;
-  --pencil-blue-wash: color-mix(in srgb, var(--pencil-blue) 8%, var(--sheet));
+  /* ── 主 CTA：白底黑字（情报文档 §7.1）── */
+  --cta: #ffffff;
+  --cta-hover: #e6e7e9;
+  --cta-ink: #08090b; /* 19.92:1 */
 
-  --pencil-red: #9c2e1c; /* 6.47:1 · 告警 / 挂零 / 不变量对不上 */
-  --pencil-red-wash: color-mix(in srgb, var(--pencil-red) 7%, var(--sheet));
+  /* ── 语义色：**只给数字与状态**，不给按钮 ── */
+  --up: #4ade80; /* 11.43:1 */
+  --down: #ff6b6b; /* 7.18:1 */
+  --warn: #f5c15a; /* 12.01:1 */
 
-  /* ── 状态：只配文字或形状出现，绝不单独承载信息 ── */
-  /* ground 4.80 · sheet 5.50 · 自身 wash 4.87。同样是 ground 最紧 ——
-     旧值 #8A5A0E 对 ground 只有 4.48。 */
-  --amber: #84560c; /* 部分成功 / 需留意 */
-  --amber-wash: color-mix(in srgb, var(--amber) 9%, var(--sheet));
-  --pine: #3d6b4a; /* 5.37:1 · 有效 / 成功 */
-  --pine-wash: color-mix(in srgb, var(--pine) 9%, var(--sheet));
+  /* ── 平台色：只做识别芯片，绝不进图表 ──
+     情报文档 §4.4：平台芯片是中文 GEO 产品的识别机会，
+     不要用一个通用 sparkle 代表所有模型。 */
+  --plat-tongyi: #a78bfa;
+  --plat-deepseek: #7b93ff;
+  --plat-doubao: #5ec8e8;
+  --plat-yuanbao: #ffa25c;
+  --plat-wenxin: #5fd4c4;
+  --plat-kimi: #ff8fb8;
 
-  /* ── 顺序色阶（见文件头 ①②）── */
-  --seq-1: #8faac3;
-  --seq-2: #4a7ba4;
-  --seq-3: #1b4870;
+  /* ── 顺序色阶（不承载文字的填充）──
+     单色 + 两个低饱和辅助，禁止默认 Categorical 彩虹（情报文档 §7.1）。 */
+  --seq-1: #1e3a44;
+  --seq-2: #2f6b78;
+  --seq-3: #58b3c2;
 
-  /* ── 本品 vs 竞品（见文件头 ③）── */
-  --trace-own: #1b4870;
-  --trace-other: #8a857c;
-  --trace-bed: #dedbd4;
+  /* ── 刻度尺：本品 vs 竞品 ── */
+  --tick-on: var(--accent);
+  --tick-off: rgba(255, 255, 255, 0.1);
+  --tick-other: rgba(255, 255, 255, 0.38);
+  --tick-zero: var(--down);
 
-  /* ── 刻度：这套设计的签名 ──
-     tick-on = 数到的那一格，tick-off = 数不到但**存在**的那一格。
-     分母有多大，就画多少格 —— 18 格和 12 格一眼不一样长。 */
-  --tick-on: #1b4870;
-  --tick-off: #cbc7bf;
-  --tick-zero: #9c2e1c; /* 挂零：格子全空，但起手一格是红的 */
-  --tick-void: transparent; /* 没有记录：连格子都不画 */
+  /* 暗色几乎不用投影，靠底色分层；只在浮层上给一点 */
+  --lift-1: none;
+  --lift-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --lift-3: 0 20px 60px rgba(0, 0, 0, 0.65);
 
-  /* ── 平台色：只做识别记号，不进任何图表 ── */
+  color-scheme: dark;
+}
+
+/* ── 强调色 A/B（情报文档 §12：登录页做一次 A/B 即可）── */
+
+/* 默认：冷氰。理由不是好看 —— 是它和语义绿分得开（见文件头 ③）。 */
+:root,
+[data-accent='cyan'] {
+  --accent: #5ce1e6; /* 12.68:1 on canvas */
+  --accent-quiet: #2b7d84;
+  --accent-wash: rgba(92, 225, 230, 0.12);
+  --accent-ink: #04191b; /* 放在 accent 实底上的字 */
+}
+
+[data-accent='phosphor'] {
+  --accent: #3dff9a; /* 15.15:1 on canvas */
+  --accent-quiet: #1d8f5a;
+  --accent-wash: rgba(61, 255, 154, 0.1);
+  --accent-ink: #032013;
+  /* 磷光绿与语义绿色距仅 44 —— 合并成同一个，
+     与其画两个分不开的绿，不如承认它们是一个。 */
+  --up: #3dff9a;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   浅色 —— 保留（白天读表 / 将来的导出与打印）
+   ══════════════════════════════════════════════════════════════════ */
+[data-theme='light'] {
+  --canvas: #f6f7f8;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #f0f1f3;
+
+  --border: rgba(8, 9, 11, 0.1);
+  --border-strong: rgba(8, 9, 11, 0.2);
+
+  --text-1: rgba(8, 9, 11, 0.92); /* 15.89:1 */
+  --text-2: rgba(8, 9, 11, 0.72); /* 8.06:1 */
+  --text-3: rgba(8, 9, 11, 0.58); /* 4.83:1 —— 地板 */
+
+  /* 浅色下主 CTA 反过来：黑底白字 */
+  --cta: #14161a;
+  --cta-hover: #24272d;
+  --cta-ink: #ffffff;
+
+  --up: #16794b;
+  --down: #c0392f;
+  --warn: #8a6516;
+
   --plat-tongyi: #6b4f9e;
   --plat-deepseek: #35508c;
   --plat-doubao: #1f6f8b;
@@ -110,105 +154,72 @@
   --plat-wenxin: #1c6b6b;
   --plat-kimi: #8f3663;
 
-  /* 记录纸是压在台面上的，投影很浅、偏移很小 */
-  --lift-1: 0 1px 0 rgba(26, 24, 21, 0.04), 0 1px 2px rgba(26, 24, 21, 0.06);
-  --lift-2: 0 1px 1px rgba(26, 24, 21, 0.05), 0 4px 10px rgba(26, 24, 21, 0.08);
-  --lift-3: 0 2px 4px rgba(26, 24, 21, 0.08), 0 14px 34px rgba(26, 24, 21, 0.14);
+  --seq-1: #cfe3e8;
+  --seq-2: #6ba9b6;
+  --seq-3: #17606d;
+
+  --tick-off: rgba(8, 9, 11, 0.12);
+  --tick-other: rgba(8, 9, 11, 0.42);
+
+  --lift-1: 0 1px 2px rgba(8, 9, 11, 0.06);
+  --lift-2: 0 4px 14px rgba(8, 9, 11, 0.08);
+  --lift-3: 0 16px 44px rgba(8, 9, 11, 0.14);
 
   color-scheme: light;
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   深色 = 负片（熏烟原片）
-   ══════════════════════════════════════════════════════════════════ */
-[data-theme='dark'] {
-  --ground: #131009;
-  --sheet: #1e1915; /* ← 色阶验证用的就是这个面 */
-  --sheet-raised: #262019;
-  --sheet-sunken: #171310;
+/* 浅色的强调色是**另配的深色版**，不是同一个值（见文件头 ④） */
+[data-theme='light'],
+[data-theme='light'][data-accent='cyan'] {
+  --accent: #0c6e7a; /* 5.55:1 on canvas */
+  --accent-quiet: #7fb3bb;
+  --accent-wash: rgba(12, 110, 122, 0.09);
+  --accent-ink: #ffffff;
+}
 
-  --rule: rgba(237, 231, 218, 0.09);
-  --rule-strong: rgba(237, 231, 218, 0.2);
-  --edge: #362e26;
-  --edge-strong: #52483c;
-
-  --ink: #ede7da; /* 14.1:1 */
-  --ink-2: #a8a196; /* 6.81:1 */
-  --ink-3: #948d80; /* 5.29:1 */
-
-  --pencil-blue: #8fbbdf; /* 8.58:1 */
-  --pencil-blue-hover: #aacff0;
-  --pencil-blue-press: #c4e0f8;
-  --pencil-blue-on: #0f1c28;
-  --pencil-blue-wash: color-mix(in srgb, var(--pencil-blue) 14%, var(--sheet));
-
-  --pencil-red: #e8836b; /* 6.55:1 */
-  --pencil-red-wash: color-mix(in srgb, var(--pencil-red) 13%, var(--sheet));
-
-  --amber: #d9a441; /* 7.75:1 */
-  --amber-wash: color-mix(in srgb, var(--amber) 14%, var(--sheet));
-  --pine: #7fb08c; /* 7.05:1 */
-  --pine-wash: color-mix(in srgb, var(--pine) 14%, var(--sheet));
-
-  /* 深底上方向相反：越亮 = 值越大（离底色越远 = 值越大） */
-  --seq-1: #2c577c;
-  --seq-2: #6193be;
-  --seq-3: #a8c6e0;
-
-  --trace-own: #8fbbdf;
-  --trace-other: #7a736a;
-  --trace-bed: #2a231d;
-
-  --tick-on: #8fbbdf;
-  --tick-off: #3b332a;
-  --tick-zero: #e8836b;
-
-  --plat-tongyi: #b79ae6;
-  --plat-deepseek: #8ba4e0;
-  --plat-doubao: #6cc0d8;
-  --plat-yuanbao: #e0a06a;
-  --plat-wenxin: #6cc0bb;
-  --plat-kimi: #de85ad;
-
-  --lift-1: 0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.5);
-  --lift-2: 0 1px 1px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.55);
-  --lift-3: 0 2px 5px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
-
-  color-scheme: dark;
+[data-theme='light'][data-accent='phosphor'] {
+  --accent: #0a7f48; /* 4.73:1 on canvas */
+  --accent-quiet: #7cc0a0;
+  --accent-wash: rgba(10, 127, 72, 0.09);
+  --accent-ink: #ffffff;
+  --up: #0a7f48;
 }
 
 /* ══════════════════════════════════════════════════════════════════
    字、格、节奏 —— 与主题无关
    ══════════════════════════════════════════════════════════════════ */
 :root {
-  /* ── 三种声音 ──
-     instrument  仪器自己的读数：数字、比率、代号、列头、刻度标注
-     display     中文展示字（得意黑，天生倾斜）：字标 / 页标题 / 面板标题，仅此三处
-     text        中文正文与**用户内容**（提问原文、AI 回答原文）—— 系统栈。
-                 用户内容是无界的，不可能子集化；见 scripts/fonts/README.md */
-  --font-instrument: 'Martian Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  --font-display: 'Smiley Sans', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
-  --font-text: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC',
-    'Microsoft YaHei', 'Segoe UI', sans-serif;
+  /* ── 三种声音（情报文档 §7.2：三层，不要更多）──
+     display  中文标题走思源 600 子集；拉丁走 Geist
+     text     正文与**用户内容**（提问原文、AI 回答原文）
+              —— 中文部分是系统栈，因为它无界、不可能子集化
+     mono     数据：数字、比率、代号、时间戳、列头 */
+  --font-display: 'Geist', 'Noto Sans SC Display', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --font-text: 'Geist', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC',
+    'Microsoft YaHei', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
-  /* ── 字阶：有峰值 ──
-     上一版最大 30px、正文 14px，比例 2.1:1 —— 全站没有落点，所以扫一眼像任何后台。
-     readout 是仪器面板上的读数，它该压得住场。 */
-  --fs-readout: 44px;
-  --fs-readout-sm: 30px;
-  --fs-display: 26px;
-  --fs-title: 17px;
-  --fs-body: 14px;
-  --fs-sm: 13px;
-  --fs-label: 11px; /* instrument 字，大写 + 加字距 —— 面板上刻的那种标 */
+  /* ── 字阶 ──
+     密度即豪华（情报文档 §4.2）：正文压到 13，把空间让给数据读数。 */
+  --fs-hero: clamp(30px, 3.4vw, 46px);
+  --fs-readout: 38px;
+  --fs-readout-sm: 26px;
+  --fs-display: 22px;
+  --fs-title: 15px;
+  --fs-body: 13px;
+  --fs-sm: 12px;
+  --fs-label: 11px;
   --fs-micro: 10px;
 
-  --lh-tight: 1.12;
-  --lh-body: 1.7;
+  --lh-tight: 1.1;
+  --lh-body: 1.65;
   --lh-prose: 1.85; /* 回答原文：中文长文要更松 */
 
-  --tr-label: 0.1em; /* 刻标的字距 */
+  /* 紧追踪是这套语法的一半（情报文档 §4.1「紧字距标题」） */
+  --tr-hero: -0.03em;
+  --tr-display: -0.02em;
   --tr-readout: -0.02em;
+  --tr-label: 0.08em;
 
   /* ── 间距 ── */
   --sp-1: 4px;
@@ -220,27 +231,23 @@
   --sp-7: 40px;
   --sp-8: 56px;
 
-  /* ── 圆角：记录纸是切边的，仪器面板只有很小的倒角 ── */
-  --r-xs: 1px;
-  --r-sm: 2px;
-  --r-md: 3px;
+  /* ── 形状：情报文档 §7.3「半径 6–8px 或更小；指挥台可以接近直角」── */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 6px;
   --r-pill: 999px;
 
   /* ── 刻度尺的几何 ── */
-  --tick-w: 3px; /* 一格的宽 */
-  --tick-gap: 2px; /* 格与格之间的缝 —— dataviz 要求填充之间留 2px 面色 */
-  --tick-h: 10px;
-  --tick-h-lg: 18px;
+  --tick-gap: 2px; /* dataviz：相邻填充之间要留 2px 面色 */
+  --tick-h: 8px;
+  --tick-h-lg: 14px;
 
   /* ── 布局 ── */
-  --rail-w: 232px; /* 侧栏 */
-  --content-max: 1240px;
+  --rail-w: 212px;
+  --content-max: 1340px; /* 密度即豪华：比上一版宽 100px */
 
-  /* ── 纸的纹理：分钟刻线。
-     只画一次，全站复用。深浅两套主题都用 --rule，所以会自动跟着翻。 */
-  --ruling: repeating-linear-gradient(
-    to right,
-    var(--rule) 0 1px,
-    transparent 1px 100%
-  );
+  /* ── 动效（情报文档 §7.4）：150–280ms，强调出场到 400ms，禁止 bounce ── */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 180ms;
+  --dur-lg: 320ms;
 }

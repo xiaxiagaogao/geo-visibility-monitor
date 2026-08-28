@@ -1,43 +1,73 @@
 /**
  * 自托管字体 —— 不走任何第三方 CDN。
  * 来源、授权、以及「改了文案要重跑子集」那条纪律见 scripts/fonts/README.md。
+ *
+ * 选型依据是风格情报 §7.2：展示与正文用紧追踪无衬线、数据用等宽、
+ * 中文用现代黑体（明确排除阿里普惠与圆体）。
  */
 
-/* ── Martian Mono：仪器的声音 ──
-   数字、比率、代号、刻度读数、列头。可变字重 300–800。
-   之所以是等宽：这个产品里的数字要成列对齐、要能一眼比长短，
-   等宽是功能，不是「技术感」的戏服。 */
+/* ── Geist：拉丁展示与正文 ──
+   风格情报点名的第一选择，而它正好也是文档列的气质参考（Vercel）自家的字。
+   可变字重 100–900，紧追踪，数字形态克制。 */
 @font-face {
-  font-family: 'Martian Mono';
+  font-family: 'Geist';
   font-style: normal;
-  font-weight: 300 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/MartianMono-latin.woff2') format('woff2');
+  src: url('/fonts/Geist-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
     U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: 'Martian Mono';
+  font-family: 'Geist';
   font-style: normal;
-  font-weight: 300 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/MartianMono-latin-ext.woff2') format('woff2');
+  src: url('/fonts/Geist-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
     U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* ── 得意黑（子集）：中文展示字 ──
-   只用在字标、页标题、面板标题三处。它天生是斜体 ——
-   那正是压印在仪器面板上的标签的样子，但也正因如此不能拿来排正文。
-   **子集只含仓库里出现过的汉字**，新增文案后必须重跑
+/* ── Geist Mono：数据 ──
+   数字、比率、代号、时间戳、列头。**等宽在这个产品里是功能不是戏服**：
+   数字要成列对齐、要能一眼比长短。 */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/GeistMono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/GeistMono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ── 思源黑体 SC（子集，静态 wght 600）：中文展示字 ──
+   风格情报 §7.2 点名可用「思源的显示级别」。只用在字标、页标题、面板标题。
+   **静态 600 而不是可变全轴**：可变全轴 362 KB、限轴 500–700 仍 322 KB，
+   而单一 600 只要 193 KB —— 中文字形的体积压在轮廓上，不在轴上。
+   标题的粗细层级靠字号与字距做，不靠字重插值。
+
+   ⚠️ **子集只含仓库里出现过的汉字**，新增文案后必须重跑
    `bash scripts/fonts/build-cjk-subset.sh`，否则漏掉的字会单独掉回系统字。 */
 @font-face {
-  font-family: 'Smiley Sans';
-  font-style: normal; /* 字体本身即倾斜，不再叠 italic */
-  font-weight: 400;
+  font-family: 'Noto Sans SC Display';
+  font-style: normal;
+  font-weight: 600;
   font-display: swap;
-  src: url('/fonts/SmileySans-Oblique-subset.woff2') format('woff2');
+  src: url('/fonts/NotoSansSC-600-subset.woff2') format('woff2');
 }

@@ -1,52 +1,92 @@
 /**
  * ⚠️ 过渡层 —— 改版完成后整个文件删掉。
  *
- * 这一轮只重做四个页面（任务列表 / 任务详情 / 证据页 / 新增引用榜）。
- * 其余七个路由的 CSS Module 还在引用旧 token 名（--bg-app / --accent / --border …）。
- * 没有这层别名，改 tokens.css 的那一刻它们会一起变成无样式的裸页面。
+ * 现在要同时喂两批还没改造的页面：
  *
- * 这里**只做名字映射，不引入任何新取值** —— 每一行右边都是新世界里已经存在、
- * 且已经过验证的 token。所以旧页面会跟着换成新配色（不再是青绿 SaaS），
- * 但版式仍是旧的，看起来会和新页面不是一套。**这是预期中的中间态，不是 bug。**
+ *   · **v0（最初那套 SaaS 后台）** 还剩 7 个路由在用 `--bg-app` / `--accent` /
+ *     `--text-primary` 这批名字（品牌、品牌详情、新建品牌、新建任务、用户、首页分流）
+ *   · **v1（熏烟纸地震图）** 有 5 个路由在用 `--sheet` / `--ink` / `--pencil-blue`
+ *     这批名字（任务列表、任务详情、证据页、引用榜、登录页）
  *
- * 删除条件：`grep -rl "var(--bg-app\|var(--accent\|var(--text-primary" apps/web/src`
+ * v2 是「暗色情报终端」，token 名字第三次换。这里**只做名字映射，不引入任何新取值** ——
+ * 右边全是 tokens.css 里已经存在、且已经跑过对比度的值。
+ *
+ * 后果要说清楚：**两批旧页面会跟着换成暗色配色，但版式还是旧的**，
+ * 看起来会和新页面不是一套。这是预期中的中间态，不是 bug。
+ * 而且 v1 那套的隐喻名（pencil / sheet / rule）在新世界里已经没有意义了 ——
+ * 谁读到都会困惑，所以它们的存在时间越短越好。
+ *
+ * 删除条件：
+ *   grep -rl "var(--bg-app\|var(--sheet\|var(--ink\b\|var(--pencil" apps/web/src
  * 返回空的时候。
  */
 
 :root,
-[data-theme='dark'] {
-  /* 面与线 */
-  --bg-app: var(--ground);
-  --bg-surface: var(--sheet);
-  --bg-elevated: var(--sheet-raised);
-  --bg-subtle: var(--sheet-sunken);
-  --bg-hover: var(--sheet-sunken);
-  --border: var(--edge);
-  --border-strong: var(--edge-strong);
+[data-theme='light'] {
+  /* ═══ v1（熏烟纸）→ v2 ═══ */
 
-  /* 墨 */
-  --text-primary: var(--ink);
-  --text-secondary: var(--ink-2);
-  --text-tertiary: var(--ink-3);
+  --ground: var(--canvas);
+  --sheet: var(--surface-1);
+  --sheet-raised: var(--surface-2);
+  --sheet-sunken: var(--surface-2);
+  --rule: var(--border);
+  --rule-strong: var(--border-strong);
+  --edge: var(--border);
+  --edge-strong: var(--border-strong);
 
-  /* 主色 —— 旧的 teal 全部换成蓝铅笔 */
-  --accent: var(--pencil-blue);
-  --accent-hover: var(--pencil-blue-hover);
-  --accent-press: var(--pencil-blue-press);
-  --accent-contrast: var(--pencil-blue-on);
-  --accent-soft: var(--pencil-blue-wash);
+  --ink: var(--text-1);
+  --ink-2: var(--text-2);
+  --ink-3: var(--text-3);
 
-  /* 状态 */
-  --success: var(--pine);
-  --warning: var(--amber);
-  --danger: var(--pencil-red);
+  /* 蓝铅笔 → 强调色；红铅笔 → 语义「跌 / 告警」 */
+  --pencil-blue: var(--accent);
+  --pencil-blue-hover: var(--accent);
+  --pencil-blue-press: var(--accent-quiet);
+  --pencil-blue-on: var(--accent-ink);
+  --pencil-blue-wash: var(--accent-wash);
+  --pencil-red: var(--down);
+  --pencil-red-wash: color-mix(in srgb, var(--down) 12%, var(--surface-1));
 
-  /* 情感：本期仍全部走降级态，取值只是为了别让旧样式取到 undefined */
-  --sentiment-positive: var(--pine);
-  --sentiment-neutral: var(--ink-3);
-  --sentiment-negative: var(--pencil-red);
+  --amber: var(--warn);
+  --amber-wash: color-mix(in srgb, var(--warn) 12%, var(--surface-1));
+  --pine: var(--up);
+  --pine-wash: color-mix(in srgb, var(--up) 12%, var(--surface-1));
 
-  /* 平台 */
+  --trace-own: var(--accent);
+  --trace-other: var(--tick-other);
+  --trace-bed: var(--tick-off);
+
+  /* 熏烟纸的分钟刻线在这个世界里没有对应物 —— 映射成透明，让它安静消失。
+     旧组件仍然会画那一层，只是画不出东西来。 */
+  --ruling: repeating-linear-gradient(to right, transparent 0 1px, transparent 1px 100%);
+
+  --font-instrument: var(--font-mono);
+
+  /* ═══ v0（最初那套）→ v2 ═══ */
+
+  --bg-app: var(--canvas);
+  --bg-surface: var(--surface-1);
+  --bg-elevated: var(--surface-2);
+  --bg-subtle: var(--surface-2);
+  --bg-hover: var(--surface-3);
+
+  --text-primary: var(--text-1);
+  --text-secondary: var(--text-2);
+  --text-tertiary: var(--text-3);
+
+  --accent-hover: var(--accent);
+  --accent-press: var(--accent-quiet);
+  --accent-contrast: var(--accent-ink);
+  --accent-soft: var(--accent-wash);
+
+  --success: var(--up);
+  --warning: var(--warn);
+  --danger: var(--down);
+
+  --sentiment-positive: var(--up);
+  --sentiment-neutral: var(--text-3);
+  --sentiment-negative: var(--down);
+
   --platform-deepseek: var(--plat-deepseek);
   --platform-doubao: var(--plat-doubao);
   --platform-yuanbao: var(--plat-yuanbao);
@@ -54,19 +94,14 @@
   --platform-wenxin: var(--plat-wenxin);
   --platform-kimi: var(--plat-kimi);
 
-  /* 图元 */
-  --bar-own: var(--trace-own);
-  --bar-other: var(--trace-other);
-  --bar-track: var(--trace-bed);
-  /* 旧矩阵把数值印在色块里 —— 新色阶明确不支持那种用法（见 tokens.css ②）。
-     这里给的 ink 是能读的组合，但旧矩阵一旦改到新版就该整个换掉。 */
-  --seq-1-ink: var(--ink);
-  --seq-2-ink: var(--ink);
-  --seq-3-ink: var(--sheet);
+  --bar-own: var(--accent);
+  --bar-other: var(--tick-other);
+  --bar-track: var(--tick-off);
+  --seq-1-ink: var(--text-1);
+  --seq-2-ink: var(--text-1);
+  --seq-3-ink: var(--canvas);
 
-  /* 字与形 */
   --font-sans: var(--font-text);
-  --font-mono: var(--font-instrument);
 
   --fs-data: var(--fs-readout-sm);
   --fs-h1: var(--fs-title);

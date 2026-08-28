@@ -6,21 +6,22 @@ import { AuthProvider } from '@/lib/auth-context'
 import '@/styles/globals.css'
 
 const DIRECTION_CONTRACT = `<!--
-GEO 监测台 · 方向契约 (impeccable seed e13eab31 · direction · operate · code-led)
+GEO 监测台 · 方向契约 v2（用户 brief 钉死，见 GEO-前端风格情报.md）
 
-THESIS: 这不是仪表盘，是一份记录。拒绝「四张一样的 KPI 卡 + 折线图」那套
-  类目默认排布 —— 那正是它上一版的样子。
-OWN-WORLD: 熏烟纸地震图。浅色是冲印正片、深色是熏烟原片，同一份记录的两面。
-  中性灰纸 + 烟墨，全站只有两支铅笔：蓝（本品/主操作）红（告警/挂零）。
-  分钟刻线是纸的纹理；四角近乎切齐（圆角 1–3px）；数字戴 Martian Mono，
-  中文展示字是得意黑，两款都自托管。
-STORY: 看的人先看见一段时间上的记录，再看见这一次的读数由多大的分母撑着，
-  最后能顺着标注回到原文的第 N 个字符。他带走的是一份缺口清单。
-FIRST VIEWPORT: 顶部一条贯穿整宽的时间纸带（12 次 run，本品实线、竞品淡线，
-  采集条件变过处画断口并写明「口径变了，两段不可直接比」）；纸带下方是**一块**
-  仪器面板（不是四张卡），四个读数以刻线分隔，每个读数下面是一条按分母刻度的
-  标尺 —— 18 格和 12 格一眼不一样长。主操作「立即运行」在面板右上。
-FORM: 自选 grounded 列表第 6 位「纸带记录仪」，由骰子分配，用户确认。seed e13eab31。
+THESIS: 暗色情报终端。一种强调色。回答流是唯一装饰。登录和监测台共用同一个
+  签名物件。拒绝「居中登录卡 + 圆角白卡片栅格 + 亮蓝主按钮」那张开源后台脸 ——
+  那正是 v0 的样子。
+OWN-WORLD: 画布近黑且偏冷 #08090B（明确不用 #0F172A）；表面靠底色差 4–8% 分层，
+  边框白 8%，几乎看不见；强调色只给数据、高亮与状态，**主 CTA 是白底黑字**；
+  半径 4–6px；Geist / Geist Mono / 思源 600 子集三种声音；紧追踪标题。
+STORY: 看的人先看见一段真实的 AI 回答里自己的品牌被点亮，再看见这次测量的
+  分母有多大，最后能顺着标注回到原文的第 N 个字符。他带走一份缺口清单。
+FIRST VIEWPORT: 登录页左右劈开 —— 左侧是 Answer Canvas（一段正在生成的回答，
+  品牌高亮、引用小票浮出），右侧是表单，无卡片。监测台首屏是四个真实读数
+  （有效样本/提及率/首位提及率/覆盖缺口，**没有 Sentiment：本产品恒 NULL**）
+  加单色面积图与竞品表。
+FORM: 用户 brief 指定，非骰子分配 —— brief 优先于 roll。路线 A 做壳、B 做核心、
+  C 只留给报告封面。替换 v1（熏烟纸地震图，seed e13eab31）。
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
   review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 -->`
@@ -40,8 +41,9 @@ export const metadata: Metadata = {
  * Sidebar + Topbar 那层壳仍在 (dashboard) 路由组里 —— 登录页不该套壳。
  */
 export default function RootLayout({ children }: { children: ReactNode }) {
+  // 暗色是默认，所以 html 上不带 data-theme；选了浅色才由 ThemeScript 写上
   return (
-    <html lang="zh-CN" data-theme="light" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>

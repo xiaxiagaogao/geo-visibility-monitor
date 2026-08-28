@@ -7,23 +7,27 @@ import styles from './shell.module.css'
 export const THEME_KEY = 'geo-theme'
 
 /**
- * 浅/深切换。
+ * 深/浅切换。
+ *
+ * **暗色是默认**（视觉立场就是「暗色情报终端」），浅色是显式选择 ——
+ * 所以 DOM 上只有选了浅色时才有 `data-theme="light"`，暗色时什么都不写。
+ * 上一版方向相反（浅色默认、`data-theme="dark"`），切换逻辑跟着反了过来。
  *
  * 首屏那一下由 layout 里的内联脚本负责（见 ThemeScript），
- * 这里只管切换与持久化 —— 否则静态导出的 HTML 是浅色，
- * 深色用户会先闪一下白屏。
+ * 这里只管切换与持久化。
  */
 export function ThemeToggle() {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
 
   useEffect(() => {
-    setDark(document.documentElement.dataset.theme === 'dark')
+    setDark(document.documentElement.dataset.theme !== 'light')
   }, [])
 
   const toggle = () => {
     const next = !dark
     setDark(next)
-    document.documentElement.dataset.theme = next ? 'dark' : 'light'
+    if (next) delete document.documentElement.dataset.theme
+    else document.documentElement.dataset.theme = 'light'
     try {
       localStorage.setItem(THEME_KEY, next ? 'dark' : 'light')
     } catch {
@@ -35,10 +39,8 @@ export function ThemeToggle() {
     <button
       className={styles.iconBtn}
       onClick={toggle}
-      /* 两套主题是同一份记录的正片与负片，不是「浅色调暗」——
-         tooltip 把这件事说出来，但主语仍是「浅色/深色」，别让人猜 */
       aria-label={dark ? '切换到浅色' : '切换到深色'}
-      title={dark ? '切换到浅色（冲印正片）' : '切换到深色（熏烟原片）'}
+      title={dark ? '切换到浅色' : '切换到深色'}
     >
       {dark ? <SunIcon /> : <MoonIcon />}
     </button>
@@ -46,13 +48,14 @@ export function ThemeToggle() {
 }
 
 /**
- * 在 <head> 里同步执行，避免选了深色的用户看到一帧白屏。
+ * 在 <head> 里同步执行，避免选了浅色的用户看到一帧黑屏。
  *
- * **默认浅色**，不跟随系统偏好 —— 定的是「浅色为主 + 深色可切」，
- * 且视觉稿本身就是照着浅底调的。深色是用户显式选择的结果，不是系统替他选。
+ * **默认暗色**，不跟随系统偏好 —— 视觉立场就是暗色终端，
+ * 让系统偏好替用户选会让一半访客看到一个并非为他们设计的版本。
+ * 浅色是用户显式点出来的结果。
  */
 export function ThemeScript() {
-  const js = `try{document.documentElement.dataset.theme=localStorage.getItem('${THEME_KEY}')==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}`
+  const js = `try{if(localStorage.getItem('${THEME_KEY}')==='light')document.documentElement.dataset.theme='light'}catch(e){}`
   return <script dangerouslySetInnerHTML={{ __html: js }} />
 }
 
