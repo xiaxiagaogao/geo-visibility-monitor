@@ -15,6 +15,7 @@ import {
   Plate,
   Notation,
   Notices,
+  PageHead,
   type Notice,
   ReadoutBlank,
   ReadoutCount,
@@ -292,14 +293,16 @@ function TaskHeader({
 
   return (
     <div>
-      <div className={runs.head}>
-        <div>
-          <h1 className={runs.title}>
+      <PageHead
+        title={
+          <>
             {task.name}
             <Mark tone="own">{brandName}</Mark>
             {task.is_active ? null : <Mark>已停用</Mark>}
-          </h1>
-          <div className={runs.meta}>
+          </>
+        }
+        meta={
+          <>
             <span>
               {(active?.platforms.length ? active.platforms : task.platforms).join(' · ') ||
                 '未选平台'}
@@ -312,10 +315,10 @@ function TaskHeader({
                 <span>共 {runList.length} 次运行</span>
               </>
             ) : null}
-          </div>
-        </div>
-
-        <div className={runs.actions}>
+          </>
+        }
+        action={
+          <div className={runs.actions}>
           {/* 只在 activeRunId 真在列表里时才画 —— 一个 value 不在 options
               里的 select 会渲染成空白框，看起来像坏了 */}
           {active ? (
@@ -344,8 +347,9 @@ function TaskHeader({
               disabled={taskInFlight || inactive}
             />
           ) : null}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {viewingInFlight ? (
         <div style={{ marginTop: 'var(--sp-4)' }}>

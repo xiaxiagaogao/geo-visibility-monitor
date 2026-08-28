@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
-import runs from '@/components/runs/runs.module.css'
 import {
   Mark,
+  PageHead,
   Button,
   Blank,
   Fault,
@@ -105,25 +105,29 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
   const writable = canWrite(me)
 
   return (
-    <div className={runs.panelStack}>
-      <div className={runs.taskHead}>
-        <div>
-          <h1 className={runs.taskTitle}>
+    <div className={kit.pageStack}>
+      <PageHead
+        title={
+          <>
             {brand.name}
             {brand.name_en ? <Mark>{brand.name_en}</Mark> : null}
-          </h1>
-          <div className={runs.taskMeta}>
+          </>
+        }
+        meta={
+          <>
             <span>{brand.industry || '未填行业'}</span>
             <span>·</span>
             <span className={kit.numeric}>workspace {brand.workspace_id}</span>
             <span>·</span>
             <span>{taskCount === null ? '—' : `${taskCount} 个任务`}</span>
-          </div>
-        </div>
-        <Link href="/brands" className={kit.rowLink}>
-          ← 品牌列表
-        </Link>
-      </div>
+          </>
+        }
+        action={
+          <Link href="/brands" className={kit.rowLink}>
+            ← 品牌列表
+          </Link>
+        }
+      />
 
       <BasicPanel brand={brand} writable={writable} onSaved={reload} />
       <AliasPanel brand={brand} writable={writable} onSaved={reload} />

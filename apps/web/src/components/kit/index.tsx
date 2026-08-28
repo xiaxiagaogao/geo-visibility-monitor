@@ -45,6 +45,41 @@ export function Plate({
   )
 }
 
+/**
+ * 页头 —— **每个路由的标题归页面自己**，顶栏只是工具轨。
+ *
+ * 提成原语是因为 `/tasks` 与 `/citations` 各写了一份，两份 CSS 除了
+ * `line-height`（1.7 / 1.75）与 `max-width`（62ch / 68ch）逐字相同 ——
+ * 那两个差值没有理由，纯属分头写出来的。而 `/brands`、`/users` 干脆没有页头，
+ * 标题塞在面板的 `<h2>` 里 —— 于是全站有三种「这一页叫什么」的表达。
+ *
+ * `title` 收 ReactNode 而不是 string：任务详情页的标题行跟着一个品牌徽章。
+ */
+export function PageHead({
+  title,
+  lede,
+  meta,
+  action,
+}: {
+  title: ReactNode
+  lede?: ReactNode
+  /** 标题下面那行等宽小字（口径、计数），比 lede 更硬 */
+  meta?: ReactNode
+  /** 右上角的主操作或筛选器 */
+  action?: ReactNode
+}) {
+  return (
+    <div className={styles.pageHead}>
+      <div className={styles.pageHeadMain}>
+        <h1 className={styles.pageTitle}>{title}</h1>
+        {lede ? <p className={styles.pageLede}>{lede}</p> : null}
+        {meta ? <div className={styles.pageMeta}>{meta}</div> : null}
+      </div>
+      {action}
+    </div>
+  )
+}
+
 /** 旁注 —— 铅笔写在记录旁边的那种话 */
 export function Aside({
   tone = 'plain',

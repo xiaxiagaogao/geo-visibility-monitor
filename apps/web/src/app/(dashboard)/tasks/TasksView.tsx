@@ -9,6 +9,7 @@ import {
   Mark,
   markTone,
   Pending,
+  PageHead,
   Plate,
   kit,
   Table,
@@ -56,23 +57,25 @@ export function TasksView() {
 
   return (
     <div className={page.stack}>
-      <div className={page.head}>
-        <div>
-          <h1 className={page.title}>检测任务</h1>
-          <p className={page.lede}>
+      <PageHead
+        title="检测任务"
+        lede={
+          <>
             每个任务盯一个品牌；一次执行叫一个 run，
             <strong>提问集与竞品集在发起那一刻冻结</strong> ——
             所以两次运行之间的差异是表现变化，不是口径变化。
-          </p>
-        </div>
-        {/* 客户是纯只读，按角色隐藏按钮**只是体验，不是安全边界** ——
-            服务端的 require_write 才是。 */}
-        {canWrite(me) ? (
-          <Link href="/tasks/new" className={kit.link}>
-            新建任务 +
-          </Link>
-        ) : null}
-      </div>
+          </>
+        }
+        action={
+          /* 客户是纯只读，按角色隐藏按钮**只是体验，不是安全边界** ——
+             服务端的 require_write 才是。 */
+          canWrite(me) ? (
+            <Link href="/tasks/new" className={kit.link}>
+              新建任务 +
+            </Link>
+          ) : null
+        }
+      />
 
       {error ? (
         <Fault

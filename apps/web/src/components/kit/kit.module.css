@@ -798,9 +798,66 @@
   margin-bottom: 0;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   页头 —— 一页只有一个 h1，且在面板之外
+   ══════════════════════════════════════════════════════════════════ */
+
+.pageHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+.pageHeadMain {
+  min-width: 0;
+}
+
+/* flex 是给标题行里跟着徽章的页面用的（任务详情）。
+   纯文字标题下它等同于普通块，无副作用。 */
+.pageTitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--text-1);
+}
+
+.pageLede {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--text-2);
+  max-width: 66ch;
+}
+
+.pageMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+
 /* 数字单元格 —— 等宽 + 表格数字，让同一列的数能按位对齐。
    ⚠️ 同样是此前不存在的类（`kit.numeric` 被引用了两处却从没定义过）。 */
 .numeric {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* 页面级纵向节奏。 */
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
 }

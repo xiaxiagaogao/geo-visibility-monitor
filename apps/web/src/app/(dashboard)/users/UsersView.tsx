@@ -8,6 +8,7 @@ import {
   Button,
   Blank,
   Fault,
+  PageHead,
   Plate,
   Aside,
   Pending,
@@ -72,11 +73,14 @@ export function UsersView() {
   // 但运营点进来会拿到一个 403，说清楚比让他看「加载失败 403」强
   if (!isSuperadmin(me)) {
     return (
-      <Plate title="用户管理">
-        <Blank lead="只有超级管理员能管理用户">
-          这不是界面限制 —— 接口本身就只对超管开放。
-        </Blank>
-      </Plate>
+      <div className={kit.pageStack}>
+        <PageHead title="用户管理" />
+        <Plate>
+          <Blank lead="只有超级管理员能管理用户">
+            这不是界面限制 —— 接口本身就只对超管开放。
+          </Blank>
+        </Plate>
+      </div>
     )
   }
 
@@ -100,16 +104,14 @@ export function UsersView() {
   }
 
   return (
-    <div className={runs.panelStack}>
-      <Plate
-        title="用户"
-        subtitle="客户只能看到自己 workspace 下的品牌；超管与运营看全部"
-        right={
-          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
-            共 {users.length} 个
-          </span>
-        }
-      >
+    <div className={kit.pageStack}>
+      <PageHead
+        title="用户管理"
+        lede="客户只能看到自己 workspace 下的品牌；超管与运营看全部。"
+        meta={<span>共 {users.length} 个账号</span>}
+      />
+
+      <Plate>
         <Table>
           <thead>
             <tr>

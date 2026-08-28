@@ -10,6 +10,7 @@ import {
   Mark,
   Notation,
   Pending,
+  PageHead,
   Plate,
   Select,
   TickScale,
@@ -117,29 +118,31 @@ export function CitationsView() {
 
   return (
     <div className={styles.stack}>
-      <div className={styles.head}>
-        <div>
-          <h1 className={styles.title}>引用榜</h1>
-          <p className={styles.lede}>
+      <PageHead
+        title="引用榜"
+        lede={
+          <>
             AI 回答里被引用的网页来自哪些站。数据来自千问的 <span className="mono">SSE</span> 流
             —— <strong>它的引用不在页面上</strong>，页面那块只有站点图标、一条外链都没有。
             口径是这个品牌<strong>全部运行的累计</strong>，不是某一次。
-          </p>
-        </div>
-        {monitored && monitored.length > 1 ? (
-          <Select
-            value={brandId ?? ''}
-            onChange={(e) => setBrandId(Number(e.target.value))}
-            aria-label="选择被监测品牌"
-          >
-            {monitored.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
-        ) : null}
-      </div>
+          </>
+        }
+        action={
+          monitored && monitored.length > 1 ? (
+            <Select
+              value={brandId ?? ''}
+              onChange={(e) => setBrandId(Number(e.target.value))}
+              aria-label="选择被监测品牌"
+            >
+              {monitored.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          ) : null
+        }
+      />
 
       {monitored !== null && monitored.length === 0 ? (
         <Plate>

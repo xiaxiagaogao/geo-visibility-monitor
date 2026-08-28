@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
-import { Mark, Blank, Fault, Plate, Pending, Table, kit } from '@/components/kit'
+import { Mark, Blank, Fault, PageHead, Plate, Pending, Table, kit } from '@/components/kit'
 import { canWrite } from '@/lib/api/auth'
 import { listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
@@ -47,17 +47,20 @@ export function BrandsView() {
   const nameOf = (id: number) => brands?.find((b) => b.id === id)?.name ?? `#${id}`
 
   return (
-    <Plate
-      title="品牌"
-      subtitle="别名决定 L1 能不能认出它；竞品集决定缺口清单和失分量跟谁比"
-      right={
-        canWrite(me) ? (
-          <Link href="/brands/new" className={kit.rowLink}>
-            新建品牌 +
-          </Link>
-        ) : null
-      }
-    >
+    <div className={kit.pageStack}>
+      <PageHead
+        title="品牌"
+        lede="别名决定 L1 能不能认出它；竞品集决定缺口清单和失分量跟谁比。"
+        action={
+          canWrite(me) ? (
+            <Link href="/brands/new" className={kit.link}>
+              新建品牌 +
+            </Link>
+          ) : null
+        }
+      />
+
+      <Plate>
       {brands === null ? (
         <div style={{ display: 'grid', gap: 8 }}>
           <Pending height={20} />
@@ -137,6 +140,7 @@ export function BrandsView() {
           </tbody>
         </Table>
       )}
-    </Plate>
+      </Plate>
+    </div>
   )
 }
