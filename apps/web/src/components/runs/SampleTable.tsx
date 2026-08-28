@@ -138,7 +138,12 @@ export function SampleTable({
                 ) : null}
               </td>
 
-              <td className={styles.sampleSnippet}>{hit.snippet ?? '—'}</td>
+              {/* 截断样式必须套在**内层元素**上，不能直接给 td ——
+                  `display: -webkit-box` 会把 td 踢出表格盒模型（计算值 flow-root），
+                  实测单元格高 39px 而行高 77px，边框与内容全部错位。 */}
+              <td>
+                <span className={styles.sampleSnippet}>{hit.snippet ?? '—'}</span>
+              </td>
             </tr>
           )
         })}
