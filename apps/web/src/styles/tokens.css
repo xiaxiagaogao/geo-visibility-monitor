@@ -122,8 +122,14 @@
 [data-theme='light'] {
   --canvas: #f6f7f8;
   --surface-1: #ffffff;
-  --surface-2: #ffffff;
-  --surface-3: #f0f1f3;
+  /* ⚠️ surface-2 曾经**也是 #ffffff**，和 surface-1 完全相同 ——
+     于是所有靠它表达「次一层」的东西在浅色下全部失效：
+     **表格 hover 没有任何视觉反馈**，旁注块与徽章只剩边框。
+     暗色档没暴露这个问题（那边两者差 4–8%），是浅色档单独漏的。
+     现在三种面在浅色下也真的分得开（对比比 1.11 / 1.18）。
+     三级文字 58% 在这三种面上实测 4.93 / 4.78 / 4.69，仍在 4.5 之上。 */
+  --surface-2: #f2f3f5;
+  --surface-3: #eaecf0;
 
   --border: rgba(8, 9, 11, 0.1);
   --border-strong: rgba(8, 9, 11, 0.2);
