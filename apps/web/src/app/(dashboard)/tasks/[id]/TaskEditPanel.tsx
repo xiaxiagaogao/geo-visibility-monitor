@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { Badge, Button, ErrorState, Panel, PanelNote, Skeleton, ui } from '@/components/ui'
+import { Mark, Button, Fault, Plate, Aside, Pending, kit } from '@/components/kit'
 import { ApiError } from '@/lib/api/client'
 import { fetchPlatforms } from '@/lib/api/config'
 import { updateTask } from '@/lib/api/tasks'
@@ -84,26 +84,26 @@ export function TaskEditPanel({
 
   if (loadError) {
     return (
-      <Panel title="编辑任务">
-        <ErrorState
+      <Plate title="编辑任务">
+        <Fault
           status={loadError instanceof ApiError ? loadError.status : 0}
           message={loadError instanceof ApiError ? loadError.detail : '加载失败'}
         />
-      </Panel>
+      </Plate>
     )
   }
 
   return (
-    <Panel
+    <Plate
       title="编辑任务"
       subtitle="品牌不在这里 —— 任务过不了户，后端也不收这个字段"
       right={<Button onClick={onCancel}>取消</Button>}
     >
-      <div className={ui.formGrid}>
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>任务名</span>
+      <div className={kit.formGrid}>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>任务名</span>
           <input
-            className={ui.input}
+            className={kit.input}
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={120}
@@ -111,17 +111,17 @@ export function TaskEditPanel({
           />
         </label>
 
-        <div className={ui.field}>
-          <span className={ui.fieldLabel}>平台</span>
+        <div className={kit.field}>
+          <span className={kit.fieldLabel}>平台</span>
           {platforms === null ? (
-            <Skeleton height={28} width="60%" />
+            <Pending height={28} width="60%" />
           ) : (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {platforms.map((p) => (
                 <button
                   key={p.code}
                   type="button"
-                  className={`${ui.chip} ${picked.includes(p.code) ? ui.chipOn : ''}`}
+                  className={`${kit.chip} ${picked.includes(p.code) ? kit.chipOn : ''}`}
                   onClick={() =>
                     setPicked((prev) =>
                       prev.includes(p.code)
@@ -142,10 +142,10 @@ export function TaskEditPanel({
           )}
         </div>
 
-        <label className={ui.field} style={{ maxWidth: 200 }}>
-          <span className={ui.fieldLabel}>每条提问采样次数</span>
+        <label className={kit.field} style={{ maxWidth: 200 }}>
+          <span className={kit.fieldLabel}>每条提问采样次数</span>
           <input
-            className={ui.input}
+            className={kit.input}
             type="number"
             min={1}
             max={20}
@@ -162,8 +162,8 @@ export function TaskEditPanel({
             onChange={(e) => setIsActive(!e.target.checked)}
             disabled={busy}
           />
-          <span className={ui.fieldLabel}>停用这个任务</span>
-          {!isActive ? <Badge tone="warning">已停用</Badge> : null}
+          <span className={kit.fieldLabel}>停用这个任务</span>
+          {!isActive ? <Mark tone="warn">已停用</Mark> : null}
         </label>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -171,25 +171,25 @@ export function TaskEditPanel({
             {busy ? '保存中…' : '保存'}
           </Button>
           {dirty ? (
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--warning)' }}>
+            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--warn)' }}>
               有未保存的改动
             </span>
           ) : null}
         </div>
 
         {err ? (
-          <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+          <p role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
             {err}
           </p>
         ) : null}
       </div>
 
-      <PanelNote>
+      <Aside>
         改平台与采样数<strong>只影响以后的运行</strong> —— 每次 run 都冻结了自己那份
         平台快照，历史运行不会被改写。
         <br />
         <strong>停用之后发起运行会被拒绝</strong>，但已有的运行与证据都留着。
-      </PanelNote>
-    </Panel>
+      </Aside>
+    </Plate>
   )
 }

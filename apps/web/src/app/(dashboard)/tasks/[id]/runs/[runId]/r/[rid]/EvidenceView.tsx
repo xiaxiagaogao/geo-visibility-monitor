@@ -14,10 +14,10 @@ import {
   markTone,
   Pending,
   Plate,
-  rec,
+  kit,
   Table,
   type MarkTone,
-} from '@/components/record'
+} from '@/components/kit'
 import { brandNameMap, listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
 import { getResponse } from '@/lib/api/responses'
@@ -147,7 +147,7 @@ export function EvidenceView({
   return (
     <div className={evidence.stack}>
       <div className={evidence.head}>
-        <Link href={`/tasks/${taskId}/runs/${runId}`} className={rec.link}>
+        <Link href={`/tasks/${taskId}/runs/${runId}`} className={kit.link}>
           ← 回到这次运行
         </Link>
         <span className={evidence.headSep}>·</span>
@@ -168,7 +168,7 @@ export function EvidenceView({
         <Mark tone={search.degraded ? 'void' : markTone(search.tone)}>{search.text}</Mark>
       </div>
 
-      <Plate ruled>
+      <Plate>
         <span className={evidence.promptStamp}>提问</span>
         <p className={evidence.prompt}>{sample.prompt_text}</p>
       </Plate>
@@ -269,7 +269,7 @@ export function EvidenceView({
         subtitle="千问的引用来自 SSE 流，不是页面 —— 页面上那块只有站点图标，一条外链都没有"
         right={
           sample.citations.length > 0 ? (
-            <span className="mono" style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-label)' }}>
+            <span className="mono" style={{ color: 'var(--text-2)', fontSize: 'var(--fs-label)' }}>
               {sample.citations.length} 条
             </span>
           ) : null

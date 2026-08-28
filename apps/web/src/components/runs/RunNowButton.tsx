@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Input } from '@/components/record'
+import { Button, Input } from '@/components/kit'
 
 import styles from './runs.module.css'
 

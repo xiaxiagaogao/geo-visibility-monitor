@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 import {
-  Badge,
+  Mark,
   Button,
-  EmptyState,
-  ErrorState,
-  Panel,
-  PanelNote,
-  Skeleton,
-  ui,
-} from '@/components/ui'
+  Blank,
+  Fault,
+  Plate,
+  Aside,
+  Pending,
+  kit,
+} from '@/components/kit'
 import { ApiError } from '@/lib/api/client'
 import { createPrompt, deletePrompt, listPrompts, updatePrompt } from '@/lib/api/prompts'
 import { activeCount, groupByCategory } from '@/lib/l3/prompts'
@@ -69,24 +69,24 @@ export function PromptsPanel({
 
   if (error) {
     return (
-      <Panel title="提问词">
-        <ErrorState
+      <Plate title="提问词">
+        <Fault
           status={error instanceof ApiError ? error.status : 0}
           message={error instanceof ApiError ? error.detail : '加载失败'}
           onRetry={reload}
         />
-      </Panel>
+      </Plate>
     )
   }
 
   if (prompts === null) {
     return (
-      <Panel title="提问词">
+      <Plate title="提问词">
         <div style={{ display: 'grid', gap: 8 }}>
-          <Skeleton height={20} />
-          <Skeleton height={20} />
+          <Pending height={20} />
+          <Pending height={20} />
         </div>
-      </Panel>
+      </Plate>
     )
   }
 
@@ -94,11 +94,11 @@ export function PromptsPanel({
   const groups = groupByCategory(prompts)
 
   return (
-    <Panel
+    <Plate
       title="提问词"
       subtitle="这些问题会被拿去问 AI。启用中的条数 × 采样数 = 一次运行建出来的 job 数"
       right={
-        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+        <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
           共 {prompts.length} 条 · 启用 {active} 条
         </span>
       }
@@ -106,22 +106,19 @@ export function PromptsPanel({
       {/* 提及率的分母就是这些提问跑出来的样本数。全停用的话下一次运行会是
           `empty` —— 一条 job 都建不出来，那是配置问题不是采集失败 */}
       {active === 0 ? (
-        <PanelNote>
-          <strong style={{ color: 'var(--danger)' }}>一条启用中的提问词都没有。</strong>
+        <Aside>
+          <strong style={{ color: 'var(--down)' }}>一条启用中的提问词都没有。</strong>
           现在发起运行会建不出任何 job，run 状态是「未产生任务」——
           那是配置问题，不是采集失败。
-        </PanelNote>
+        </Aside>
       ) : null}
 
       {prompts.length === 0 ? (
-        <EmptyState>
-          <strong style={{ color: 'var(--text-secondary)' }}>还没有提问词</strong>
-          <span>
-            {writable
-              ? '加几条你想知道 AI 会怎么回答的问题。它们是这个品牌全部数据的来源。'
-              : '还没有为这个品牌配置提问词。'}
-          </span>
-        </EmptyState>
+        <Blank lead="还没有提问词">
+          {writable
+            ? '加几条你想知道 AI 会怎么回答的问题。它们是这个品牌全部数据的来源。'
+            : '还没有为这个品牌配置提问词。'}
+        </Blank>
       ) : (
         groups.map((g) => (
           <div key={g.category} style={{ marginBottom: 'var(--sp-4)' }}>
@@ -137,7 +134,7 @@ export function PromptsPanel({
       )}
 
       {writable ? <AddPromptForm brandId={brandId} onAdded={reload} /> : null}
-    </Panel>
+    </Plate>
   )
 }
 
@@ -176,7 +173,7 @@ function PromptRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         {editing ? (
           <input
-            className={ui.input}
+            className={kit.input}
             value={text}
             onChange={(e) => setText(e.target.value)}
             disabled={busy}
@@ -186,13 +183,13 @@ function PromptRow({
           <div className={styles.promptText}>{prompt.text}</div>
         )}
         {err ? (
-          <div role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+          <div role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
             {err}
           </div>
         ) : null}
         {armed ? (
-          <div className={ui.deleteWarn} role="alert">
-            <strong style={{ color: 'var(--danger)' }}>删除会改写历史，不只是「以后不问」。</strong>
+          <div className={kit.deleteWarn} role="alert">
+            <strong style={{ color: 'var(--down)' }}>删除会改写历史，不只是「以后不问」。</strong>
             它的全部采样、回答与标注会一起删掉，用过这条提问的<strong>历史运行</strong>
             分母会少一截，总提及率当场变。
             <br />
@@ -201,7 +198,7 @@ function PromptRow({
         ) : null}
       </div>
 
-      {!prompt.is_active ? <Badge>已停用</Badge> : null}
+      {!prompt.is_active ? <Mark>已停用</Mark> : null}
 
       {writable ? (
         <div className={styles.promptActions}>
@@ -294,7 +291,7 @@ function AddPromptForm({ brandId, onAdded }: { brandId: number; onAdded: () => v
   return (
     <form onSubmit={onSubmit} className={styles.addRow}>
       <input
-        className={ui.input}
+        className={kit.input}
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="例：2026年跑步鞋哪个品牌好？"
@@ -303,7 +300,7 @@ function AddPromptForm({ brandId, onAdded }: { brandId: number; onAdded: () => v
         style={{ flex: 1, minWidth: 220 }}
       />
       <input
-        className={ui.input}
+        className={kit.input}
         value={category}
         onChange={(e) => setCategory(e.target.value)}
         placeholder="类别（可选）"
@@ -322,7 +319,7 @@ function AddPromptForm({ brandId, onAdded }: { brandId: number; onAdded: () => v
         {busy ? '添加中…' : '添加'}
       </Button>
       {err ? (
-        <span role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+        <span role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
           {err}
         </span>
       ) : null}

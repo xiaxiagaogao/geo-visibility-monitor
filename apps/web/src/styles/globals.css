@@ -1,6 +1,5 @@
 @import './fonts.css';
 @import './tokens.css';
-@import './legacy-aliases.css'; /* ⚠️ 改版收尾时删掉，见该文件头 */
 
 *,
 *::before,

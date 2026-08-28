@@ -1,4 +1,4 @@
-import { Blank, Mark, type MarkTone } from '@/components/record'
+import { Blank, Mark, type MarkTone } from '@/components/kit'
 import type { Gap, GapPriority, GapTier } from '@/lib/l3/gaps'
 import { formatFraction } from '@/lib/l3/rates'
 

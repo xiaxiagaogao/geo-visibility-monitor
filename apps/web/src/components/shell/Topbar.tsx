@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Mark } from '@/components/record'
+import { Mark } from '@/components/kit'
 import { canWrite } from '@/lib/api/auth'
 import { useAuth } from '@/lib/auth-context'
 

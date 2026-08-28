@@ -20,31 +20,31 @@
   font-weight: 400;
   line-height: 1.2;
   margin: 0;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .lede {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-sm);
   line-height: 1.7;
-  color: var(--ink-2);
+  color: var(--text-2);
   max-width: 62ch;
 }
 
 .taskName {
   font-size: var(--fs-body);
-  color: var(--ink);
-  border-bottom: 1px solid var(--edge-strong);
+  color: var(--text-1);
+  border-bottom: 1px solid var(--border-strong);
   transition: border-color 140ms ease;
 }
 
 .taskName:hover {
-  border-bottom-color: var(--pencil-blue);
-  color: var(--pencil-blue);
+  border-bottom-color: var(--accent);
+  color: var(--accent);
 }
 
 .cellMeta {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }

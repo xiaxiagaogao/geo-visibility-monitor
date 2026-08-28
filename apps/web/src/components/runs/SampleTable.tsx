@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { Mark, markTone, rec, Table, type MarkTone } from '@/components/record'
+import { kit, Mark, markTone, Table, type MarkTone } from '@/components/kit'
 import { isPreviewTruncated, ownHit, type SampleHitKind } from '@/lib/l3/samples'
 import { searchUsedLabel } from '@/lib/l3/search-used'
 import type { RawResponseSummary } from '@/lib/types'
@@ -83,7 +83,7 @@ export function SampleTable({
           return (
             <tr key={s.id} data-excluded={excluded || undefined}>
               <td>
-                <Link href={`/tasks/${taskId}/runs/${runId}/r/${s.id}`} className={rec.link}>
+                <Link href={`/tasks/${taskId}/runs/${runId}/r/${s.id}`} className={kit.link}>
                   #{s.id}
                 </Link>
               </td>

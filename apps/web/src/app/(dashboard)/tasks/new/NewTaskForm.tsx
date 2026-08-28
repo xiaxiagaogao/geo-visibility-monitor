@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type FormEvent } from 'react'
 
-import { Badge, Button, ErrorState, Panel, PanelNote, Skeleton, ui } from '@/components/ui'
+import { Mark, Button, Fault, Plate, Aside, Pending, kit } from '@/components/kit'
 import { listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
 import { fetchPlatforms } from '@/lib/api/config'
@@ -76,7 +76,7 @@ export function NewTaskForm() {
 
   if (loadError) {
     return (
-      <ErrorState
+      <Fault
         status={loadError instanceof ApiError ? loadError.status : 0}
         message={loadError instanceof ApiError ? loadError.detail : '加载失败'}
       />
@@ -85,12 +85,12 @@ export function NewTaskForm() {
 
   if (brands === null || platforms === null) {
     return (
-      <Panel title="新建任务">
+      <Plate title="新建任务">
         <div style={{ display: 'grid', gap: 8 }}>
-          <Skeleton height={20} />
-          <Skeleton height={20} />
+          <Pending height={20} />
+          <Pending height={20} />
         </div>
-      </Panel>
+      </Plate>
     )
   }
 
@@ -98,12 +98,12 @@ export function NewTaskForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      <Panel title="新建任务" subtitle="任务盯一个品牌；每次执行会冻结当时的提问集与竞品集">
+      <Plate title="新建任务" subtitle="任务盯一个品牌；每次执行会冻结当时的提问集与竞品集">
         <div style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span className={ui.fieldLabel}>品牌</span>
+            <span className={kit.fieldLabel}>品牌</span>
             <select
-              className={ui.input}
+              className={kit.input}
               value={brandId}
               onChange={(e) => setBrandId(e.target.value === '' ? '' : Number(e.target.value))}
               disabled={busy}
@@ -120,9 +120,9 @@ export function NewTaskForm() {
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span className={ui.fieldLabel}>任务名</span>
+            <span className={kit.fieldLabel}>任务名</span>
             <input
-              className={ui.input}
+              className={kit.input}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例：安踏周度监测"
@@ -133,13 +133,13 @@ export function NewTaskForm() {
           </label>
 
           <div style={{ display: 'grid', gap: 6 }}>
-            <span className={ui.fieldLabel}>平台</span>
+            <span className={kit.fieldLabel}>平台</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {platforms.map((p) => (
                 <button
                   key={p.code}
                   type="button"
-                  className={`${ui.chip} ${picked.includes(p.code) ? ui.chipOn : ''}`}
+                  className={`${kit.chip} ${picked.includes(p.code) ? kit.chipOn : ''}`}
                   onClick={() => togglePlatform(p.code)}
                   // 建完就跑不了的平台不给选 —— 否则用户看到的是「抓取失败」，
                   // 而真相是「这个平台没接」，两者排查方向完全不同。
@@ -152,16 +152,16 @@ export function NewTaskForm() {
               ))}
             </div>
             {runnable.length === 0 ? (
-              <span style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+              <span style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
                 当前没有可用平台，建了任务也跑不起来。
               </span>
             ) : null}
           </div>
 
           <label style={{ display: 'grid', gap: 6, maxWidth: 200 }}>
-            <span className={ui.fieldLabel}>每条提问采样次数</span>
+            <span className={kit.fieldLabel}>每条提问采样次数</span>
             <input
-              className={ui.input}
+              className={kit.input}
               type="number"
               min={1}
               max={20}
@@ -178,22 +178,22 @@ export function NewTaskForm() {
             </Button>
             <Button onClick={() => router.back()}>取消</Button>
             {crawlMode === 'fake' ? (
-              <Badge tone="warning">当前 crawl_mode=fake，产出的是假数据</Badge>
+              <Mark tone="warn">当前 crawl_mode=fake，产出的是假数据</Mark>
             ) : null}
           </div>
 
           {submitError ? (
-            <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+            <p role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
               {submitError}
             </p>
           ) : null}
         </div>
-      </Panel>
+      </Plate>
 
-      <PanelNote>
+      <Aside>
         建任务<strong>不会</strong>立刻开始抓取。要跑得进任务详情点「立即运行」——
         那一步才会真的建 job、消耗额度。
-      </PanelNote>
+      </Aside>
     </form>
   )
 }

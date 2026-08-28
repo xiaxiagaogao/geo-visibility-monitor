@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
-import { Badge, EmptyState, ErrorState, Panel, Skeleton, Table, ui } from '@/components/ui'
+import { Mark, Blank, Fault, Plate, Pending, Table, kit } from '@/components/kit'
 import { canWrite } from '@/lib/api/auth'
 import { listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
@@ -34,7 +34,7 @@ export function BrandsView() {
 
   if (error) {
     return (
-      <ErrorState
+      <Fault
         status={error instanceof ApiError ? error.status : 0}
         message={error instanceof ApiError ? error.detail : '加载失败'}
         onRetry={load}
@@ -47,12 +47,12 @@ export function BrandsView() {
   const nameOf = (id: number) => brands?.find((b) => b.id === id)?.name ?? `#${id}`
 
   return (
-    <Panel
+    <Plate
       title="品牌"
       subtitle="别名决定 L1 能不能认出它；竞品集决定缺口清单和失分量跟谁比"
       right={
         canWrite(me) ? (
-          <Link href="/brands/new" className={ui.rowLink}>
+          <Link href="/brands/new" className={kit.rowLink}>
             新建品牌 +
           </Link>
         ) : null
@@ -60,18 +60,15 @@ export function BrandsView() {
     >
       {brands === null ? (
         <div style={{ display: 'grid', gap: 8 }}>
-          <Skeleton height={20} />
-          <Skeleton height={20} />
+          <Pending height={20} />
+          <Pending height={20} />
         </div>
       ) : brands.length === 0 ? (
-        <EmptyState>
-          <strong style={{ color: 'var(--text-secondary)' }}>还没有品牌</strong>
-          <span>
-            {canWrite(me)
-              ? '先建一个品牌，配好别名与竞品，才能给它建监测任务。'
-              : '你的 workspace 下还没有品牌，请联系运营。'}
-          </span>
-        </EmptyState>
+        <Blank lead="还没有品牌">
+          {canWrite(me)
+            ? '先建一个品牌，配好别名与竞品，才能给它建监测任务。'
+            : '你的 workspace 下还没有品牌，请联系运营。'}
+        </Blank>
       ) : (
         <Table>
           <thead>
@@ -87,35 +84,35 @@ export function BrandsView() {
             {brands.map((b) => (
               <tr key={b.id}>
                 <td>
-                  <Link href={`/brands/${b.id}`} className={ui.rowLink}>
+                  <Link href={`/brands/${b.id}`} className={kit.rowLink}>
                     {b.name}
                   </Link>
                   {b.name_en ? (
                     <span
                       style={{
                         marginLeft: 6,
-                        color: 'var(--text-tertiary)',
-                        fontSize: 'var(--fs-xs)',
+                        color: 'var(--text-3)',
+                        fontSize: 'var(--fs-label)',
                       }}
                     >
                       {b.name_en}
                     </span>
                   ) : null}
                 </td>
-                <td style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)' }}>
+                <td style={{ color: 'var(--text-2)', fontSize: 'var(--fs-label)' }}>
                   {b.industry || '—'}
                 </td>
-                <td className={ui.numeric}>{b.workspace_id}</td>
+                <td className={kit.numeric}>{b.workspace_id}</td>
                 <td>
                   {/* 别名为 0 时明说，不显示空白 —— 没有别名意味着 L1 只能靠
                       品牌名原样匹配，漏检率会高，这是配置问题不是展示问题 */}
                   {b.aliases.length === 0 ? (
-                    <span style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+                    <span style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
                       未配别名
                     </span>
                   ) : (
                     <span
-                      style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}
+                      style={{ fontSize: 'var(--fs-label)', color: 'var(--text-2)' }}
                       title={b.aliases.join(' · ')}
                     >
                       {b.aliases.slice(0, 3).join(' · ')}
@@ -125,10 +122,10 @@ export function BrandsView() {
                 </td>
                 <td>
                   {b.competitor_ids.length === 0 ? (
-                    <Badge>无</Badge>
+                    <Mark>无</Mark>
                   ) : (
                     <span
-                      style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}
+                      style={{ fontSize: 'var(--fs-label)', color: 'var(--text-2)' }}
                       title={b.competitor_ids.map(nameOf).join(' · ')}
                     >
                       {b.competitor_ids.length} 个
@@ -140,6 +137,6 @@ export function BrandsView() {
           </tbody>
         </Table>
       )}
-    </Panel>
+    </Plate>
   )
 }

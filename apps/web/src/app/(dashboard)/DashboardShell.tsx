@@ -21,7 +21,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <div className={shell.root}>
         <div className={shell.body}>
           <main className={shell.main}>
-            <div className={shell.content} style={{ color: 'var(--text-tertiary)', padding: 24 }}>
+            <div className={shell.content} style={{ color: 'var(--text-3)', padding: 24 }}>
               {status === 'loading' ? '正在确认身份…' : '未登录，正在跳转…'}
             </div>
           </main>

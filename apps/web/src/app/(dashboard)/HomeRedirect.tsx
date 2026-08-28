@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-import { ErrorState, ui } from '@/components/ui'
+import { Fault, kit } from '@/components/kit'
 import { ApiError } from '@/lib/api/client'
 import { getLatestRun } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
@@ -63,18 +63,18 @@ export function HomeRedirect() {
   if (error) {
     return (
       <div style={{ display: 'grid', gap: 12, padding: 24 }}>
-        <ErrorState
+        <Fault
           status={error instanceof ApiError ? error.status : 0}
           message={error instanceof ApiError ? error.detail : '加载失败'}
           onRetry={() => setAttempt((a) => a + 1)}
         />
         {/* 分流失败不该变成死路 —— 任务列表始终可达，客户在那儿一样能点进去 */}
-        <Link href={TASKS_ROUTE} className={ui.rowLink}>
+        <Link href={TASKS_ROUTE} className={kit.rowLink}>
           直接去任务列表 →
         </Link>
       </div>
     )
   }
 
-  return <div style={{ color: 'var(--text-tertiary)', padding: 24 }}>正在进入…</div>
+  return <div style={{ color: 'var(--text-3)', padding: 24 }}>正在进入…</div>
 }

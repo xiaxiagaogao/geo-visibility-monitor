@@ -17,10 +17,10 @@ import {
   ReadoutBlank,
   ReadoutCount,
   ReadoutRate,
-} from '@/components/record'
-import { HitGrid, type GridColumn } from '@/components/record/HitGrid'
-import { RecordStrip } from '@/components/record/RecordStrip'
-import { TraceBars } from '@/components/record/TraceBars'
+} from '@/components/kit'
+import { HitGrid, type GridColumn } from '@/components/kit/HitGrid'
+import { RecordStrip } from '@/components/kit/RecordStrip'
+import { TraceBars } from '@/components/kit/TraceBars'
 import { ExportGapsButton } from '@/components/runs/ExportGapsButton'
 import { GapList } from '@/components/runs/GapList'
 import { RunNowButton } from '@/components/runs/RunNowButton'
@@ -356,7 +356,7 @@ function TaskHeader({
       ) : null}
 
       {startError ? (
-        <p role="alert" style={{ color: 'var(--pencil-red)', fontSize: 'var(--fs-sm)' }}>
+        <p role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-sm)' }}>
           {startError}
         </p>
       ) : null}
@@ -425,7 +425,7 @@ function RecordPlate({
 
   if (points === null) {
     return (
-      <Plate ruled title="记录">
+      <Plate title="记录">
         <Pending height={128} />
       </Plate>
     )
@@ -441,7 +441,6 @@ function RecordPlate({
 
   return (
     <Plate
-      ruled
       title="记录"
       subtitle={`${points.length} 次运行，本品提及率沿真实时间排开。点纸带上任意一次即可切过去。`}
       right={
@@ -458,8 +457,8 @@ function RecordPlate({
 
       <Notation
         entries={[
-          { swatch: 'var(--trace-own)', label: '本品提及率' },
-          { swatch: 'var(--trace-other)', label: '竞品区间（最低~最高）' },
+          { swatch: 'var(--accent)', label: '本品提及率' },
+          { swatch: 'var(--tick-other)', label: '竞品区间（最低~最高）' },
           { swatch: 'void', label: '空心方标 = 分母不完整' },
         ]}
         note="纵轴 0–100%"
@@ -860,7 +859,7 @@ function RunReport({
                   <Notation
                     entries={[
                       { swatch: 'var(--tick-on)', label: '本品命中' },
-                      { swatch: 'var(--trace-other)', label: '竞品命中' },
+                      { swatch: 'var(--tick-other)', label: '竞品命中' },
                       { swatch: 'var(--tick-off)', label: '未提及（真实的 0）' },
                       { swatch: 'zero', label: '本品挂零' },
                       { swatch: 'void', label: '无有效样本，算不出' },

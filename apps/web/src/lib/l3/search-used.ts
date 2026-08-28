@@ -17,11 +17,18 @@
  * 这和证据页那条「不做 indexOf 兜底」是同一条纪律：**宁可显示降级，
  * 不可显示一个看起来正常的错误。**
  */
-import type { BadgeTone } from '@/components/ui'
+
+/**
+ * 色调名。**刻意在这里自己定义，不从组件层 import** ——
+ * 原来它 `import type { BadgeTone } from '@/components/ui'`，
+ * 那是一条 L3 → 组件层的反向依赖：换一次设计系统就要动纯函数层，
+ * 而纯函数层有 238 条测试钉着。现在表现层自己去做映射（`kit.markTone`）。
+ */
+export type Tone = 'ok' | 'warning' | 'danger' | 'neutral'
 
 export interface SearchUsedLabel {
   text: string
-  tone: BadgeTone
+  tone: Tone
   /** 是不是降级态（= 我们不知道）。真值时界面该用 `Degraded` 而不是 `Badge` */
   degraded: boolean
   /** 鼠标悬停解释，避免用户把三态读成两态 */

@@ -15,9 +15,9 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-3);
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .headSep {
@@ -32,18 +32,18 @@
   font-size: 23px;
   font-weight: 400;
   line-height: 1.45;
-  color: var(--ink);
+  color: var(--text-1);
   margin: 0;
   max-width: 30em;
 }
 
 .promptStamp {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: var(--tr-label);
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--text-3);
   display: block;
   margin-bottom: var(--sp-3);
 }
@@ -56,8 +56,8 @@
 
 .sheet {
   position: relative;
-  background: var(--sheet-sunken);
-  border: 1px solid var(--rule);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: var(--sp-5) var(--sp-6) var(--sp-5) var(--sp-7);
   max-height: 62vh;
@@ -72,7 +72,7 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--rule-strong);
+  background: var(--border-strong);
   opacity: 0.5;
 }
 
@@ -80,7 +80,7 @@
   font-family: var(--font-text);
   font-size: var(--fs-body);
   line-height: var(--lh-prose);
-  color: var(--ink);
+  color: var(--text-1);
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 42em; /* ≈ 42 个汉字一行 */
@@ -90,8 +90,8 @@
 /* ═══ 标注 —— 铅笔划的线，不是荧光笔的块 ═══ */
 
 .mark {
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  border-bottom: 2px solid var(--ink-3);
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  border-bottom: 2px solid var(--text-3);
   border-radius: 2px 2px 0 0;
   padding: 1px 2px;
   color: inherit;
@@ -99,8 +99,8 @@
 
 /* 本品：蓝铅笔。它是这一页要找的东西 */
 .markOwn {
-  background: var(--pencil-blue-wash);
-  border-bottom: 2px solid var(--pencil-blue);
+  background: var(--accent-wash);
+  border-bottom: 2px solid var(--accent);
   border-radius: 2px 2px 0 0;
   padding: 1px 2px;
   color: inherit;
@@ -114,10 +114,10 @@
   gap: var(--sp-2) var(--sp-5);
   margin-top: var(--sp-4);
   padding-top: var(--sp-4);
-  border-top: 1px solid var(--rule);
-  font-family: var(--font-instrument);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .legend mark {
@@ -132,7 +132,7 @@
 }
 
 .orderSep {
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 /* ═══ 不变量对不上 —— 红笔画的告警 ═══
@@ -140,29 +140,29 @@
 
 .mismatch {
   padding: var(--sp-4) var(--sp-5);
-  border: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
-  background: var(--pencil-red-wash);
+  border: 1px solid color-mix(in srgb, var(--down) 45%, transparent);
+  background: var(--down-wash);
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   line-height: 1.7;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .mismatchLead {
   font-family: var(--font-display);
   font-size: var(--fs-title);
-  color: var(--pencil-red);
+  color: var(--down);
   display: block;
   margin-bottom: var(--sp-2);
 }
 
 .mismatchRow {
   margin-top: var(--sp-2);
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
   padding-left: var(--sp-3);
-  border-left: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--down) 45%, transparent);
 }
 
 /* ═══ 截图 ═══ */
@@ -170,7 +170,7 @@
 .shot {
   display: block;
   max-width: 100%;
-  border: 1px solid var(--edge-strong);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
 }
 
@@ -187,7 +187,7 @@
   position: relative;
   counter-increment: cite;
   padding: var(--sp-3) 0 var(--sp-3) var(--sp-6);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 
 .cite:last-child {
@@ -199,10 +199,10 @@
   position: absolute;
   left: 0;
   top: var(--sp-3);
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
   width: var(--sp-5);
   text-align: right;
 }
@@ -210,7 +210,7 @@
 .citeTitle {
   font-size: var(--fs-sm);
   line-height: 1.55;
-  color: var(--pencil-blue);
+  color: var(--accent);
   border-bottom: 1px solid transparent;
 }
 
@@ -223,20 +223,20 @@
   align-items: center;
   gap: var(--sp-3);
   margin-top: 3px;
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .citeIndex {
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .citeSnippet {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-label);
   line-height: 1.7;
-  color: var(--ink-2);
+  color: var(--text-2);
   max-width: 46em;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -250,14 +250,14 @@
 .snippetCell {
   max-width: 30ch;
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
   line-height: 1.6;
 }
 
 .metaCell {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 @media (max-width: 900px) {

@@ -13,7 +13,7 @@
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 
 .row:last-child {
@@ -25,7 +25,7 @@
 .label {
   font-size: var(--fs-body);
   line-height: 1.55;
-  color: var(--ink);
+  color: var(--text-1);
   min-width: 0;
 }
 
@@ -43,22 +43,22 @@
 .rate {
   font-size: var(--fs-body);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 /* 挂零是结论，不是缺陷 —— 但要一眼看得出来 */
 .rate[data-zero] {
-  color: var(--pencil-red);
+  color: var(--down);
 }
 
 .rate[data-void] {
-  color: var(--ink-3);
+  color: var(--text-3);
   font-weight: 400;
 }
 
 .frac {
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 /* ═══ 命中矩阵 ═══ */
@@ -77,14 +77,14 @@
 .gridCorner,
 .gridHead {
   padding: 0 var(--sp-2) var(--sp-3);
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--ink-3);
+  color: var(--text-3);
   text-align: center;
   white-space: nowrap;
-  border-bottom: 1px solid var(--edge-strong);
+  border-bottom: 1px solid var(--border-strong);
 }
 
 .gridCorner {
@@ -94,7 +94,7 @@
 
 /* 本品那一列：列头用蓝铅笔，整列有极淡的底 —— 它是读这张表的起点 */
 .gridHeadOwn {
-  color: var(--pencil-blue);
+  color: var(--accent);
 }
 
 .gridRowHead {
@@ -102,7 +102,7 @@
   text-align: left;
   font-weight: 400;
   vertical-align: middle;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
   min-width: 220px;
   max-width: 340px;
 }
@@ -111,20 +111,20 @@
   display: block;
   font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .gridRowMeta {
   display: block;
   margin-top: 3px;
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .gridCell {
   padding: var(--sp-3) var(--sp-2);
-  border-bottom: 1px solid var(--rule);
-  border-left: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   text-align: center;
   vertical-align: middle;
   min-width: 74px;
@@ -134,26 +134,26 @@
   display: block;
   margin-top: 6px;
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
   white-space: nowrap;
 }
 
 /* 本品挂零 —— 这个产品的核心结论，整格描红。
    竞品没出现不用这个样式（那不是结论，是常态）。 */
 .gridCell[data-kind='zeroOwn'] {
-  background: var(--pencil-red-wash);
-  outline: 1px solid color-mix(in srgb, var(--pencil-red) 45%, transparent);
+  background: var(--down-wash);
+  outline: 1px solid color-mix(in srgb, var(--down) 45%, transparent);
   outline-offset: -1px;
 }
 
 .gridCell[data-kind='zeroOwn'] .gridValue {
-  color: var(--pencil-red);
+  color: var(--down);
   font-weight: 600;
 }
 
 /* 一条有效样本都没有 —— 算不出，不是 0 */
 .gridCell[data-kind='na'] .gridValue {
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 @media (max-width: 900px) {

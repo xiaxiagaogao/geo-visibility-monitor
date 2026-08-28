@@ -4,17 +4,17 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 import runs from '@/components/runs/runs.module.css'
 import {
-  Badge,
+  Mark,
   Button,
-  EmptyState,
-  ErrorState,
-  Panel,
-  PanelNote,
-  Skeleton,
+  Blank,
+  Fault,
+  Plate,
+  Aside,
+  Pending,
   Table,
-  ui,
-  type BadgeTone,
-} from '@/components/ui'
+  kit,
+  type MarkTone,
+} from '@/components/kit'
 import { isSuperadmin, type Role } from '@/lib/api/auth'
 import { ApiError } from '@/lib/api/client'
 import { createUser, deleteUser, listUsers, updateUser, type User } from '@/lib/api/users'
@@ -27,10 +27,10 @@ import {
   workspaceForRole,
 } from '@/lib/l3/users'
 
-const ROLE_TONE: Record<string, BadgeTone> = {
-  superadmin: 'danger',
-  operator: 'accent',
-  client: 'neutral',
+const ROLE_TONE: Record<string, MarkTone> = {
+  superadmin: 'fault',
+  operator: 'own',
+  client: 'plain',
 }
 
 /**
@@ -72,18 +72,17 @@ export function UsersView() {
   // 但运营点进来会拿到一个 403，说清楚比让他看「加载失败 403」强
   if (!isSuperadmin(me)) {
     return (
-      <Panel title="用户管理">
-        <EmptyState>
-          <strong style={{ color: 'var(--text-secondary)' }}>只有超级管理员能管理用户</strong>
-          <span>这不是界面限制 —— 接口本身就只对超管开放。</span>
-        </EmptyState>
-      </Panel>
+      <Plate title="用户管理">
+        <Blank lead="只有超级管理员能管理用户">
+          这不是界面限制 —— 接口本身就只对超管开放。
+        </Blank>
+      </Plate>
     )
   }
 
   if (error) {
     return (
-      <ErrorState
+      <Fault
         status={error instanceof ApiError ? error.status : 0}
         message={error instanceof ApiError ? error.detail : '加载失败'}
         onRetry={reload}
@@ -94,19 +93,19 @@ export function UsersView() {
   if (users === null) {
     return (
       <div style={{ display: 'grid', gap: 8 }}>
-        <Skeleton height={20} />
-        <Skeleton height={20} />
+        <Pending height={20} />
+        <Pending height={20} />
       </div>
     )
   }
 
   return (
     <div className={runs.panelStack}>
-      <Panel
+      <Plate
         title="用户"
         subtitle="客户只能看到自己 workspace 下的品牌；超管与运营看全部"
         right={
-          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
             共 {users.length} 个
           </span>
         }
@@ -133,7 +132,7 @@ export function UsersView() {
             ))}
           </tbody>
         </Table>
-      </Panel>
+      </Plate>
 
       <CreateUserPanel onCreated={reload} />
     </div>
@@ -177,17 +176,17 @@ function UserRow({
         {user.email}
         {isSelf ? (
           <span style={{ marginLeft: 6 }}>
-            <Badge tone="accent">你自己</Badge>
+            <Mark tone="own">你自己</Mark>
           </span>
         ) : null}
         {err ? (
-          <div role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+          <div role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
             {err}
           </div>
         ) : null}
         {armed ? (
-          <div className={ui.deleteWarn} role="alert">
-            <strong style={{ color: 'var(--danger)' }}>删除「{user.email}」？</strong>
+          <div className={kit.deleteWarn} role="alert">
+            <strong style={{ color: 'var(--down)' }}>删除「{user.email}」？</strong>
             他的全部会话会一起失效，无法撤销。
             <br />
             只是想暂时禁止他登录 → 点<strong>停用</strong>，账号和历史都留着。
@@ -196,19 +195,19 @@ function UserRow({
       </td>
 
       <td>
-        <Badge tone={ROLE_TONE[user.role] ?? 'neutral'}>{roleLabel(user.role)}</Badge>
+        <Mark tone={ROLE_TONE[user.role] ?? 'neutral'}>{roleLabel(user.role)}</Mark>
       </td>
 
-      <td className={ui.numeric}>
+      <td className={kit.numeric}>
         {/* 超管/运营是 null，显示 — 而不是空白：空白看起来像没加载出来 */}
         {user.workspace_id ?? '—'}
       </td>
 
       <td>
-        {user.is_active ? <Badge tone="ok">启用中</Badge> : <Badge tone="warning">已停用</Badge>}
+        {user.is_active ? <Mark tone="ok">启用中</Mark> : <Mark tone="warn">已停用</Mark>}
       </td>
 
-      <td className={ui.numeric} style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+      <td className={kit.numeric} style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
         {user.last_login_at ? user.last_login_at.slice(0, 16).replace('T', ' ') : '从未登录'}
       </td>
 
@@ -242,8 +241,8 @@ function UserRow({
         {isSelf ? (
           <div
             style={{
-              fontSize: 'var(--fs-2xs)',
-              color: 'var(--text-tertiary)',
+              fontSize: 'var(--fs-micro)',
+              color: 'var(--text-3)',
               textAlign: 'right',
               marginTop: 2,
             }}
@@ -300,12 +299,12 @@ function CreateUserPanel({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Panel title="新建用户">
-      <form onSubmit={onSubmit} className={ui.formGrid}>
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>邮箱</span>
+    <Plate title="新建用户">
+      <form onSubmit={onSubmit} className={kit.formGrid}>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>邮箱</span>
           <input
-            className={ui.input}
+            className={kit.input}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -315,10 +314,10 @@ function CreateUserPanel({ onCreated }: { onCreated: () => void }) {
           />
         </label>
 
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>初始密码</span>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>初始密码</span>
           <input
-            className={ui.input}
+            className={kit.input}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -326,16 +325,16 @@ function CreateUserPanel({ onCreated }: { onCreated: () => void }) {
             required
             autoComplete="new-password"
           />
-          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
             长度不够的话后端会拒绝并告诉你最短几位 —— 这里不复制那个数字，
             免得两边对不上。
           </span>
         </label>
 
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>角色</span>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>角色</span>
           <select
-            className={ui.input}
+            className={kit.input}
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
             disabled={busy}
@@ -351,10 +350,10 @@ function CreateUserPanel({ onCreated }: { onCreated: () => void }) {
         {/* 只有客户显示这一项。超管/运营的 workspace 会被后端置 null ——
             给他们留着输入框，填了不生效而界面看起来像生效了 */}
         {needsWorkspace(role) ? (
-          <label className={ui.field}>
-            <span className={ui.fieldLabel}>workspace_id</span>
+          <label className={kit.field}>
+            <span className={kit.fieldLabel}>workspace_id</span>
             <input
-              className={ui.input}
+              className={kit.input}
               type="number"
               min={1}
               value={workspaceId}
@@ -363,16 +362,16 @@ function CreateUserPanel({ onCreated }: { onCreated: () => void }) {
               required
               style={{ maxWidth: 160 }}
             />
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
               他只能看到这个 workspace 下的品牌。填错的话他登录进来会看到别人的数据，
               或者什么都看不到 —— 在品牌页能查到每个品牌属于哪个 workspace。
             </span>
           </label>
         ) : (
-          <PanelNote>
+          <Aside>
             {roleLabel(role)}看<strong>全部</strong> workspace 的数据，
             所以没有 workspace 这一项 —— 后端会把它置空。
-          </PanelNote>
+          </Aside>
         )}
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -382,11 +381,11 @@ function CreateUserPanel({ onCreated }: { onCreated: () => void }) {
         </div>
 
         {err ? (
-          <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+          <p role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
             {err}
           </p>
         ) : null}
       </form>
-    </Panel>
+    </Plate>
   )
 }

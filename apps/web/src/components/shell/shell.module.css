@@ -1,11 +1,14 @@
 /* ══════════════════════════════════════════════════════════════════
-   壳 —— 仪器的机身：左边一条脊，右边是摊开的记录
+   壳 —— 情报终端：左边一条稳的侧栏，右边是尽量大的内容区
+
+   风格情报 §4.1（Resend）：「侧栏稳、内容区大、主按钮白底黑字」。
+   §7.3：仪表盘 padding 小于落地页，监测台允许「满」。
    ══════════════════════════════════════════════════════════════════ */
 
 .root {
   display: flex;
   min-height: 100vh;
-  background: var(--ground);
+  background: var(--canvas);
 }
 
 /* ═══ 侧栏 ═══ */
@@ -19,25 +22,9 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--sheet);
-  border-right: 1px solid var(--edge);
+  background: var(--canvas);
+  border-right: 1px solid var(--border);
   overflow: hidden;
-}
-
-/* 脊上那道刻线：竖着的分钟刻线，把侧栏读成仪器的边框而不是一块灰底 */
-.sidebar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 3px;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--rule) 0 1px,
-    transparent 1px 7px
-  );
-  pointer-events: none;
 }
 
 .brand {
@@ -45,14 +32,14 @@
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 
 .brandMark {
   width: 30px;
   height: 30px;
   flex: none;
-  color: var(--pencil-blue);
+  color: var(--accent);
 }
 
 .brandText {
@@ -65,15 +52,15 @@
   font-family: var(--font-display);
   font-size: 19px;
   line-height: 1.15;
-  color: var(--ink);
+  color: var(--text-1);
   letter-spacing: 0.01em;
 }
 
 .brandSub {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-micro);
   letter-spacing: 0.06em;
-  color: var(--ink-3);
+  color: var(--text-3);
   margin-top: 3px;
   white-space: nowrap;
 }
@@ -96,22 +83,22 @@
   padding: 9px var(--sp-3) 9px var(--sp-4);
   border-radius: var(--r-sm);
   font-size: var(--fs-body);
-  color: var(--ink-2);
+  color: var(--text-2);
   transition:
     background 140ms ease,
     color 140ms ease;
 }
 
 .navItem:hover {
-  background: var(--sheet-sunken);
-  color: var(--ink);
+  background: var(--surface-2);
+  color: var(--text-1);
 }
 
-/* 当前位置 = 触针停在哪一道。左边那道 2px 的蓝铅笔线是「针的位置」，
-   不是装饰性的彩色左边框。 */
+/* 当前位置。左边那道 2px 的强调色是**位置指示**，
+   不是装饰性的彩色左边框（craft floor 点名的那种 side-tab）。 */
 .navItemOn {
-  color: var(--ink);
-  background: var(--pencil-blue-wash);
+  color: var(--text-1);
+  background: var(--accent-wash);
   font-weight: 500;
 }
 
@@ -122,32 +109,32 @@
   top: 6px;
   bottom: 6px;
   width: 2px;
-  background: var(--pencil-blue);
+  background: var(--accent);
   border-radius: var(--r-pill);
 }
 
 .navIcon {
   flex: none;
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .navItemOn .navIcon {
-  color: var(--pencil-blue);
+  color: var(--accent);
 }
 
 .navSep {
   height: 1px;
-  background: var(--rule);
+  background: var(--border);
   margin: var(--sp-3) var(--sp-3);
 }
 
 .sideFoot {
   padding: var(--sp-3) var(--sp-5) var(--sp-5);
-  border-top: 1px solid var(--rule);
-  font-family: var(--font-instrument);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
   font-size: var(--fs-micro);
   letter-spacing: 0.05em;
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 /* ═══ 主区 ═══ */
@@ -172,9 +159,9 @@
   gap: var(--sp-3);
   height: 52px;
   padding: 0 var(--sp-6);
-  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--edge);
+  border-bottom: 1px solid var(--border);
 }
 
 .spacer {
@@ -189,9 +176,9 @@
 }
 
 .userEmail {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -202,10 +189,10 @@
   background: none;
   border: none;
   padding: 0;
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
-  color: var(--pencil-blue);
+  color: var(--accent);
   border-bottom: 1px solid transparent;
 }
 
@@ -214,7 +201,7 @@
 }
 
 .linkBtn:disabled {
-  color: var(--ink-3);
+  color: var(--text-3);
   cursor: not-allowed;
 }
 
@@ -225,18 +212,18 @@
   width: 30px;
   height: 30px;
   flex: none;
-  border: 1px solid var(--edge-strong);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
-  background: var(--sheet);
-  color: var(--ink-2);
+  background: var(--surface-1);
+  color: var(--text-2);
   transition:
     color 140ms ease,
     border-color 140ms ease;
 }
 
 .iconBtn:hover {
-  color: var(--ink);
-  border-color: var(--ink-2);
+  color: var(--text-1);
+  border-color: var(--text-2);
 }
 
 .main {
@@ -267,7 +254,7 @@
     align-items: center;
     gap: var(--sp-2);
     border-right: none;
-    border-bottom: 1px solid var(--edge);
+    border-bottom: 1px solid var(--border);
     overflow-x: auto;
     /* 全局滚动条是 11px 的，压在这条 48px 高的横轨下面太抢眼。
        **不隐藏它** —— 它是「右边还有」的唯一提示，只是收细。 */
@@ -280,11 +267,7 @@
 
   .sidebar::-webkit-scrollbar-thumb {
     border: none;
-    background: var(--edge-strong);
-  }
-
-  .sidebar::after {
-    display: none;
+    background: var(--border-strong);
   }
 
   .brand {

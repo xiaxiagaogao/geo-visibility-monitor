@@ -20,20 +20,20 @@
   font-weight: 400;
   line-height: 1.2;
   margin: 0;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .lede {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-sm);
   line-height: 1.75;
-  color: var(--ink-2);
+  color: var(--text-2);
   max-width: 68ch;
 }
 
 .headline {
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
   white-space: nowrap;
 }
 
@@ -53,41 +53,41 @@
   display: flex;
   align-items: center;
   gap: var(--sp-1);
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: var(--tr-label);
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .bucketValue {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-readout-sm);
   font-weight: 500;
   letter-spacing: var(--tr-readout);
   line-height: var(--lh-tight);
   margin: var(--sp-2) 0 var(--sp-3);
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 /* 「不知道」那一档整体压成次要色 —— 它不是一个成就，是一段缺口 */
 .bucket[data-void] .bucketValue {
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .bucketDenom {
   margin-top: var(--sp-2);
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .bucketAbsent {
   margin-top: var(--sp-2);
   font-size: var(--fs-micro);
   line-height: 1.5;
-  color: var(--ink-3);
-  border-left: 1px dashed var(--edge-strong);
+  color: var(--text-3);
+  border-left: 1px dashed var(--border-strong);
   padding-left: var(--sp-2);
 }
 
@@ -104,7 +104,7 @@
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-2) 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 
 .row:last-child {
@@ -113,14 +113,14 @@
 
 .rank {
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
   text-align: right;
 }
 
 .domain {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  color: var(--ink);
+  color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -129,7 +129,7 @@
 .barCell {
   display: block;
   height: var(--tick-h);
-  background: var(--trace-bed);
+  background: var(--tick-off);
   border-radius: var(--r-xs);
   overflow: hidden;
 }
@@ -137,14 +137,14 @@
 .bar {
   display: block;
   height: 100%;
-  background: var(--trace-own);
+  background: var(--accent);
   border-radius: var(--r-xs);
 }
 
 .count {
   font-size: var(--fs-body);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--text-1);
   text-align: right;
 }
 
@@ -153,13 +153,13 @@
   align-items: baseline;
   gap: 4px;
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .samplesUnit {
   font-family: var(--font-text);
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .flagCell {

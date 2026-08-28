@@ -1,6 +1,6 @@
 import { rate } from '@/lib/l3/rates'
 
-import styles from './record.module.css'
+import styles from './kit.module.css'
 
 /**
  * 刻度尺 —— 这套设计的签名元素。

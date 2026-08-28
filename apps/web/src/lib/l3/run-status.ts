@@ -10,7 +10,7 @@
  */
 import type { RunStatus } from '../types'
 
-/** 徽章色调，对应 `components/ui` 的 `Badge tone` */
+/** 色调名。表现层负责把它映射到自己的记号（`kit.markTone`）—— L3 不认识组件。 */
 export type Tone = 'ok' | 'warning' | 'danger' | 'neutral'
 
 const LABELS: Record<RunStatus, string> = {

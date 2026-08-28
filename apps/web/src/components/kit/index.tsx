@@ -2,11 +2,11 @@ import type { ReactNode } from 'react'
 
 import { formatFraction, formatRate, rate } from '@/lib/l3/rates'
 
-import styles from './record.module.css'
+import styles from './kit.module.css'
 import { TickScale } from './TickScale'
 
 export { TickScale }
-export const rec = styles
+export const kit = styles
 
 /* ══════════════════════════════════════════════════════════════════
    记录纸
@@ -16,21 +16,18 @@ export function Plate({
   title,
   subtitle,
   right,
-  ruled,
   flush,
   children,
 }: {
   title?: ReactNode
   subtitle?: ReactNode
   right?: ReactNode
-  /** 顶端画一条分钟刻线。用在「这是一份记录」要被强调的地方，别处处都画 */
-  ruled?: boolean
   /** 内容自己管内边距（表格、全宽图元） */
   flush?: boolean
   children?: ReactNode
 }) {
   return (
-    <section className={`${styles.plate} ${ruled ? styles.plateRuled : ''}`}>
+    <section className={styles.plate}>
       <div className={flush ? '' : styles.platePad}>
         {title || right ? (
           <div className={styles.plateHead}>
@@ -344,7 +341,7 @@ export function Notation({ entries, note }: { entries: NotationEntry[]; note?: R
             className={styles.notationKey}
             style={
               e.swatch === 'void'
-                ? { border: '1px dashed var(--edge-strong)' }
+                ? { border: '1px dashed var(--border-strong)' }
                 : e.swatch === 'zero'
                   ? { boxShadow: 'inset 0 0 0 1.5px var(--tick-zero)' }
                   : { background: e.swatch }
@@ -353,7 +350,7 @@ export function Notation({ entries, note }: { entries: NotationEntry[]; note?: R
           {e.label}
         </span>
       ))}
-      {note ? <span style={{ marginLeft: 'auto', color: 'var(--ink-3)' }}>{note}</span> : null}
+      {note ? <span style={{ marginLeft: 'auto', color: 'var(--text-3)' }}>{note}</span> : null}
     </div>
   )
 }

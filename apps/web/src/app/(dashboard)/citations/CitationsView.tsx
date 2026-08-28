@@ -13,7 +13,7 @@ import {
   Plate,
   Select,
   TickScale,
-} from '@/components/record'
+} from '@/components/kit'
 import { brandNameMap, listBrands } from '@/lib/api/brands'
 import { fetchCitationDomains } from '@/lib/api/citations'
 import { ApiError } from '@/lib/api/client'
@@ -204,7 +204,6 @@ function SearchBuckets({ counts }: { counts: CountsResponse | null }) {
 
   return (
     <Plate
-      ruled
       title="这批样本，我们知道多少"
       subtitle="下面那张榜只可能来自「已联网」那一档。所以得先说清楚它占多大比例。"
     >
@@ -317,7 +316,7 @@ function DomainBoard({
 
       <Notation
         entries={[
-          { swatch: 'var(--trace-own)', label: '引用次数' },
+          { swatch: 'var(--accent)', label: '引用次数' },
           { swatch: 'zero', label: '集中引用：平均每条样本引它 2 次以上' },
         ]}
         note="口径：一个域名在一条回答里被引 3 次就计 3"

@@ -1,6 +1,6 @@
 'use client'
 
-import { Mark, markTone, Select } from '@/components/record'
+import { Mark, markTone, Select } from '@/components/kit'
 import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
 import type { Run } from '@/lib/types'
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { SampleTable } from '@/components/runs/SampleTable'
 import runs from '@/components/runs/runs.module.css'
-import { Aside, Blank, Button, Fault, Pending } from '@/components/record'
+import { Aside, Blank, Button, Fault, Pending } from '@/components/kit'
 import { ApiError } from '@/lib/api/client'
 import { countRunJobs } from '@/lib/api/crawl-jobs'
 import { listRunSamples } from '@/lib/api/responses'

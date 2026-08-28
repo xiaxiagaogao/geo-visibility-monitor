@@ -28,7 +28,7 @@
   font-weight: 400;
   line-height: 1.2;
   margin: 0;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .meta {
@@ -37,9 +37,9 @@
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-3);
   margin-top: var(--sp-2);
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .metaSep {
@@ -54,9 +54,9 @@
 }
 
 .reason {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
   max-width: 150px;
   line-height: 1.4;
 }
@@ -81,8 +81,8 @@
   flex-wrap: wrap;
   gap: var(--sp-2);
   padding: var(--sp-3);
-  background: var(--amber-wash);
-  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+  background: var(--warn-wash);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   border-radius: var(--r-sm);
   max-width: 720px;
 }
@@ -90,7 +90,7 @@
 .confirmText {
   font-size: var(--fs-sm);
   line-height: 1.6;
-  color: var(--ink);
+  color: var(--text-1);
   flex-basis: 100%;
 }
 
@@ -102,7 +102,7 @@
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 
 .gapRow:last-child {
@@ -112,14 +112,14 @@
 .gapPrompt {
   font-size: var(--fs-body);
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .gapWho {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   line-height: 1.7;
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .gapScore {
@@ -130,7 +130,7 @@
 
 .samplePrompt {
   font-size: var(--fs-sm);
-  color: var(--ink);
+  color: var(--text-1);
   line-height: 1.5;
 }
 
@@ -138,7 +138,7 @@
   margin-top: 3px;
   font-size: var(--fs-label);
   font-family: var(--font-text);
-  color: var(--ink-3);
+  color: var(--text-3);
   line-height: 1.6;
   max-width: 52ch;
   display: -webkit-box;
@@ -149,27 +149,27 @@
 }
 
 .samplePlatform {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .sampleNote {
   margin-top: 4px;
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
 .sampleRank {
   margin-left: 6px;
   font-size: var(--fs-micro);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .sampleSnippet {
   font-size: var(--fs-label);
-  color: var(--ink-2);
+  color: var(--text-2);
   line-height: 1.6;
   max-width: 26ch;
   display: -webkit-box;
@@ -190,11 +190,11 @@
 }
 
 .filterLabel {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: var(--tr-label);
-  color: var(--ink-3);
+  color: var(--text-3);
   margin-right: var(--sp-1);
 }
 
@@ -205,26 +205,26 @@
   height: 27px;
   padding: 0 11px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--edge-strong);
-  background: var(--sheet-raised);
-  font-family: var(--font-instrument);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
-  color: var(--ink-2);
+  color: var(--text-2);
   transition:
     border-color 140ms ease,
     color 140ms ease;
 }
 
 .chip:hover:not(:disabled) {
-  border-color: var(--ink-2);
-  color: var(--ink);
+  border-color: var(--text-2);
+  color: var(--text-1);
 }
 
 .chip[aria-pressed='true'] {
-  border-color: var(--pencil-blue);
-  background: var(--pencil-blue-wash);
-  color: var(--pencil-blue);
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
 }
 
 .chip:disabled {
@@ -237,7 +237,7 @@
 .tabs {
   display: flex;
   gap: var(--sp-5);
-  border-bottom: 1px solid var(--edge-strong);
+  border-bottom: 1px solid var(--border-strong);
   margin-bottom: var(--sp-5);
 }
 
@@ -248,16 +248,16 @@
   border: none;
   font-family: var(--font-display);
   font-size: var(--fs-title);
-  color: var(--ink-3);
+  color: var(--text-3);
   transition: color 140ms ease;
 }
 
 .tab:hover {
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .tabOn {
-  color: var(--ink);
+  color: var(--text-1);
 }
 
 .tabOn::after {
@@ -267,15 +267,15 @@
   right: 0;
   bottom: -1px;
   height: 2px;
-  background: var(--pencil-blue);
+  background: var(--accent);
 }
 
 .tabCount {
   margin-left: 6px;
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 @media (max-width: 900px) {
@@ -301,14 +301,14 @@
   gap: var(--sp-4);
   padding-top: var(--sp-4);
   margin-top: var(--sp-2);
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--border);
 }
 
 .pagerInfo {
-  font-family: var(--font-instrument);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-label);
-  color: var(--ink-3);
+  color: var(--text-3);
 }
 
 .pagerButtons {

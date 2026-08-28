@@ -6,15 +6,15 @@ import { useCallback, useEffect, useState } from 'react'
 
 import runs from '@/components/runs/runs.module.css'
 import {
-  Badge,
+  Mark,
   Button,
-  EmptyState,
-  ErrorState,
-  Panel,
-  PanelNote,
-  Skeleton,
-  ui,
-} from '@/components/ui'
+  Blank,
+  Fault,
+  Plate,
+  Aside,
+  Pending,
+  kit,
+} from '@/components/kit'
 import { canWrite } from '@/lib/api/auth'
 import {
   deleteBrand,
@@ -79,7 +79,7 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
 
   if (error) {
     return (
-      <ErrorState
+      <Fault
         status={error instanceof ApiError ? error.status : 0}
         message={
           error instanceof ApiError && error.status === 404
@@ -96,8 +96,8 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
   if (!brand) {
     return (
       <div style={{ display: 'grid', gap: 12 }}>
-        <Skeleton height={28} width="40%" />
-        <Skeleton height={180} />
+        <Pending height={28} width="40%" />
+        <Pending height={180} />
       </div>
     )
   }
@@ -110,17 +110,17 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
         <div>
           <h1 className={runs.taskTitle}>
             {brand.name}
-            {brand.name_en ? <Badge>{brand.name_en}</Badge> : null}
+            {brand.name_en ? <Mark>{brand.name_en}</Mark> : null}
           </h1>
           <div className={runs.taskMeta}>
             <span>{brand.industry || '未填行业'}</span>
             <span>·</span>
-            <span className={ui.numeric}>workspace {brand.workspace_id}</span>
+            <span className={kit.numeric}>workspace {brand.workspace_id}</span>
             <span>·</span>
             <span>{taskCount === null ? '—' : `${taskCount} 个任务`}</span>
           </div>
         </div>
-        <Link href="/brands" className={ui.rowLink}>
+        <Link href="/brands" className={kit.rowLink}>
           ← 品牌列表
         </Link>
       </div>
@@ -184,31 +184,31 @@ function BasicPanel({
   }
 
   return (
-    <Panel title="基本信息">
-      <div className={ui.formGrid}>
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>品牌名</span>
+    <Plate title="基本信息">
+      <div className={kit.formGrid}>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>品牌名</span>
           <input
-            className={ui.input}
+            className={kit.input}
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={!writable || busy}
             maxLength={200}
           />
         </label>
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>英文名</span>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>英文名</span>
           <input
-            className={ui.input}
+            className={kit.input}
             value={nameEn}
             onChange={(e) => setNameEn(e.target.value)}
             disabled={!writable || busy}
           />
         </label>
-        <label className={ui.field}>
-          <span className={ui.fieldLabel}>行业</span>
+        <label className={kit.field}>
+          <span className={kit.fieldLabel}>行业</span>
           <input
-            className={ui.input}
+            className={kit.input}
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
             disabled={!writable || busy}
@@ -217,11 +217,11 @@ function BasicPanel({
 
         {/* workspace_id 只读展示，不给编辑框 —— 后端 BrandUpdate 里根本没有
             这个字段，做个输入框在这儿只会让人以为改得动 */}
-        <div className={ui.field}>
-          <span className={ui.fieldLabel}>workspace_id</span>
-          <div className={ui.numeric} style={{ fontSize: 'var(--fs-body)' }}>
+        <div className={kit.field}>
+          <span className={kit.fieldLabel}>workspace_id</span>
+          <div className={kit.numeric} style={{ fontSize: 'var(--fs-body)' }}>
             {brand.workspace_id}
-            <span style={{ marginLeft: 8, fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+            <span style={{ marginLeft: 8, fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
               不可修改 —— 品牌不能换 workspace
             </span>
           </div>
@@ -238,7 +238,7 @@ function BasicPanel({
           disabled={!name.trim()}
         />
       ) : null}
-    </Panel>
+    </Plate>
   )
 }
 
@@ -278,7 +278,7 @@ function AliasPanel({
   }
 
   return (
-    <Panel
+    <Plate
       title="别名"
       subtitle="L1 靠这些词在回答正文里认出这个品牌。少一个常用写法，就会漏检成「未提及」"
     >
@@ -289,15 +289,15 @@ function AliasPanel({
         disabled={!writable || busy}
         placeholder={'一行一个\nANTA\n安踏体育'}
       />
-      <PanelNote>
+      <Aside>
         <strong>整体替换。</strong>保存时提交的是文本框里的全部内容 ——
         删掉一行就是删掉那个别名。这也意味着清空文本框再保存 = 删光所有别名。
         {brand.aliases.length > 0 ? `当前 ${brand.aliases.length} 个。` : ''}
-      </PanelNote>
+      </Aside>
       {writable ? (
         <SaveBar dirty={dirty} busy={busy} ok={ok} err={err} onSave={save} />
       ) : null}
-    </Panel>
+    </Plate>
   )
 }
 
@@ -346,14 +346,14 @@ function CompetitorPanel({
   }
 
   return (
-    <Panel
+    <Plate
       title="竞品"
       subtitle="缺口清单与失分量跟谁比，由这一组决定。列表顺序就是命中矩阵的列顺序"
     >
       {/* 已选的按顺序摆出来 —— 顺序是矩阵列顺序的唯一依据，藏在勾选框里看不出来 */}
       <div className={styles.orderStrip}>
         {ids.length === 0 ? (
-          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-3)' }}>
             还没选竞品 —— 缺口清单会永远是空的（没有竞品在场，就判不出缺口）
           </span>
         ) : (
@@ -378,10 +378,9 @@ function CompetitorPanel({
       </div>
 
       {others.length === 0 ? (
-        <EmptyState>
-          <strong style={{ color: 'var(--text-secondary)' }}>没有别的品牌可选</strong>
-          <span>竞品也是品牌行，不是字符串 —— 先把竞品当作品牌建出来。</span>
-        </EmptyState>
+        <Blank lead="没有别的品牌可选">
+          竞品也是品牌行，不是字符串 —— 先把竞品当作品牌建出来。
+        </Blank>
       ) : (
         <div className={styles.pickGrid}>
           {others.map((b) => (
@@ -398,16 +397,16 @@ function CompetitorPanel({
         </div>
       )}
 
-      <PanelNote>
+      <Aside>
         <strong>整体替换，且只影响以后。</strong>竞品集在发起 run 的那一刻被冻结进快照，
         改它<strong>不会</strong>回头改写历史运行的缺口清单 —— 那正是 <span className="mono">run_competitors</span> 存在的理由。
         但下一次运行会按新的这一组算。
-      </PanelNote>
+      </Aside>
 
       {writable ? (
         <SaveBar dirty={dirty} busy={busy} ok={ok} err={err} onSave={save} />
       ) : null}
-    </Panel>
+    </Plate>
   )
 }
 
@@ -434,7 +433,7 @@ function DangerPanel({ brand, taskCount }: { brand: Brand; taskCount: number | n
   return (
     <div className={styles.dangerZone}>
       <p className={styles.dangerText}>
-        <strong style={{ color: 'var(--danger)' }}>删除品牌</strong>
+        <strong style={{ color: 'var(--down)' }}>删除品牌</strong>
         {' —— '}
         会<strong>级联删掉</strong>它的提问词、别名、竞品关系，以及挂在它下面的任务、
         运行与证据。
@@ -451,7 +450,7 @@ function DangerPanel({ brand, taskCount }: { brand: Brand; taskCount: number | n
         <Button onClick={() => setArmed(true)}>删除这个品牌</Button>
       ) : (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--danger)' }}>
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--down)' }}>
             确认删除「{brand.name}」？
           </span>
           <Button primary onClick={doDelete} disabled={busy}>
@@ -464,7 +463,7 @@ function DangerPanel({ brand, taskCount }: { brand: Brand; taskCount: number | n
       )}
 
       {err ? (
-        <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)', marginTop: 8 }}>
+        <p role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)', marginTop: 8 }}>
           {err}
         </p>
       ) : null}
@@ -499,7 +498,7 @@ function SaveBar({
       {dirty ? <span className={styles.dirty}>有未保存的改动</span> : null}
       {!dirty && ok ? <span className={styles.saved}>已保存</span> : null}
       {err ? (
-        <span role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)' }}>
+        <span role="alert" style={{ color: 'var(--down)', fontSize: 'var(--fs-label)' }}>
           {err}
         </span>
       ) : null}

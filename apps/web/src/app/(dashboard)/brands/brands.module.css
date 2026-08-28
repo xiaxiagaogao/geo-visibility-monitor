@@ -5,8 +5,8 @@
   padding: 10px;
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
-  background: var(--bg-app);
-  color: var(--text-primary);
+  background: var(--canvas);
+  color: var(--text-1);
   font-size: var(--fs-sm);
   font-family: var(--font-mono);
   line-height: 1.8;
@@ -28,7 +28,7 @@
   padding: var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  background: var(--bg-app);
+  background: var(--canvas);
 }
 
 .pickItem {
@@ -36,15 +36,15 @@
   align-items: center;
   gap: 7px;
   font-size: var(--fs-sm);
-  color: var(--text-secondary);
+  color: var(--text-2);
   padding: 3px 4px;
   border-radius: var(--r-xs);
   cursor: pointer;
 }
 
 .pickItem:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--surface-3);
+  color: var(--text-1);
 }
 
 /* 已选中的顺序条 —— 竞品顺序就是矩阵的列顺序，必须看得见 */
@@ -65,28 +65,28 @@
   padding: 0 6px 0 9px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
-  background: var(--bg-subtle);
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
+  background: var(--surface-2);
+  font-size: var(--fs-label);
+  color: var(--text-2);
 }
 
 .orderNum {
   font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--text-tertiary);
+  font-size: var(--fs-micro);
+  color: var(--text-3);
 }
 
 .chipX {
   background: none;
   border: none;
   padding: 0 2px;
-  color: var(--text-tertiary);
+  color: var(--text-3);
   font-size: var(--fs-sm);
   line-height: 1;
 }
 
 .chipX:hover {
-  color: var(--danger);
+  color: var(--down);
 }
 
 /* ═══ 保存条 ═══ */
@@ -99,26 +99,26 @@
 }
 
 .dirty {
-  font-size: var(--fs-xs);
-  color: var(--warning);
+  font-size: var(--fs-label);
+  color: var(--warn);
 }
 
 .saved {
-  font-size: var(--fs-xs);
-  color: var(--success);
+  font-size: var(--fs-label);
+  color: var(--up);
 }
 
 /* ═══ 危险区 ═══ */
 .dangerZone {
-  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--bg-surface));
-  background: color-mix(in srgb, var(--danger) 5%, var(--bg-surface));
-  border-radius: var(--r-lg);
+  border: 1px solid color-mix(in srgb, var(--down) 30%, var(--surface-1));
+  background: color-mix(in srgb, var(--down) 5%, var(--surface-1));
+  border-radius: var(--r-md);
   padding: var(--sp-4) var(--sp-5);
 }
 
 .dangerText {
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
+  font-size: var(--fs-label);
+  color: var(--text-2);
   line-height: 1.7;
   margin: 0 0 var(--sp-3);
 }
@@ -129,8 +129,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
+  font-size: var(--fs-label);
+  color: var(--text-3);
   font-weight: 500;
   padding-bottom: var(--sp-2);
   border-bottom: 1px solid var(--border);
@@ -139,7 +139,7 @@
 
 .groupCount {
   font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-micro);
   opacity: 0.8;
 }
 
@@ -158,14 +158,14 @@
 /* 停用的压暗但**不隐藏** —— 用户得看得见它还在，
    否则会以为被删了，然后再建一条重复的 */
 .promptOff .promptText {
-  color: var(--text-tertiary);
+  color: var(--text-3);
   text-decoration: line-through;
   text-decoration-color: var(--border-strong);
 }
 
 .promptText {
   font-size: var(--fs-sm);
-  color: var(--text-primary);
+  color: var(--text-1);
   line-height: 1.5;
   word-break: break-word;
 }

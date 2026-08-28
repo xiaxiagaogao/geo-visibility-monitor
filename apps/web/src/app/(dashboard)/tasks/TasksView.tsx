@@ -10,9 +10,9 @@ import {
   markTone,
   Pending,
   Plate,
-  rec,
+  kit,
   Table,
-} from '@/components/record'
+} from '@/components/kit'
 import { brandNameMap, listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
 import { listTasks } from '@/lib/api/tasks'
@@ -68,7 +68,7 @@ export function TasksView() {
         {/* 客户是纯只读，按角色隐藏按钮**只是体验，不是安全边界** ——
             服务端的 require_write 才是。 */}
         {canWrite(me) ? (
-          <Link href="/tasks/new" className={rec.link}>
+          <Link href="/tasks/new" className={kit.link}>
             新建任务 +
           </Link>
         ) : null}
@@ -81,7 +81,7 @@ export function TasksView() {
           onRetry={load}
         />
       ) : (
-        <Plate flush ruled>
+        <Plate flush>
           <div style={{ padding: 'var(--sp-5) var(--sp-6)' }}>
             {tasks === null ? (
               <div style={{ display: 'grid', gap: 8 }}>
