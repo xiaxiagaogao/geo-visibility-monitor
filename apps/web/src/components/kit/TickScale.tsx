@@ -67,7 +67,7 @@ export function TickScale({
     const decades = Math.floor(n / 10)
     return (
       <div
-        className={`${styles.scale} ${styles[size]} ${styles.dense}`}
+        className={`${styles.scale} ${styles[size]}`}
         data-tone={tone}
         data-zero={zero || undefined}
         aria-hidden="true"

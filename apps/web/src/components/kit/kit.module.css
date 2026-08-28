@@ -508,6 +508,22 @@
   border-bottom-color: currentColor;
 }
 
+/* 行内链接 —— 表格里的品牌名、返回链、空态里的去处。
+   ⚠️ 四处代码一直在写 `kit.rowLink`，但**这个类此前根本不存在** ——
+   CSS Modules 查不到就返回 undefined，className 落成空字符串，
+   那四个链接一直以浏览器默认样式渲染（蓝紫下划线），在暗色底上尤其扎眼。
+   它和 `.link` 刻意不同：行链接是**行的主文**，用正文色不抢强调色；
+   `.link` 是页头/面板角上的操作，才用等宽强调色。 */
+.rowLink {
+  color: var(--text-1);
+  border-bottom: 1px solid var(--border-strong);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.rowLink:hover {
+  border-bottom-color: var(--accent);
+}
+
 /* ═══ 三态 ═══ */
 
 .blank {
@@ -780,4 +796,11 @@
 
 .noticesItem:last-child {
   margin-bottom: 0;
+}
+
+/* 数字单元格 —— 等宽 + 表格数字，让同一列的数能按位对齐。
+   ⚠️ 同样是此前不存在的类（`kit.numeric` 被引用了两处却从没定义过）。 */
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }

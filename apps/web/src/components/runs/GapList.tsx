@@ -52,7 +52,7 @@ export function GapList({
             <div className={styles.gapPrompt}>
               {promptText.get(g.promptId) ?? `提问 #${g.promptId}`}
             </div>
-            <div className={styles.taskMeta}>
+            <div className={styles.meta}>
               <Mark tone={g.tier === 'absent' ? 'fault' : 'warn'}>{TIER_LABEL[g.tier]}</Mark>
               <span className="mono">本品 {formatFraction(g.ownM, g.n)}</span>
             </div>
