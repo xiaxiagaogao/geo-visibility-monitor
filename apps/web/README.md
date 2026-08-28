@@ -1,9 +1,10 @@
 # GEO 监测台 · 前端
 
-> **状态：已部署在 https://geo.xg22.top。A1–A8 主线已闭合，配置页也已完成。**
-> 2026-08-23 起在做**视觉改版**：任务列表 / 任务详情 / 证据页 / 新增引用榜
-> 已换成新设计系统，其余 7 个路由还在旧原语上（靠 `legacy-aliases.css` 撑着，
-> 看起来会和新页面不是一套 —— 这是预期的中间态）。进度与欠账见 §10。
+> **状态：已部署在 https://geo.xg22.top（线上跑的是 v1）。A1–A8 主线已闭合。**
+> 2026-08-24：视觉世界换成**「暗色情报终端」**（由 `docs/STYLE-BRIEF.md` 钉死），
+> 全站 13 个路由已统一到这套语言，`legacy-aliases.css` / `components/ui/` /
+> `components/charts/` 已删除。**v2 全部在分支上，生产仍是 v1，等做完一次性替换。**
+> 设计系统见仓库根 `DESIGN.md`；进度与欠账见 §10。
 > 接口契约看 [`docs/API.md`](../../docs/API.md)（唯一权威，本文不重复字段）。
 > 后端职责看 [`docs/BACKEND.md`](../../docs/BACKEND.md)。
 
@@ -15,14 +16,13 @@
 
 ```text
 src/
-  styles/tokens.css      设计 token —— 熏烟纸地震图。**改色前先读文件头那三条**
-  styles/fonts.css       自托管 Martian Mono + 得意黑（子集）
-  styles/legacy-aliases.css  ⚠️ 过渡层，第二批路由改造完就整份删掉
+  styles/tokens.css      设计 token —— 暗色情报终端。**改色前先读文件头那四条**
+  styles/fonts.css       自托管 Geist + Geist Mono + 思源黑体 600 子集
 
-  components/record/     **新原语**：TickScale（签名）· Plate · Instrument/Readout* ·
+  components/canvas/     **签名物件** AnswerCanvas —— 登录页/证据页/报告封面复用同一个
+  components/kit/        原语：TickScale（数据记号）· Plate · Instrument/Readout* ·
                          Mark · Notation · Table · Blank/Fault/Pending ·
-                         RecordStrip（纸带）· TraceBars · HitGrid
-  components/ui/         ⚠️ **旧原语**，只剩第二批那 7 个路由在用，之后整目录删掉
+                         RecordStrip · TraceBars · HitGrid
   components/runs/       RunSwitcher · RunNowButton · GapList · SampleTable（只吃 props）
   components/shell/      Sidebar Topbar ThemeToggle
   components/evidence/   HighlightedText（按 first_offset 切片，不自己搜正文）
@@ -40,8 +40,7 @@ src/
   app/login/             已打通
 ```
 
-`components/charts/`（EmphasisBars · HitMatrix）**已被 `components/record/` 取代**，
-改版第二批收尾时删除。
+`components/ui/` 与 `components/charts/` **已删除** —— 全站只剩一套 token、一套原语。
 
 **取数一律走 `lib/api/`**，没有第二个出口；派生一律走 `lib/l3/`，组件只吃 props。
 **刻意还没有的：** 状态管理库 —— 每个页面自己 `useEffect` 取数就够，
@@ -329,59 +328,62 @@ http://geo.xg22.top, https://geo.xg22.top {
 | A8 客户首页分流 | ✅ 判定在 `lib/l3/home` |
 | **A2/A3/A4 品牌 / 提问词 / 用户管理** | ✅ **已完成**（提问词做在 `brands/[id]/PromptsPanel`，不是独立路由） |
 | **P2-37 联网标注 + 引用来源** | ✅ 证据页渲染引用；样本表加「联网」列 + 四档筛选 |
-| **视觉改版 · 第一批** | ✅ 任务列表 / 任务详情 / 证据页 / **新增引用榜** |
-| **视觉改版 · 第二批** | ⬜ 品牌 · 品牌详情 · 新建品牌 · 新建任务 · 用户 · 登录 · 首页分流 |
+| **视觉改版 v1**（熏烟纸地震图） | ⚠️ **已作废**。上过生产一天，2026-08-24 被风格 brief 替换 |
+| **视觉改版 v2**（暗色情报终端） | ✅ 全站 13 个路由已统一；旧原语与过渡层已删 |
 
 ---
 
-### 视觉改版：已落地的部分
+### 视觉改版：现在是什么
 
-**视觉世界是「熏烟纸地震图记录」**（impeccable seed `e13eab31` · direction · operate ·
-code-led）。方向契约写在 `src/app/layout.tsx` 顶部，以 HTML 注释形式活到生产构建之后
-（`grep 'seed e13eab31' .next/` 能找到 —— 一份构建擦掉的契约没人能审）。
-设计系统的完整记录见仓库根 **`DESIGN.md`**；产品事实见 **`PRODUCT.md`**。
+**视觉世界由 `docs/STYLE-BRIEF.md` 钉死**（用户提供的风格情报），
+不是我发明的、也不是 impeccable 骰子分配的 —— **brief 优先于 roll**。
 
-**为什么是这个世界**（不是审美选择，是数据形态）：
-12 次 run 是时间轴；采集条件变过的地方是纸带上一道**断口**；
-「空白」（161 条 `search_used=unknown`）与「走平的线」（0% 提及）
-在同一张纸上从来不会混淆；**增益即分母** —— 一条没标增益的地震道是废的，
-和「孤零零的百分比没有可信度」是同一句话。
+> 暗色情报终端。一种强调色。回答流是唯一装饰。登录和监测台共用同一个签名物件。
 
-**签名元素是刻度尺**（`components/record/TickScale.tsx`）：
-轨道宽度固定、按分母切成 n 格、命中的 m 格上墨。填充比例 = 比率（可扫读），
-格数与格宽 = 分母。于是「比率永远跟着 m/n」不再只是一条文字纪律，**成了图形本身** ——
+方向契约写在 `src/app/layout.tsx` 顶部，以 HTML 注释形式活到生产构建之后
+（一份构建擦掉的契约没人能审）。**设计系统的完整记录见仓库根 `DESIGN.md`**；
+产品事实见 `PRODUCT.md`。
+
+**签名物件是 Answer Canvas**（`components/canvas/`）：一段模型回答，本品高亮、
+竞品次级、引用行内小票。登录页播它、证据页还是它、将来报告封面还是它 ——
+复用三次以上才叫识别度。
+
+**刻度尺**（`components/kit/TickScale.tsx`）仍在，但它是**数据记号**不是签名物件，
+和 Answer Canvas 不在同一层。它承担「分母可见」：轨道宽度固定、按分母切成 n 格 ——
 提及率 18 格、首位提及率 12 格，一眼看出这两个百分比的分母不一样。
 
 **三处一定要读代码注释再动的地方：**
 
-1. `src/styles/tokens.css` 文件头 —— 色阶跑过 `dataviz` 验证器（浅色与深色各一次，
-   四项全 PASS）。里面写清了一个**实测出来的死区**：三档色阶的中段，
-   白字 3.92:1、墨字 3.93:1，两边都够不到 4.5。所以**色阶只用于不承载文字的填充，
-   格内数值一律 ink-on-sheet**。
-2. `src/styles/legacy-aliases.css` —— **过渡层，第二批做完就整份删掉**。
-   删除条件写在文件头。没有它，还没改造的 7 个路由会一起变成裸页面。
-3. `scripts/fonts/README.md` —— 得意黑是**子集**，只含仓库里出现过的汉字。
+1. `src/styles/tokens.css` 文件头 —— 四条硬约束。最要紧的两条：
+   **文字层级的下沿没有余量**（白 48% 正好 4.98:1，再淡就不合格）；
+   **顺序色阶只用于不承载文字的填充**（三档色阶的中段是死区，
+   白字 3.92、深字 3.93，两边都够不到 4.5）。改色阶要重跑 `dataviz` 验证器。
+2. `scripts/fonts/README.md` —— 中文是**子集**，只含仓库里出现过的汉字。
    **改了界面文案要重跑 `bash scripts/fonts/build-cjk-subset.sh`**，
    否则漏掉的字会单独掉回系统字，一个词里两种字形。
+3. `components/canvas/AnswerCanvas.tsx` —— 高亮只来自 L1 的 `first_offset`，
+   组件内部再验一次不变量，对不上就不画。**这条自检不是摆设**：
+   做登录页时手数的演示偏移全错，高亮落在了「价位」「跑者」上。
 
-**新增的两个 L3 模块**（口径逻辑仍然全部在纯函数里，组件只吃 props）：
+**L3 层的两个新模块**（口径逻辑仍然全部在纯函数里，组件只吃 props）：
 `lib/l3/trend.ts`（跨 run 序列 + 断点判据，19 条测试）、
-`lib/l3/citations.ts`（榜单派生，12 条测试）。测试从 204 涨到 **238**。
+`lib/l3/citations.ts`（榜单派生，12 条测试）。测试共 **238** 条。
 
 ### 还欠的账
 
 1. **⚠️ 招聘方打不开这个站。** 所有页面都要登录 —— 简历链接发出去，看的人没有账号。
    2026-08-23 明确**不做**演示模式/演示账号（「按正常项目做，不要因为演示就乱改」），
    所以这条靠截图与录屏解决。**它仍然没有被解决。**
-2. **仍然没有组件级 / 端到端测试。** 238 条全是纯函数。改版第一批的回归全靠
-   `pnpm lint` + 手工截图 + 浏览器里跑的对比度/溢出审计接住 —— 那不是网。
-   `webapp-testing` 这个 skill 就是干这个的。
-3. **375px 没有直接验过。** 检查轮里那台 Chrome 窗口最小只能到 489px。
-   489px 下四页横向溢出为 0，CSS 里的 min-width 也逐条复查过，
-   但这不等于在真机上验过。
-4. **旧原语 `components/ui/` 还活着**，被第二批那 7 个路由用着。
-   impeccable 检测器在它上面还有 2 条命中（`.kpi::before` 的 3px 彩色左边条、
-   `transition: width`）—— 那批路由改造时一并清掉，然后删掉整个目录。
+2. **仍然没有组件级 / 端到端测试。** 238 条全是纯函数。而 v2 那次全站扫荡
+   一次改了 24 个文件，完全没有网兜着。`webapp-testing` 就是干这个的。
+3. **登录后的页面在 v2 下没有经过人眼确认。** 那一轮 Chrome 扩展断连、
+   浏览器面板又没有会话。代码层面全绿（lint / 238 / build / 检测器结构类 0 命中），
+   视觉未验。
+4. **纸带 `kit/RecordStrip` 还是 v1 的形态。** 按 `STYLE-BRIEF.md` §8.2
+   它应该是**单色面积图**；文件里还留着「纸带 / 触针 / 刻线」这类 v1 注释。
+5. **生产上跑的仍是 v1。** v2 全部在分支上，等做完一次性替换。
+6. **已知分歧（未压掉）**：impeccable 检测器把 **Geist 判为 `overused-font`**，
+   而 `STYLE-BRIEF.md` §7.2 点名它是第一选择。brief 优先，用户 2026-08-24 确认保留。
 
 ### 本机怎么跑
 
@@ -449,17 +451,16 @@ full_text.slice(first_offset, first_offset + matched_term.length) === matched_te
 
 ### 视觉来源
 
-~~风格来自两个 Claude Design 项目（GeoMonitor / L3 设计系统 v2）。~~
-**已被 2026-08-23 的改版整体替换。** 那两稿现在只是历史，别再照它们加新页面。
+**由 `docs/STYLE-BRIEF.md` 钉死**（用户提供的风格情报），不是从零发明、
+也不是 impeccable 骰子分配的结果 —— **brief 优先于 roll**。
 
-现在的来源是一次 impeccable 方向轮：seed `e13eab31`，从 7 个候选里由骰子
-分配到「纸带记录仪」，用户确认留下。完整记录见仓库根 `DESIGN.md`；
-方向契约在 `src/app/layout.tsx` 顶部，能活到生产构建之后。
+历史（都已作废，别再照它们加新页面）：
+- ~~两个 Claude Design 项目（GeoMonitor / L3 设计系统 v2）~~ —— 2026-08-23 替换
+- ~~v1「熏烟纸地震图」，impeccable seed `e13eab31`~~ —— 2026-08-24 替换，
+  它在生产上跑过一天
 
-旧稿留下的一条结论仍然成立、且被新色阶继承：
-**GeoMonitor 原热力图亮度非单调（中段深字压近黑底读不出来），没有照搬。**
-新色阶重新跑过 `dataviz` 验证器，并且发现了同一个问题的更一般形式 ——
-三档色阶的中段本来就是个死区，所以规矩改成「色阶不承载文字」。
+完整设计记录见仓库根 `DESIGN.md`。
+
 
 ### 开发闭环
 
