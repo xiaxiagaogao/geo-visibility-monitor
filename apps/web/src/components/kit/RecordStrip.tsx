@@ -8,13 +8,13 @@ import { comparableSegments, timeAxis, type TrendPoint } from '@/lib/l3/trend'
 import styles from './strip.module.css'
 
 /**
- * 纸带 —— 12 次运行沿真实时间轴摊开。
+ * 历次运行 —— 12 次运行沿真实时间轴摊开。
  *
  * 这是这一版的论点：**这个产品不是仪表盘，是一份记录。**
  *
  * 三件它必须说清楚、而一条普通折线说不清楚的事：
  *
- * 1. **断口。** 平台集变过的地方纸带是断开的，两段之间不连线。
+ * 1. **断口。** 平台集变过的地方线是断开的，两段之间不连。
  *    连起来就是把口径变化伪装成表现变化 —— run 快照这套机制存在的
  *    全部理由就是防这件事（README §2.1）。
  * 2. **分母不完整的那几次**用空心方标，不是实心。partial 的 run 比率会偏高，
@@ -75,7 +75,7 @@ export function RecordStrip({
             role="img"
             aria-label={`${points.length} 次运行的提及率记录`}
           >
-            {/* 纸的刻线 */}
+            {/* 横向刻度 */}
             {GRID.map((g) => (
               <line
                 key={g}
@@ -139,8 +139,8 @@ export function RecordStrip({
               )
             })}
 
-            {/* 每一段的平台集，标在纸带顶端。
-                没有这个标注，一条碎成 5 段的纸带看起来只是「图坏了」；
+            {/* 每一段的平台集，标在这一段顶端。
+                没有这个标注，一条碎成 5 段的线看起来只是「图坏了」；
                 有了它，读者立刻知道每一段是在什么条件下采的、以及为什么不能接着比。 */}
             {segments.map((seg, si) => {
               const first = indexOf.get(seg[0].runId)!

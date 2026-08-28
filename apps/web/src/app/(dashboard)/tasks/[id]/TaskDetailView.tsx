@@ -59,10 +59,10 @@ import { TaskEditPanel } from './TaskEditPanel'
  *
  * 版式在改版中重排过一次，顺序是有理由的：
  *
- *   页头 → **纸带（全部运行）** → 仪器面板（这一次的读数）→ 逐提问 → 缺口 → 矩阵/样本
+ *   页头 → **历次运行（全部 run 的时间线）** → 仪器面板（这一次的读数）→ 逐提问 → 缺口 → 矩阵/样本
  *
- * 纸带排在读数之前，是因为「这一次是 66.7%」这句话单独说出来没有意义 ——
- * 得先知道它在这条记录上处于什么位置、以及中间有没有换过口径。
+ * 时间线排在读数之前，是因为「这一次是 66.7%」这句话单独说出来没有意义 ——
+ * 得先知道它在这条线上处于什么位置、以及中间有没有换过口径。
  *
  * `runId` 不传就落到最新一次运行；传了就钉在那一次。
  * **切 run 是换路由，不是换查询参数** —— 运营要把某一次运行的链接发给客户。
@@ -190,7 +190,7 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
         />
       ) : null}
 
-      {/* 纸带：整个任务的记录。它在读数之前 —— 一个孤零零的「66.7%」
+      {/* 历次运行：整个任务的时间线。它在读数之前 —— 一个孤零零的「66.7%」
           说不清自己处在什么位置。 */}
       <RecordPlate
         taskId={taskId}
@@ -204,7 +204,7 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
         <Plate>
           <Blank lead="这次运行不属于这个任务">
             链接里的 run #{runId} 不在「{task.name}」的运行历史里。
-            用上面的纸带或切换器选一次。
+            用上面的图或切换器选一次。
           </Blank>
         </Plate>
       ) : activeRunId === null ? (
@@ -371,7 +371,7 @@ function TaskHeader({
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   纸带
+   历次运行
    ══════════════════════════════════════════════════════════════════ */
 
 /** 最多画这么多次运行。再往前的记录在这个宽度上挤成一团，读不出东西。 */
@@ -408,7 +408,7 @@ function RecordPlate({
     }
     let alive = true
     setPoints(null)
-    // **allSettled 而不是 all**：一次运行取不到 counts 不该让整条纸带消失。
+    // **allSettled 而不是 all**：一次运行取不到 counts 不该让整条时间线消失。
     // 取不到的那次在 buildTrend 里直接不出现 —— 绝不在轴上补一个 0。
     Promise.allSettled(
       recent.map((r) =>
@@ -431,7 +431,7 @@ function RecordPlate({
 
   if (points === null) {
     return (
-      <Plate title="记录">
+      <Plate title="历次运行">
         <Pending height={128} />
       </Plate>
     )
@@ -447,8 +447,8 @@ function RecordPlate({
 
   return (
     <Plate
-      title="记录"
-      subtitle={`${points.length} 次运行，本品提及率沿真实时间排开。点纸带上任意一次即可切过去。`}
+      title="历次运行"
+      subtitle={`${points.length} 次运行，本品提及率沿真实时间排开。点图上任意一次即可切过去。`}
       right={
         <span className={runs.reason}>
           {torn > 0 ? `${torn} 处断口` : '无断口'}
@@ -483,7 +483,7 @@ function RecordPlate({
                     tone: 'alert' as const,
                     body: (
                       <>
-                        纸带上有 <strong>{torn}</strong> 处断口 ——
+                        这条线上有 <strong>{torn}</strong> 处断口 ——
                         那几处<strong>平台集变过</strong>，前后两段的分母构成不同，
                         <strong>不能直接比</strong>。断口两侧的线是分开画的，不连过去。
                       </>
@@ -740,7 +740,7 @@ function RunReport({
         ]}
       />
 
-      {/* 一块面板，四个读数，中间用刻线分隔 —— 不是四张一样大的卡片 */}
+      {/* 一块面板，四个读数，中间用细线分隔 —— 不是四张一样大的卡片 */}
       <Instrument>
         <ReadoutCount
           label="有效样本"

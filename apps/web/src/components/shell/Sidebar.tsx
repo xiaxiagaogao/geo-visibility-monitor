@@ -36,7 +36,7 @@ export function Sidebar() {
         <TraceMark />
         <div className={styles.brandText}>
           <span className={styles.brandName}>GEO 监测台</span>
-          <span className={styles.brandSub}>AI 回答可见度记录</span>
+          <span className={styles.brandSub}>AI 回答可见度监测</span>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export function Sidebar() {
 }
 
 /**
- * 字标 —— 一段触针走出来的记录：走平、一个尖峰、再走平。
+ * 字标 —— 一段可见度读数：走平、一个尖峰、再走平。
  *
  * 上一版是个放大镜，那是「搜索」的通用符号，和这个产品没关系。
  * 这一枚说的是这个产品实际在做的事：持续记录，偶尔出现一次事件。
@@ -103,9 +103,9 @@ function TraceMark() {
       aria-hidden="true"
     >
       <rect x="1.4" y="1.4" width="27.2" height="27.2" rx="2.5" strokeWidth="1.3" opacity="0.4" />
-      {/* 分钟刻线 */}
+      {/* 刻度 */}
       <path d="M7 5.6v2M12 5.6v2M17 5.6v2M22 5.6v2" strokeWidth="1.1" opacity="0.45" />
-      {/* 触针走过的道 */}
+      {/* 走过的轨迹 */}
       <path d="M4 17h4.4l1.9-3.2 2 8.6 2.3-11.9 2.2 6.8 1.7-2.8H26" />
     </svg>
   )
@@ -132,7 +132,7 @@ function Icon({ children }: { children: ReactNode }) {
   )
 }
 
-/** 记录纸：一张带刻线的纸 */
+/** 底格：带刻度的读数区 */
 function SheetIcon() {
   return (
     <Icon>

@@ -57,7 +57,7 @@
   border-top: 1px dashed var(--border-strong);
 }
 
-/* 分母大到数不清 —— 退化成实心条 + 每 10 个一道刻线 */
+/* 分母大到数不清 —— 退化成实心条 + 每 10 个一道分隔 */
 .denseBed {
   position: relative;
   width: 100%;

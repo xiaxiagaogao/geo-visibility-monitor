@@ -20,7 +20,7 @@ import styles from './kit.module.css'
  *                        而真相是这个数算不出来。
  *   m = 0   **真的是 0** —— n 个格子全空，但第一格描红。
  *                        全空且无标记的话，它和「还在加载」长得一模一样。
- *   n 很大   格宽会掉到亚像素 —— 退化成实心条 + 每 10 格一道刻线。
+ *   n 很大   格宽会掉到亚像素 —— 退化成实心条 + 每 10 格一道分隔。
  *            这个退化本身也是诚实的：分母大到数不清的时候，就别假装能数。
  */
 
@@ -63,7 +63,7 @@ export function TickScale({
   const dense = n > MAX_DISCRETE
 
   if (dense) {
-    // 退化态：实心条 + 每 10 个样本一道刻线
+    // 退化态：实心条 + 每 10 个样本一道分隔
     const decades = Math.floor(n / 10)
     return (
       <div

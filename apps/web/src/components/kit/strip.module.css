@@ -1,4 +1,4 @@
-/* 纸带 —— 见 RecordStrip.tsx 的注释 */
+/* 历次运行的时间线 —— 见 RecordStrip.tsx 的注释 */
 
 .wrap {
   position: relative;
@@ -17,7 +17,7 @@
   display: block;
 }
 
-/* ── 纸的刻线 ── */
+/* ── 横向刻度 ── */
 
 .gridline {
   stroke: var(--border);
@@ -53,7 +53,7 @@
   opacity: 0.5;
 }
 
-/* 触针落在纸上的一个方标。圆点是图表库的默认，方标是记录纸上的记号。 */
+/* 一次运行是一个方标。圆点是图表库的默认，方标是仪器读数的记号。 */
 .mark {
   fill: var(--accent);
   stroke: var(--surface-2);
