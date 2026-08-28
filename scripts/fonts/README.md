@@ -1,6 +1,6 @@
 # 自托管字体
 
-三个文件，共约 188 KB，全部放在 `apps/web/public/fonts/`，由
+五个文件，共约 284 KB，全部放在 `apps/web/public/fonts/`，由
 `apps/web/src/styles/fonts.css` 声明。**不走 Google Fonts CDN** —— 生产在国内访问不稳，
 且外部字体请求会把访问者的 IP 泄给第三方。
 
@@ -11,7 +11,7 @@
 | `NotoSansSC-600-subset.woff2` | [思源黑体 SC](https://github.com/google/fonts/tree/main/ofl/notosanssc)，**静态 wght=600 + 子集化后 193 KB**（原可变 17.7 MB） | SIL OFL 1.1 | 中文**展示字**：字标、页标题、面板标题。仅此三处 |
 
 中文正文、提问词原文、AI 回答原文一律走**系统字栈**（PingFang SC / Noto Sans SC / 微软雅黑）——
-那部分内容是无界的，不可能子集化，硬塞一个 1.1 MB 的 CJK woff2 是拿访问者的流量买设计感。
+那部分内容是无界的，不可能子集化；硬塞一份全字集 CJK woff2 是拿访问者的流量买设计感。
 
 ---
 
@@ -28,4 +28,4 @@ bash scripts/fonts/build-cjk-subset.sh
 需要 Python 3 与网络（首次会下原始字体并在 `/tmp` 建一次性 venv 装 `fonttools`）。
 
 **为什么不干脆全量打包**：全量可变 17.7 MB，静态 600 全字集也有数 MB。这个站的首屏本来就要拉四路接口，
-再加 1.1 MB 字体是把「设计上讲究」变成「用起来更慢」，方向反了。
+再加几 MB 字体是把「设计上讲究」变成「用起来更慢」，方向反了。
