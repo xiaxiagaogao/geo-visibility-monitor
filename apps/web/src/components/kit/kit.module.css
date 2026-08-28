@@ -693,3 +693,91 @@
   line-height: 1.7;
   color: var(--text-2);
 }
+
+/* ═══ 折叠提示条 ═══
+   见 Notices.tsx：把若干条口径警示压成一行，点开才展全文。
+   摘要行带上最重的那一条的语气 —— 折叠不能把警告的分量一起折掉。 */
+
+.notices {
+  border: 1px solid var(--border);
+  border-left: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.noticesAlert {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 7%, var(--surface-1));
+}
+
+.noticesFault {
+  border-left-color: var(--down);
+  background: color-mix(in srgb, var(--down) 7%, var(--surface-1));
+}
+
+.noticesBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: 9px var(--sp-4);
+  background: none;
+  border: none;
+  text-align: left;
+}
+
+.noticesLabels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  min-width: 0;
+}
+
+/* 标签之间用一个点分隔，不用竖线 —— 竖线在这个密度下会读成表格列 */
+.noticesLabel {
+  position: relative;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.noticesLabel + .noticesLabel::before {
+  content: '·';
+  position: absolute;
+  left: calc(var(--sp-4) / -2 - 2px);
+  color: var(--text-3);
+}
+
+.noticesToggle {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.noticesBar:hover .noticesToggle {
+  color: var(--text-1);
+}
+
+.noticesBody {
+  padding: 0 var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+  padding-top: var(--sp-3);
+}
+
+.noticesItem {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+  color: var(--text-2);
+  max-width: 82ch;
+}
+
+.noticesItem:last-child {
+  margin-bottom: 0;
+}

@@ -6,6 +6,7 @@ import styles from './kit.module.css'
 import { TickScale } from './TickScale'
 
 export { TickScale }
+export { Notices, type Notice } from './Notices'
 export const kit = styles
 
 /* ══════════════════════════════════════════════════════════════════

@@ -14,6 +14,8 @@ import {
   Pending,
   Plate,
   Notation,
+  Notices,
+  type Notice,
   ReadoutBlank,
   ReadoutCount,
   ReadoutRate,
@@ -464,30 +466,46 @@ function RecordPlate({
         note="纵轴 0–100%"
       />
 
-      {torn > 0 ? (
-        <div style={{ marginTop: 'var(--sp-4)' }}>
-          <Aside tone="alert">
-            纸带上有 <strong>{torn}</strong> 处断口 ——
-            那几处<strong>平台集变过</strong>，前后两段的分母构成不同，
-            <strong>不能直接比</strong>。断口两侧的线是分开画的，不连过去。
-          </Aside>
-        </div>
-      ) : null}
-
-      {/* 这条限度必须说出来：没断口 ≠ 口径没变 */}
-      <div style={{ marginTop: torn > 0 ? 'var(--sp-3)' : 'var(--sp-4)' }}>
-        <Aside>
-          断口只认<strong>平台集变化</strong>。提问集改过不会在这里显示
-          —— 那要逐次运行取快照比对（{points.length} 次运行就是 {points.length} 个额外请求）。
-          所以<strong>没有断口不等于口径没变过</strong>；带说明的那几次在轴下有一个小三角，
-          把鼠标放上去能看到当时写了什么。
-          {partial > 0 ? (
-            <>
-              {' '}另有 <strong>{partial}</strong> 次运行的分母不完整（空心方标），
-              它们的比率会偏高。
-            </>
-          ) : null}
-        </Aside>
+      {/* 这两条一条都不能删 —— 它们是这个产品拒绝说好听话的地方。
+          但四段说明曾把首屏 307px 占满、把读数全推到折叠线以下，
+          所以改成默认一行、点开展全文（见 kit/Notices）。 */}
+      <div style={{ marginTop: 'var(--sp-4)' }}>
+        <Notices
+          items={[
+            ...(torn > 0
+              ? [
+                  {
+                    label: `${torn} 处口径断点`,
+                    tone: 'alert' as const,
+                    body: (
+                      <>
+                        纸带上有 <strong>{torn}</strong> 处断口 ——
+                        那几处<strong>平台集变过</strong>，前后两段的分母构成不同，
+                        <strong>不能直接比</strong>。断口两侧的线是分开画的，不连过去。
+                      </>
+                    ),
+                  },
+                ]
+              : []),
+            {
+              label: '断点判据的限度',
+              body: (
+                <>
+                  断口只认<strong>平台集变化</strong>。提问集改过不会在这里显示 ——
+                  那要逐次运行取快照比对（{points.length} 次运行就是 {points.length} 个额外请求）。
+                  所以<strong>没有断口不等于口径没变过</strong>；带说明的那几次在轴下有一个小三角，
+                  把鼠标放上去能看到当时写了什么。
+                  {partial > 0 ? (
+                    <>
+                      {' '}另有 <strong>{partial}</strong> 次运行的分母不完整（空心方标），
+                      它们的比率会偏高。
+                    </>
+                  ) : null}
+                </>
+              ),
+            },
+          ]}
+        />
       </div>
     </Plate>
   )
@@ -695,15 +713,28 @@ function RunReport({
 
   return (
     <div className={runs.stack}>
-      {run.status === 'partial' ? (
-        <Aside tone="alert">
-          <strong>部分成功。</strong>
-          {run.n_jobs} 个采样里只有 {den.n_total_responses} 条回来了，
-          分母比预期少一截 —— 下面所有比率都会偏高，别拿它和一次完整运行直接比。
-        </Aside>
-      ) : null}
-
-      {run.note ? <Aside>{run.note}</Aside> : null}
+      {/* 同上：默认一行，点开展全文。
+          「部分成功」必须在读数**之前**出现 —— 它决定那几个比率可不可信。 */}
+      <Notices
+        items={[
+          ...(run.status === 'partial'
+            ? [
+                {
+                  label: '本次部分成功',
+                  tone: 'alert' as const,
+                  body: (
+                    <>
+                      <strong>部分成功。</strong>
+                      {run.n_jobs} 个采样里只有 {den.n_total_responses} 条回来了，
+                      分母比预期少一截 —— 下面所有比率都会偏高，别拿它和一次完整运行直接比。
+                    </>
+                  ),
+                } as Notice,
+              ]
+            : []),
+          ...(run.note ? [{ label: '带运行说明', body: run.note } as Notice] : []),
+        ]}
+      />
 
       {/* 一块面板，四个读数，中间用刻线分隔 —— 不是四张一样大的卡片 */}
       <Instrument>
