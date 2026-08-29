@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { formatFraction, formatRate } from '@/lib/l3/rates'
 import { comparableSegments, timeAxis, type TrendPoint } from '@/lib/l3/trend'
 
-import styles from './strip.module.css'
+import styles from './trendArea.module.css'
 
 /**
  * 历次运行 —— 12 次运行沿真实时间轴摊开，画成**单色面积图**。
@@ -41,7 +41,7 @@ const PAD_B = 18
 const PAD_X = 12
 const GRID = [0, 0.25, 0.5, 0.75, 1]
 
-export function RecordStrip({
+export function TrendArea({
   points,
   activeRunId,
   onPick,

@@ -25,8 +25,8 @@ import {
   kit,
 } from '@/components/kit'
 import { HitGrid, type GridColumn } from '@/components/kit/HitGrid'
-import { RecordStrip } from '@/components/kit/RecordStrip'
 import { TraceBars } from '@/components/kit/TraceBars'
+import { TrendArea } from '@/components/kit/TrendArea'
 import { ExportGapsButton } from '@/components/runs/ExportGapsButton'
 import { GapList } from '@/components/runs/GapList'
 import { RunNowButton } from '@/components/runs/RunNowButton'
@@ -39,11 +39,11 @@ import { fetchPlatforms } from '@/lib/api/config'
 import { fetchRunCounts } from '@/lib/api/counts'
 import { getRun, getTask, listRuns, startRun } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
-import { findGaps } from '@/lib/l3/gaps'
-import { formatFraction, formatRate } from '@/lib/l3/rates'
 import { gapCsvFileName, gapCsvRows } from '@/lib/l3/gap-export'
+import { findGaps } from '@/lib/l3/gaps'
 import { buildMatrix, gapInputsFromMatrix } from '@/lib/l3/matrix'
 import { denominatorParts, platformBars, platformSlices } from '@/lib/l3/platforms'
+import { formatFraction, formatRate } from '@/lib/l3/rates'
 import { runStatusLabel, runStatusTone } from '@/lib/l3/run-status'
 import { buildTrend, incompleteCount, type TrendPoint } from '@/lib/l3/trend'
 import type {
@@ -196,7 +196,7 @@ export function TaskDetailView({ taskId, runId }: { taskId: number; runId?: numb
 
       {/* 历次运行：整个任务的时间线。它在读数之前 —— 一个孤零零的「66.7%」
           说不清自己处在什么位置。 */}
-      <RecordPlate
+      <TrendPlate
         taskId={taskId}
         brandId={task.brand_id}
         runList={runList}
@@ -381,7 +381,7 @@ function TaskHeader({
 /** 最多画这么多次运行。再往前的记录在这个宽度上挤成一团，读不出东西。 */
 const MAX_RUNS_ON_STRIP = 24
 
-function RecordPlate({
+function TrendPlate({
   taskId,
   brandId,
   runList,
@@ -459,7 +459,7 @@ function RecordPlate({
         </span>
       }
     >
-      <RecordStrip
+      <TrendArea
         points={points}
         activeRunId={activeRunId}
         onPick={(id) => router.push(`/tasks/${taskId}/runs/${id}`)}
