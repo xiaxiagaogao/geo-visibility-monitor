@@ -8,19 +8,28 @@ import { comparableSegments, timeAxis, type TrendPoint } from '@/lib/l3/trend'
 import styles from './strip.module.css'
 
 /**
- * 历次运行 —— 12 次运行沿真实时间轴摊开。
+ * 历次运行 —— 12 次运行沿真实时间轴摊开，画成**单色面积图**。
  *
- * 这是这一版的论点：**这个产品不是仪表盘，是一份记录。**
+ * 为什么是面积不是折线（`STYLE-BRIEF.md` §8.2）：这条序列的量纲是
+ * **0–100% 的比率，零点有意义**。面积把「离零点多远」变成可以一眼估量的
+ * 体量，而折线只给出一条高度。同时它让这张图在缩到 128px 高时仍然有主体 ——
+ * 一条 2px 的线在这个高度上几乎只是装饰。
+ *
+ * **单色**：数据只用一个色相（强调色）。竞品是中性灰，不是第二个色相 ——
+ * 这是 emphasis（突出一个、其余灰化），不是类目色板。
  *
  * 三件它必须说清楚、而一条普通折线说不清楚的事：
  *
- * 1. **断口。** 平台集变过的地方线是断开的，两段之间不连。
+ * 1. **断口。** 平台集变过的地方**面积和线都是断开的**，两段之间不连。
  *    连起来就是把口径变化伪装成表现变化 —— run 快照这套机制存在的
  *    全部理由就是防这件事（README §2.1）。
  * 2. **分母不完整的那几次**用空心方标，不是实心。partial 的 run 比率会偏高，
  *    画成和完整运行一样的点，等于说它们一样可信。
  * 3. **竞品是一条区间带，不是 7 条线。** 运营要问的是「我在场上处于什么位置」，
  *    那是区间问题；7 条线在 130px 高的带子里是一团面条。
+ *    ⚠️ 换成面积图之后，竞品带**必须画在本品面积之上**并且带两道实线边 ——
+ *    画在下面的话，本品面积一路填到零点，会把带子的下沿整个盖掉，
+ *    而「我在不在竞品区间内」这个问题正好要看下沿。
  *
  * 横轴按**真实时间**排 —— 12 次里有 5 次挤在同一天，等距排会把
  * 「密集重测」和「隔天一测」画成同一件事。
@@ -75,6 +84,13 @@ export function RecordStrip({
             role="img"
             aria-label={`${points.length} 次运行的提及率记录`}
           >
+            <defs>
+              <linearGradient id="areaFade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" className={styles.areaTop} />
+                <stop offset="100%" className={styles.areaBottom} />
+              </linearGradient>
+            </defs>
+
             {/* 横向刻度 */}
             {GRID.map((g) => (
               <line
@@ -87,28 +103,47 @@ export function RecordStrip({
               />
             ))}
 
-            {/* 竞品区间带，一段一段画 —— 断口处不跨过去 */}
-            {segments.map((seg, si) => {
-              const withBand = seg.filter((p) => p.competitorBand !== null)
-              if (withBand.length < 2) return null
-              const top = withBand.map((p) => {
-                const i = indexOf.get(p.runId)!
-                return `${x(i)},${y(p.competitorBand!.max)}`
-              })
-              const bottom = [...withBand].reverse().map((p) => {
-                const i = indexOf.get(p.runId)!
-                return `${x(i)},${y(p.competitorBand!.min)}`
-              })
+            {/* 竞品区间 —— **每次运行一根须**，不是一条连续的带。
+                这条改动不只是为了让开面积：一条带会把 min/max 在两次运行**之间插值**，
+                而竞品数值只在运行发生的那一刻存在，中间那段是画出来的、不是测出来的。
+                须只陈述测到的东西 —— 和这个产品其余部分同一条规矩。
+                顺带它也不再和本品面积抢地盘：须是线，面积是面，两者不会糊在一起。 */}
+            {points.map((p, i) => {
+              if (p.competitorBand === null) return null
+              const { min, max } = p.competitorBand
+              const cx = x(i)
               return (
-                <polygon
-                  key={`band-${si}`}
-                  className={styles.band}
-                  points={[...top, ...bottom].join(' ')}
-                />
+                <g key={`whisker-${p.runId}`} className={styles.whisker}>
+                  <line x1={cx} x2={cx} y1={y(max)} y2={y(min)} />
+                  <line x1={cx - 3} x2={cx + 3} y1={y(max)} y2={y(max)} />
+                  <line x1={cx - 3} x2={cx + 3} y1={y(min)} y2={y(min)} />
+                </g>
               )
             })}
 
-            {/* 本品的道 */}
+            {/* 本品的面积。一段一段画 —— 断口处不跨过去。
+                渐变从曲线顶端的强调色淡入到零点近乎透明：它是**同一个色相的
+                单序列淡出**，不是把高度二次编码成深浅（那是 value-ramp 反模式）。 */}
+            {segments.map((seg, si) => {
+              const drawable = seg.filter((p) => p.r !== null)
+              if (drawable.length < 2) return null
+              const pts = drawable.map((p) => {
+                const i = indexOf.get(p.runId)!
+                return [x(i), y(p.r!)] as const
+              })
+              const x0 = pts[0][0]
+              const x1 = pts[pts.length - 1][0]
+              const d = [
+                `M${x0},${y(0)}`,
+                ...pts.map(([px, py]) => `L${px},${py}`),
+                `L${x1},${y(0)}`,
+                'Z',
+              ].join(' ')
+              return <path key={`area-${si}`} d={d} className={styles.area} />
+            })}
+
+            {/* 本品的线 —— 压在最上面。面积会被竞品带罩一层灰，
+                这条 2px 的强调色线保证主角在任何重叠处都不糊。 */}
             {segments.map((seg, si) => {
               const drawable = seg.filter((p) => p.r !== null)
               if (drawable.length < 2) return null

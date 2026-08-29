@@ -363,8 +363,15 @@ export function Fault({
    ══════════════════════════════════════════════════════════════════ */
 
 export interface NotationEntry {
-  /** 色块的背景；给 'void' 画成虚线空心 */
-  swatch: string | 'void' | 'zero'
+  /**
+   * 色块的背景。三个特殊值画成形状而不是纯色块：
+   *   'void'     虚线空心 —— 分母不完整
+   *   'zero'     内描边   —— 本品零命中
+   *   'whisker'  带端帽的竖线 —— 区间标记
+   * **图例的形状必须和图上真正画的形状一致。** 历次运行图从「区间带」改成
+   * 「每次运行一根须」之后，图例若还是一个灰方块，读者会去图上找一条带。
+   */
+  swatch: string | 'void' | 'zero' | 'whisker'
   label: string
 }
 
@@ -373,16 +380,26 @@ export function Notation({ entries, note }: { entries: NotationEntry[]; note?: R
     <div className={styles.notation}>
       {entries.map((e) => (
         <span key={e.label} className={styles.notationItem}>
-          <span
-            className={styles.notationKey}
-            style={
-              e.swatch === 'void'
-                ? { border: '1px dashed var(--border-strong)' }
-                : e.swatch === 'zero'
-                  ? { boxShadow: 'inset 0 0 0 1.5px var(--tick-zero)' }
-                  : { background: e.swatch }
-            }
-          />
+          {e.swatch === 'whisker' ? (
+            <svg className={styles.notationKey} viewBox="0 0 10 10" aria-hidden="true">
+              <g className={styles.notationWhisker}>
+                <line x1="5" x2="5" y1="1" y2="9" />
+                <line x1="2" x2="8" y1="1" y2="1" />
+                <line x1="2" x2="8" y1="9" y2="9" />
+              </g>
+            </svg>
+          ) : (
+            <span
+              className={styles.notationKey}
+              style={
+                e.swatch === 'void'
+                  ? { border: '1px dashed var(--border-strong)' }
+                  : e.swatch === 'zero'
+                    ? { boxShadow: 'inset 0 0 0 1.5px var(--tick-zero)' }
+                    : { background: e.swatch }
+              }
+            />
+          )}
           {e.label}
         </span>
       ))}

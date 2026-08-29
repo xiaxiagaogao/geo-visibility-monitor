@@ -861,3 +861,9 @@
   flex-direction: column;
   gap: var(--sp-5);
 }
+
+/* 图例里的「须」标记 —— 形状要和历次运行图上真正画的一致 */
+.notationWhisker line {
+  stroke: var(--tick-other);
+  stroke-width: 1;
+}

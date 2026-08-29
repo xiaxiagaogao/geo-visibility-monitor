@@ -29,19 +29,39 @@
   stroke-width: 1;
 }
 
-/* ── 竞品区间带 ── */
+/* ── 本品的面积 ── */
 
-.band {
-  fill: var(--tick-other);
-  opacity: 0.22;
+.area {
+  fill: url(#areaFade);
 }
 
-/* ── 本品的道 ── */
+/* 渐变的两端。用 <stop> 的 stop-color/stop-opacity 而不是 fill ——
+   写成 CSS 类是为了让明暗两档各自取自己的强调色。 */
+.areaTop {
+  stop-color: var(--accent);
+  stop-opacity: 0.3;
+}
+
+.areaBottom {
+  stop-color: var(--accent);
+  stop-opacity: 0.02;
+}
+
+/* ── 竞品区间：每次运行一根须 ──
+   实色 —— 实测 3.37–3.58:1，过 WCAG 1.4.11 对图形对象的 3:1。
+   1px，比本品那条 2px 细一半：竞品是参照系，不是主角。 */
+
+.whisker line {
+  stroke: var(--tick-other);
+  stroke-width: 1;
+}
+
+/* ── 本品的线 ── */
 
 .trace {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.75;
+  stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
 }

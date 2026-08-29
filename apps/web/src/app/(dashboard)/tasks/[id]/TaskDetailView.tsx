@@ -464,7 +464,7 @@ function RecordPlate({
       <Notation
         entries={[
           { swatch: 'var(--accent)', label: '本品提及率' },
-          { swatch: 'var(--tick-other)', label: '竞品区间（最低~最高）' },
+          { swatch: 'whisker', label: '竞品区间 —— 每次运行的最低~最高' },
           { swatch: 'void', label: '空心方标 = 分母不完整' },
         ]}
         note="纵轴 0–100%"
