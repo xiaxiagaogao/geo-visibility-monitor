@@ -65,6 +65,25 @@ test.describe('口径不变量', () => {
     await page.locator('a[href^="/tasks/"]:not([href$="/new"])').first().click()
     await page.waitForLoadState('networkidle')
 
+    // ⚠️ `networkidle` **不等于读数已经渲染**。读数来自 mount 之后才发的
+    // `/v1/counts`，客户端跳转时 networkidle 可能在那之前就 resolve 了，
+    // 于是 evaluate 跑在骨架屏上、一个读数都找不到。踩过。
+    // 直接轮询「读数出现了没有」，这才是这条用例真正依赖的东西。
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              [...document.querySelectorAll('*')].filter(
+                (el) =>
+                  parseFloat(getComputedStyle(el).fontSize) >= 30 &&
+                  /^\d+(\.\d+)?\s*%?$/.test((el.textContent ?? '').trim()),
+              ).length,
+          ),
+        { message: '等了很久也没有任何大号读数渲染出来' },
+      )
+      .toBeGreaterThan(0)
+
     const readouts = await page.evaluate(() => {
       const out: { label: string; value: string; denom: string }[] = []
       for (const el of document.querySelectorAll('*')) {
@@ -102,9 +121,22 @@ test.describe('口径不变量', () => {
         if (el.children.length) continue
         const t = (el.textContent ?? '').trim()
         if (t !== '0.0%' && t !== '0%') continue
-        // 真的是 0 的话，同一块里必须有 0 / n 这样的分母佐证
-        const block = el.closest('div')?.textContent ?? ''
-        if (!/\d+\s*\/\s*\d+/.test(block)) bad.push(block.slice(0, 60))
+        // 真的是 0 的话，同一个读数块里必须有 0 / n 这样的分母佐证。
+        // ⚠️ **不能用 `closest('div')`** —— 值自己就包在一个只装值的 div 里
+        // （`.bucketValue` 之类），框到的文字就是「0.0%」本身，永远判成没分母。
+        // 往上找几层，直到某一层能看到分母为止。
+        let ok = false
+        let scope: Element | null = el
+        let text = ''
+        for (let up = 0; up < 4 && scope; up++) {
+          scope = scope.parentElement
+          text = scope?.textContent ?? ''
+          if (/\d+\s*\/\s*\d+/.test(text)) {
+            ok = true
+            break
+          }
+        }
+        if (!ok) bad.push(text.slice(0, 60) || t)
       }
       return bad
     })

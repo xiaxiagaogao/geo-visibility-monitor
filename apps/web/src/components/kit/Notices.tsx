@@ -43,11 +43,18 @@ export function Notices({ items, defaultOpen = false }: { items: Notice[]; defau
       : 'plain'
 
   return (
-    <div className={`${styles.notices} ${worst === 'fault' ? styles.noticesFault : ''} ${
-      worst === 'alert' ? styles.noticesAlert : ''
-    }`}>
+    <div
+      /* 端到端测试的锚点。**不能靠按钮上的文字定位** ——
+         那行字会从「展开 N 条」变成「收起」，于是点击之后定位器重新解析时
+         会跳到另一条提示上，测试看起来像「点了没反应」。实际踩过。 */
+      data-notices={worst}
+      className={`${styles.notices} ${worst === 'fault' ? styles.noticesFault : ''} ${
+        worst === 'alert' ? styles.noticesAlert : ''
+      }`}
+    >
       <button
         type="button"
+        data-notices-toggle=""
         className={styles.noticesBar}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}

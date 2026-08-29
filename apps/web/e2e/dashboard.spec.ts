@@ -116,35 +116,40 @@ test.describe('表格孪生', () => {
 test.describe('折叠提示条', () => {
   test('默认一行，展开后全文都在', async ({ authedPage: page }) => {
     await openFirstTask(page)
-    const bar = page.locator('[aria-expanded]').filter({ hasText: '展开' }).first()
+    // ⚠️ **不能用 filter({hasText:'展开'}) 定位** —— 那行字点一下就变成「收起」，
+    // 定位器重新解析时会跳到另一条提示上，测试表现为「点了没反应」。踩过。
+    // 用 data-notices-toggle 这个不随状态变的锚点。
+    const bar = page.locator('[data-notices-toggle]').first()
     if ((await bar.count()) === 0) test.skip(true, '这个任务没有需要提示的口径问题')
 
     await expect(bar).toHaveAttribute('aria-expanded', 'false')
-    const summaryText = await bar.innerText()
+    const collapsedText = await bar.locator('xpath=..').innerText()
 
     await bar.click()
     await expect(bar).toHaveAttribute('aria-expanded', 'true')
 
     // 展开后的正文必须比摘要长得多 —— 折叠不能把内容折没了
-    const whole = await bar.locator('xpath=..').innerText()
-    expect(whole.length, '展开后没有多出内容').toBeGreaterThan(summaryText.length * 2)
+    const expandedText = await bar.locator('xpath=..').innerText()
+    expect(expandedText.length, '展开后没有多出内容').toBeGreaterThan(
+      collapsedText.length * 2,
+    )
   })
 
   test('折叠状态下也看得出有警告 —— 折叠不等于藏', async ({ authedPage: page }) => {
     await openFirstTask(page)
-    const bar = page.locator('[aria-expanded="false"]').filter({ hasText: '展开' }).first()
-    if ((await bar.count()) === 0) test.skip(true, '这个任务没有需要提示的口径问题')
+    const box = page.locator('[data-notices]').first()
+    if ((await box.count()) === 0) test.skip(true, '这个任务没有需要提示的口径问题')
 
-    // 最重的那一条的语气要带到摘要行上（琥珀=alert / 红=fault），
-    // 否则一折叠就把警告的分量一起折掉了。
-    const tone = await bar.locator('xpath=..').evaluate((el) => {
-      const cs = getComputedStyle(el)
-      return { border: cs.borderLeftColor, bg: cs.backgroundColor }
-    })
-    expect(
-      tone.border !== 'rgba(0, 0, 0, 0)' || tone.bg !== 'rgba(0, 0, 0, 0)',
-      '收起状态下这条提示没有任何语气标识',
-    ).toBe(true)
+    // 最重的那一条的语气要带到摘要行上，否则一折叠就把警告的分量一起折掉了。
+    // data-notices 的值就是那个语气，直接断言它，比反推颜色可靠。
+    const worst = await box.getAttribute('data-notices')
+    expect(['plain', 'alert', 'fault']).toContain(worst)
+
+    if (worst !== 'plain') {
+      // 非 plain 必须在收起状态下就有视觉标识
+      const tone = await box.evaluate((el) => getComputedStyle(el).borderLeftColor)
+      expect(tone, '有警告却没有任何视觉标识').not.toBe('rgba(0, 0, 0, 0)')
+    }
   })
 })
 
