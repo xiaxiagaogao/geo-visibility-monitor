@@ -238,6 +238,10 @@ export function TrendArea({
             {points.map((p, i) => (
               <rect
                 key={`hit-${p.runId}`}
+                /* 端到端测试靠这个锚点点中某一次运行。SVG 里有三种 rect
+                   （方标 / 断口留白 / 命中区），靠 nth 位置去点是猜的，
+                   加个属性把它变成确定的。 */
+                data-run-id={p.runId}
                 x={x(i) - 14}
                 y={0}
                 width={28}
