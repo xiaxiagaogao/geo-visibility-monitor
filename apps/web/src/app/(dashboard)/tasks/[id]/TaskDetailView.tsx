@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -20,6 +21,8 @@ import {
   ReadoutBlank,
   ReadoutCount,
   ReadoutRate,
+  Table,
+  kit,
 } from '@/components/kit'
 import { HitGrid, type GridColumn } from '@/components/kit/HitGrid'
 import { RecordStrip } from '@/components/kit/RecordStrip'
@@ -37,6 +40,7 @@ import { fetchRunCounts } from '@/lib/api/counts'
 import { getRun, getTask, listRuns, startRun } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
 import { findGaps } from '@/lib/l3/gaps'
+import { formatFraction, formatRate } from '@/lib/l3/rates'
 import { gapCsvFileName, gapCsvRows } from '@/lib/l3/gap-export'
 import { buildMatrix, gapInputsFromMatrix } from '@/lib/l3/matrix'
 import { denominatorParts, platformBars, platformSlices } from '@/lib/l3/platforms'
@@ -470,6 +474,12 @@ function RecordPlate({
         note="纵轴 0–100%"
       />
 
+      {/* 图的表格孪生。
+          规矩：**悬停卡不能是读到数值的唯一入口** —— 键盘用户够不着，
+          触屏上要长按，读屏软件里那张 SVG 只有一句 aria-label。
+          这张表是同一份数据的 WCAG 干净版本，顺带也是运营复制粘贴的入口。 */}
+      <TrendTable points={points} activeRunId={activeRunId} taskId={taskId} />
+
       {/* 这两条一条都不能删 —— 它们是这个产品拒绝说好听话的地方。
           但四段说明曾把首屏 307px 占满、把读数全推到折叠线以下，
           所以改成默认一行、点开展全文（见 kit/Notices）。 */}
@@ -513,6 +523,69 @@ function RecordPlate({
       </div>
     </Plate>
   )
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   历次运行的表格孪生
+   ══════════════════════════════════════════════════════════════════ */
+
+function TrendTable({
+  points,
+  activeRunId,
+  taskId,
+}: {
+  points: TrendPoint[]
+  activeRunId: number | null
+  taskId: number
+}) {
+  return (
+    <details className={runs.tableTwin}>
+      <summary>看数值（{points.length} 次运行）</summary>
+      <Table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>提及率</th>
+            <th>本品 / 分母</th>
+            <th>竞品最低~最高</th>
+            <th>平台</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {points.map((p) => (
+            <tr key={p.runId} aria-current={p.runId === activeRunId ? 'true' : undefined}>
+              <td>
+                <Link href={`/tasks/${taskId}/runs/${p.runId}`} className={kit.rowLink}>
+                  {fmtWhen(p.at)}
+                </Link>
+              </td>
+              {/* 比率和分母**永远同框** —— 这条在表格里也不松（README §3.1） */}
+              <td className={kit.numeric}>{formatRate(p.r)}</td>
+              <td className={kit.numeric}>{formatFraction(p.m, p.n)}</td>
+              <td className={kit.numeric}>
+                {p.competitorBand
+                  ? `${formatRate(p.competitorBand.min)} ~ ${formatRate(p.competitorBand.max)}`
+                  : '—'}
+              </td>
+              <td>{p.platforms.join(' · ') || '—'}</td>
+              <td>
+                {p.incomplete ? <Mark tone="warn">分母不完整</Mark> : null}
+                {p.breaks.includes('platforms') ? <Mark tone="fault">口径断点</Mark> : null}
+                {p.note ? <span className={runs.reason}>{p.note}</span> : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </details>
+  )
+}
+
+function fmtWhen(iso: string): string {
+  const d = new Date(iso)
+  const z = (x: number) => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`
 }
 
 /* ══════════════════════════════════════════════════════════════════

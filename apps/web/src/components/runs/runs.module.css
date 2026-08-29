@@ -296,3 +296,58 @@
   display: flex;
   gap: var(--sp-2);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   图的表格孪生 —— 默认收起，展开是同一份数据的 WCAG 干净版本
+   ══════════════════════════════════════════════════════════════════ */
+
+.tableTwin {
+  margin-top: var(--sp-4);
+}
+
+.tableTwin > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  cursor: pointer;
+  list-style: none;
+  border-bottom: 1px solid transparent;
+}
+
+.tableTwin > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tableTwin > summary::before {
+  content: '+';
+  font-size: var(--fs-body);
+  line-height: 1;
+}
+
+.tableTwin[open] > summary::before {
+  content: '\2212'; /* − */
+}
+
+.tableTwin > summary:hover {
+  color: var(--text-2);
+  border-bottom-color: var(--border-strong);
+}
+
+.tableTwin > table {
+  margin-top: var(--sp-3);
+}
+
+/* 时间戳和数字列不折行 —— 「2026-08-」/「08 09:06」断成两行会把整表撑高一倍 */
+.tableTwin td:nth-child(-n + 4),
+.tableTwin th:nth-child(-n + 4) {
+  white-space: nowrap;
+}
+
+/* 当前正在看的那一次 —— 和图上的实心方标对应 */
+.tableTwin tr[aria-current] {
+  background: var(--accent-wash);
+}
