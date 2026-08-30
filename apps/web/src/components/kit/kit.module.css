@@ -814,6 +814,25 @@
   min-width: 0;
 }
 
+/* 上一层。排在标题**之上**而不是右上角 —— 它是位置信息，不是操作。
+   等宽小字，比标题弱两档，不和右上角的主操作抢。 */
+.pageBack {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  border-bottom: 1px solid transparent;
+  transition: color var(--dur) var(--ease);
+}
+
+.pageBack:hover {
+  color: var(--text-1);
+  border-bottom-color: var(--border-strong);
+}
+
 /* flex 是给标题行里跟着徽章的页面用的（任务详情）。
    纯文字标题下它等同于普通块，无副作用。 */
 .pageTitle {
@@ -866,4 +885,19 @@
 .notationWhisker line {
   stroke: var(--tick-other);
   stroke-width: 1;
+}
+
+/* 字段下面的补充说明 —— 比 label 弱，但必须够得着 4.5:1 */
+.fieldHint {
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/* 「这个配置会让你白跑一次」这一档。不是错误（表单仍然可以提交），
+   是**提醒**，所以用 warn 不用 down。 */
+.fieldHintAlert {
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  color: var(--warn);
 }

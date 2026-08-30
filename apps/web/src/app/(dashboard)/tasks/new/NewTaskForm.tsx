@@ -1,13 +1,16 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type FormEvent } from 'react'
 
-import { Mark, Button, Fault, Plate, Aside, Pending, kit } from '@/components/kit'
+import { Mark, Button, Fault, PageHead, Plate, Aside, Pending, kit } from '@/components/kit'
 import { listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
 import { fetchPlatforms } from '@/lib/api/config'
-import { createTask } from '@/lib/api/tasks'
+import { listPrompts } from '@/lib/api/prompts'
+import { createTask, listTasks } from '@/lib/api/tasks'
+import { classifyBrands } from '@/lib/l3/brand-roles'
 import type { Brand, PlatformOption } from '@/lib/types'
 
 /**
@@ -33,18 +36,54 @@ export function NewTaskForm() {
   const [samples, setSamples] = useState(3)
   const [busy, setBusy] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  /** null = 还没选品牌 / 数不出来；'loading' = 在数 */
+  const [promptCount, setPromptCount] = useState<number | 'loading' | null>(null)
 
   useEffect(() => {
-    Promise.all([listBrands(), fetchPlatforms()])
-      .then(([b, p]) => {
-        setBrands(b.items)
+    // **下拉里只放监测对象。**
+    //
+    // `/v1/brands` 返回全部 17 个，其中 15 个是只作为竞品参照存在的。
+    // 不筛的话可以给「耐克」建一个任务 —— 那几乎肯定是误操作，而且建完
+    // 才发现要删（删任务是级联的）。判据和品牌列表用的是同一个 L3 函数。
+    Promise.all([listBrands(), listTasks(), fetchPlatforms()])
+      .then(([b, t, p]) => {
+        const roster = classifyBrands(b.items, t.items)
+        const pickable = roster.monitored.map((m) => m.brand)
+        setBrands(pickable)
         setPlatforms(p.items)
         setCrawlMode(p.crawl_mode)
         // 只有一个品牌时直接选上，省一次点击
-        if (b.items.length === 1) setBrandId(b.items[0].id)
+        if (pickable.length === 1) setBrandId(pickable[0].id)
       })
       .catch((e: unknown) => setLoadError(e instanceof Error ? e : new Error(String(e))))
   }, [])
+
+  /**
+   * 选中品牌后去数它有几条**启用中**的提问词。
+   *
+   * 提问集住在品牌详情里，而它是任务的输入 —— 这个先后顺序此前没有任何地方
+   * 说明。一个提问集为空的品牌建出来的任务，跑起来什么都采不到，
+   * 而用户要到「立即运行」之后才发现。
+   */
+  useEffect(() => {
+    if (brandId === '') {
+      setPromptCount(null)
+      return
+    }
+    let alive = true
+    setPromptCount('loading')
+    listPrompts({ brandId, activeOnly: true })
+      .then((r) => {
+        if (alive) setPromptCount(r.items.length)
+      })
+      .catch(() => {
+        // 数不出来不该挡住建任务 —— 它只是个提醒，不是校验
+        if (alive) setPromptCount(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [brandId])
 
   function togglePlatform(code: string) {
     setPicked((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]))
@@ -98,7 +137,14 @@ export function NewTaskForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      <Plate title="新建任务" subtitle="任务盯一个品牌；每次执行会冻结当时的提问集与竞品集">
+      {/* 这一页此前**整页没有 h1** —— 标题塞在面板的 h2 里，和改版前的
+          /brands、/users 是同一个毛病，当时漏了这两个 /new。 */}
+      <PageHead
+        title="新建任务"
+        lede="任务盯一个品牌；每次执行会冻结当时的提问集与竞品集。"
+        back={{ href: '/tasks', label: '检测任务' }}
+      />
+      <Plate>
         <div style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
           <label style={{ display: 'grid', gap: 6 }}>
             <span className={kit.fieldLabel}>品牌</span>
@@ -117,6 +163,29 @@ export function NewTaskForm() {
                 </option>
               ))}
             </select>
+            {/* 提问集是任务的输入，但它住在**品牌**详情里 —— 这个先后顺序
+                此前没有任何地方说明。提问集为空的品牌建出来的任务跑起来
+                什么都采不到，而用户要到「立即运行」之后才发现。 */}
+            {promptCount === 'loading' ? (
+              <span className={kit.fieldHint}>正在数提问集…</span>
+            ) : promptCount === 0 ? (
+              <span className={kit.fieldHintAlert}>
+                这个品牌<strong>还没有启用中的提问词</strong> —— 任务建出来能跑，
+                但一条都采不到。先去{' '}
+                <Link href={`/brands/${brandId}`} className={kit.rowLink}>
+                  它的品牌页
+                </Link>{' '}
+                配提问集。
+              </span>
+            ) : typeof promptCount === 'number' ? (
+              <span className={kit.fieldHint}>
+                这个品牌有 <strong>{promptCount}</strong> 条启用中的提问词，
+                发起运行时会连同竞品集一起冻结。{' '}
+                <Link href={`/brands/${brandId}`} className={kit.rowLink}>
+                  去改
+                </Link>
+              </span>
+            ) : null}
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>

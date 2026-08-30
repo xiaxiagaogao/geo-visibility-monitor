@@ -117,13 +117,9 @@ export function CitationsView({ brandId }: { brandId: number }) {
             口径是这个品牌<strong>全部运行的累计</strong>，不是某一次。
           </>
         }
-        action={
-          /* 换品牌是**回上一层再进另一个**，不是在这里下拉切 ——
-             这一页现在是某个品牌的视图，主语写在 URL 里。 */
-          <Link href={`/brands/${brandId}`} className={kit.rowLink}>
-            ← 回到品牌
-          </Link>
-        }
+        /* 换品牌是**回上一层再进另一个**，不是在这里下拉切 ——
+           这一页现在是某个品牌的视图，主语写在 URL 里。 */
+        back={{ href: `/brands/${brandId}`, label: brandName || '品牌' }}
       />
 
       {error ? (

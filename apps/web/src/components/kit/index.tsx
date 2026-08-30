@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { formatFraction, formatRate, rate } from '@/lib/l3/rates'
@@ -60,6 +61,7 @@ export function PageHead({
   lede,
   meta,
   action,
+  back,
 }: {
   title: ReactNode
   lede?: ReactNode
@@ -67,10 +69,23 @@ export function PageHead({
   meta?: ReactNode
   /** 右上角的主操作或筛选器 */
   action?: ReactNode
+  /**
+   * 上一层。**只写目的地的名字**，不写「回到」「返回」——
+   * 箭头已经说了方向，再加一个动词是重复。
+   *
+   * 做成 PageHead 的能力而不是每页自己写，是因为此前三页各写了一份、
+   * 两种句式（「← 品牌列表」vs「← 回到品牌」），另有三页干脆没有。
+   */
+  back?: { href: string; label: string }
 }) {
   return (
     <div className={styles.pageHead}>
       <div className={styles.pageHeadMain}>
+        {back ? (
+          <Link href={back.href} className={styles.pageBack}>
+            <span aria-hidden="true">←</span> {back.label}
+          </Link>
+        ) : null}
         <h1 className={styles.pageTitle}>{title}</h1>
         {lede ? <p className={styles.pageLede}>{lede}</p> : null}
         {meta ? <div className={styles.pageMeta}>{meta}</div> : null}

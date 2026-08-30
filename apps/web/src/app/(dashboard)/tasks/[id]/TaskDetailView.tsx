@@ -298,6 +298,7 @@ function TaskHeader({
   return (
     <div>
       <PageHead
+        back={{ href: '/tasks', label: '检测任务' }}
         title={
           <>
             {task.name}

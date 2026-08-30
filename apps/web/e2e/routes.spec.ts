@@ -85,6 +85,41 @@ test.describe('路由冒烟', () => {
     }
   })
 
+  test('新建任务只能选监测对象，且会告诉你提问集有多少条', async ({
+    authedPage: page,
+  }) => {
+    await page.goto('/tasks/new', { waitUntil: 'networkidle' })
+    const select = page.locator('select').first()
+    await expect(select).toBeVisible()
+
+    // 下拉里不能出现只作为竞品参照存在的品牌 —— 给「耐克」建任务几乎肯定是误操作
+    const options = await select.locator('option').evaluateAll((els) =>
+      els.map((e) => (e as HTMLOptionElement).value).filter(Boolean),
+    )
+    expect(options.length, '下拉是空的').toBeGreaterThan(0)
+
+    const monitored = await page.evaluate(async () => {
+      const [b, t] = await Promise.all([
+        fetch('/v1/brands').then((r) => r.json()),
+        fetch('/v1/tasks').then((r) => r.json()),
+      ])
+      const withTask = new Set(t.items.map((x: { brand_id: number }) => x.brand_id))
+      const referenced = new Set<number>()
+      for (const x of b.items) for (const c of x.competitor_ids) referenced.add(c)
+      return b.items
+        .filter(
+          (x: { id: number; competitor_ids: number[] }) =>
+            !(referenced.has(x.id) && !withTask.has(x.id) && x.competitor_ids.length === 0),
+        )
+        .map((x: { id: number }) => String(x.id))
+    })
+    expect(options.sort()).toEqual(monitored.sort())
+
+    // 选一个品牌之后必须说清提问集有多少条 —— 它是任务的输入，却住在品牌页
+    await select.selectOption(options[0])
+    await expect(page.getByText(/条启用中的提问词|还没有启用中的提问词/)).toBeVisible()
+  })
+
   test('两个核心实体互相到得了', async ({ authedPage: page }) => {
     // 任务 → 品牌。改版前品牌只是个徽章，点不动。
     await page.goto('/tasks', { waitUntil: 'networkidle' })
@@ -101,6 +136,35 @@ test.describe('路由冒烟', () => {
     await expect(page.getByText(/只看「.+」的任务/)).toBeVisible()
     // 筛选态必须有出口
     await expect(page.getByRole('link', { name: '看全部' })).toBeVisible()
+  })
+
+  /**
+   * 每个非顶级页面都要有一条回上一层的路，且**措辞一致**。
+   * 改版前三页各写了一份、两种句式（「← 品牌列表」vs「← 回到品牌」），
+   * 另有三页干脆没有 —— 包括两个 /new，它们连 h1 都没有。
+   */
+  const NESTED = ['/tasks/new', '/brands/new'] as const
+  for (const path of NESTED) {
+    test(`${path} 有页面级 h1，也有回上一层的路`, async ({ authedPage: page }) => {
+      await page.goto(path, { waitUntil: 'networkidle' })
+      await expect(page.locator('h1')).toHaveCount(1)
+
+      const back = page.getByRole('link', { name: /^←/ }).first()
+      await expect(back, '这一页没有回上一层的路').toBeVisible()
+      // 只写目的地的名字，不写「回到」「返回」—— 箭头已经说了方向
+      expect(await back.innerText()).not.toMatch(/回到|返回/)
+    })
+  }
+
+  test('任务详情和引用榜也各有一条回上一层的路', async ({ authedPage: page }) => {
+    await page.goto('/tasks', { waitUntil: 'networkidle' })
+    await page.locator('a[href^="/tasks/"]:not([href$="/new"])').first().click()
+    await page.waitForLoadState('networkidle')
+    const back = page.getByRole('link', { name: /^←/ }).first()
+    await expect(back).toBeVisible()
+    await back.click()
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(/\/tasks$/)
   })
 
   test('品牌详情能从列表点进去', async ({ authedPage: page }) => {

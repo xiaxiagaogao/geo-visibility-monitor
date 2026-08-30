@@ -132,11 +132,9 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
                 {taskCount} 个任务 →
               </Link>
             ) : null}
-            <Link href="/brands" className={kit.rowLink}>
-              ← 品牌列表
-            </Link>
           </div>
         }
+        back={{ href: '/brands', label: '品牌' }}
       />
 
       <BasicPanel brand={brand} writable={writable} onSaved={reload} />

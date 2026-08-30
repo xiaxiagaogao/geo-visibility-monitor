@@ -147,8 +147,11 @@ export function EvidenceView({
   return (
     <div className={evidence.stack}>
       <div className={evidence.head}>
+        {/* 措辞和全站一致：**只写目的地的名字**，不写「回到」——
+            箭头已经说了方向。（这一页不套 PageHead：它的头部是一行
+            上下文面包屑（任务名 · 样本 # · 平台 · 时间），不是页标题。） */}
         <Link href={`/tasks/${taskId}/runs/${runId}`} className={kit.link}>
-          ← 回到这次运行
+          ← 这次运行
         </Link>
         <span className={evidence.headSep}>·</span>
         <span>{task.name}</span>

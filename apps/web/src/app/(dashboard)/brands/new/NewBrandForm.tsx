@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 
-import { Button, Plate, Aside, kit } from '@/components/kit'
+import { Button, PageHead, Plate, Aside, kit } from '@/components/kit'
 import { createBrand } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
 import { parseAliasLines } from '@/lib/l3/brands'
@@ -53,7 +53,12 @@ export function NewBrandForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      <Plate title="新建品牌" subtitle="别名决定 L1 能不能认出它；竞品建完之后在详情页配">
+      <PageHead
+        title="新建品牌"
+        lede="别名决定 L1 能不能认出它；竞品建完之后在详情页配。"
+        back={{ href: '/brands', label: '品牌' }}
+      />
+      <Plate>
         <div className={kit.formGrid}>
           <label className={kit.field}>
             <span className={kit.fieldLabel}>品牌名</span>
