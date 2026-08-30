@@ -86,24 +86,6 @@ export function classifyBrands(brands: Brand[], tasks: Pick<Task, 'brand_id'>[])
 }
 
 /**
- * 某个监测品牌的竞品，按它自己 `competitor_ids` 的顺序返回。
- *
- * **顺序的唯一依据是 `competitor_ids` 本身**（见 `types.ts` 的注释）——
- * 不许按名字排、也不许拿 counts 里的数组下标当顺序。
- * 找不到的 id 会被跳过而不是塞一个占位：竞品被删掉之后 id 还留在数组里是
- * 可能的，画一个「#41」出来只会让人以为是个真品牌。
- */
-export function competitorsOf(brand: Brand, all: Brand[]): Brand[] {
-  const byId = new Map(all.map((b) => [b.id, b]))
-  const out: Brand[] = []
-  for (const cid of brand.competitor_ids) {
-    const found = byId.get(cid)
-    if (found) out.push(found)
-  }
-  return out
-}
-
-/**
  * 引用榜、以及任何「按被监测品牌看」的视图，默认该落在哪个品牌上。
  *
  * 有任务的优先（引用只可能来自跑过的运行），其次是配了竞品集的。

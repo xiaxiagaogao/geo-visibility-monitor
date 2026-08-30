@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Brand } from '@/lib/types'
 
-import {
-  classifyBrands,
-  competitorsOf,
-  defaultMonitoredBrandId,
-} from './brand-roles'
+import { classifyBrands, defaultMonitoredBrandId } from './brand-roles'
 
 function brand(id: number, name: string, competitor_ids: number[] = []): Brand {
   return {
@@ -85,21 +81,6 @@ describe('classifyBrands', () => {
 
   it('空输入不炸', () => {
     expect(classifyBrands([], [])).toEqual({ monitored: [], reference: [] })
-  })
-})
-
-describe('competitorsOf', () => {
-  it('按 competitor_ids 的顺序返回，不按名字排', () => {
-    const anta = brand(1, '安踏', [3, 2])
-    const all = [anta, brand(2, '阿迪'), brand(3, '耐克')]
-    expect(competitorsOf(anta, all).map((b) => b.name)).toEqual(['耐克', '阿迪'])
-  })
-
-  it('找不到的 id 跳过，不塞占位', () => {
-    // 竞品被删掉之后 id 可能还留在数组里；画一个「#99」会让人以为是真品牌
-    const anta = brand(1, '安踏', [2, 99])
-    const all = [anta, brand(2, '阿迪')]
-    expect(competitorsOf(anta, all).map((b) => b.name)).toEqual(['阿迪'])
   })
 })
 
