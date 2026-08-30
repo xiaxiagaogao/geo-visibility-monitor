@@ -63,10 +63,33 @@ read -s -p "密码: " E2E_PASSWORD && export E2E_PASSWORD && export E2E_EMAIL=�
 | `routes.spec.ts` | 六个路由冒烟 + 口径不变量 + 明暗两档对比度 |
 | `dashboard.spec.ts` | 面积图 / 表格孪生 / 折叠提示条 / 首屏 |
 
-## 两个踩过的坑
+## 红了先看这三件，再怀疑产品
+
+到目前为止**每一次红都在测试或环境侧，一次都不是产品缺陷**。所以顺序是：
+
+1. **跑的是不是我改过的那份代码。** 我在 worktree 里改、用户在主检出跑过一次，
+   中间隔着一次没做的 merge —— 白跑一轮还以为没修好。
+2. **dev server 是不是状态陈旧。** 它跨过 `git mv` 之后会抱着旧的模块图不放，
+   报「Module not found: Can't resolve './CitationsView'」而磁盘上那个 import
+   根本不存在。表现是页面 500、`main` 空、用例超时 —— **失败信息完全不指向真因**。
+   `preview_logs` 一看便知；解法是停掉、`rm -rf .next`、重启。
+3. **`/v1` 是不是连得上。** 代理打的是线上，`ECONNRESET`（TLS 被重置）会让
+   `/v1/auth/me` 拿不到，整页渲染不出来。日志里能看到 `Failed to proxy`。
+
+三条都排除了，再去读 `test-results/<用例>/error-context.md` 的
+**Page snapshot** —— 那里能看出页面当时到底渲染成了什么样。
+
+## 四个踩过的坑
 
 1. **控制台守卫要放过未登录时的 401。** `GET /v1/auth/me` 在未登录时返回 401
    是正确行为，但 Chrome 会记一条 console error。只放过 401，其余照旧算失败。
 2. **`a[href^="/tasks/"]` 会命中页头的「新建任务 +」**（`/tasks/new`），
    点进去是新建表单，后面的断言会以很难懂的方式失败。必须
    `:not([href$="/new"])`。品牌页同理。
+3. **不要按会变的、或被 a11y 改写过的文字定位。** 三类都栽过：
+   点一下就变的按钮文案（「展开 N 条」→「收起」）、`aria-hidden` 的箭头
+   （可访问名里没有它，`name: /^←/` 永远匹配不到）、SVG 里靠 nth 位置猜。
+   一律用稳定锚点：`data-notices-toggle` · `data-page-back` · `data-run-id`。
+4. **`networkidle` 不等于渲染完成。** 读数来自 mount 之后才发的请求。
+   用 `expect.poll` 等真正依赖的东西，且上限要够 dev server 冷编译一条路由
+   （热路由实测 1.8s，冷的会久得多）。
