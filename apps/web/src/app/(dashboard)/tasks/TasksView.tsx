@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -38,20 +39,33 @@ import page from './tasks.module.css'
  */
 export function TasksView() {
   const { me } = useAuth()
+  const params = useSearchParams()
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [brands, setBrands] = useState<Map<number, string>>(new Map())
   const [error, setError] = useState<ApiError | Error | null>(null)
 
+  /**
+   * `?brand=` —— 从品牌页点「N 个任务」过来时带的。
+   *
+   * 筛选**走查询参数而不是路由**，和「切 run 是换路由」刚好相反，这是有理由的：
+   * 一次运行是个**实体**（运营要把它的链接发给客户），而「按品牌筛过的任务列表」
+   * 是这一页的一个**视图状态**。给视图状态造路由段会让 IA 长出假层级。
+   *
+   * 数字之外的值一律当没传 —— URL 是用户能手改的，`?brand=abc` 不该让页面炸。
+   */
+  const brandFilter = Number(params.get('brand'))
+  const filterBrandId = Number.isInteger(brandFilter) && brandFilter > 0 ? brandFilter : null
+
   const load = useCallback(() => {
     setError(null)
     setTasks(null)
-    Promise.all([listTasks(), listBrands()])
+    Promise.all([listTasks(filterBrandId ? { brandId: filterBrandId } : {}), listBrands()])
       .then(([t, b]) => {
         setTasks(t.items)
         setBrands(brandNameMap(b.items))
       })
       .catch((e: unknown) => setError(e instanceof Error ? e : new Error(String(e))))
-  }, [])
+  }, [filterBrandId])
 
   useEffect(load, [load])
 
@@ -65,6 +79,18 @@ export function TasksView() {
             <strong>提问集与竞品集在发起那一刻冻结</strong> ——
             所以两次运行之间的差异是表现变化，不是口径变化。
           </>
+        }
+        meta={
+          /* 筛掉了东西就必须说出来，并且给一条出去的路 ——
+             一个静默筛过的列表会让人以为「任务就这些」。 */
+          filterBrandId !== null ? (
+            <>
+              <span>只看「{brands.get(filterBrandId) ?? `#${filterBrandId}`}」的任务</span>
+              <Link href="/tasks" className={kit.rowLink}>
+                看全部
+              </Link>
+            </>
+          ) : undefined
         }
         action={
           /* 客户是纯只读，按角色隐藏按钮**只是体验，不是安全边界** ——

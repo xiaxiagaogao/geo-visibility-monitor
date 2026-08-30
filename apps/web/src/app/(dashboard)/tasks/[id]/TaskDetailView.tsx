@@ -301,7 +301,12 @@ function TaskHeader({
         title={
           <>
             {task.name}
-            <Mark tone="own">{brandName}</Mark>
+            {/* 品牌是**链接**不是徽章。看到「覆盖缺口 2」时最自然的下一步是
+                「竞品集是谁」—— 那住在品牌页。改版前这里点不动，只能退回
+                侧栏 → 品牌 → 在列表里找。两个核心实体互相到不了。 */}
+            <Link href={`/brands/${task.brand_id}`} className={runs.brandLink}>
+              <Mark tone="own">{brandName}</Mark>
+            </Link>
             {task.is_active ? null : <Mark>已停用</Mark>}
           </>
         }

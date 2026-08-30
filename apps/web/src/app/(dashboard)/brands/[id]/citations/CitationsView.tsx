@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -10,16 +12,15 @@ import {
   Mark,
   Notation,
   Pending,
+  kit,
   PageHead,
   Plate,
-  Select,
   TickScale,
 } from '@/components/kit'
 import { brandNameMap, listBrands } from '@/lib/api/brands'
 import { fetchCitationDomains } from '@/lib/api/citations'
 import { ApiError } from '@/lib/api/client'
 import { fetchBrandCounts } from '@/lib/api/counts'
-import { listTasks } from '@/lib/api/tasks'
 import {
   citationCoverage,
   citationRows,
@@ -49,50 +50,41 @@ const TOP_N = 25
  * 的联网状态是 `unknown`。**先说清楚这件事**，读者才不会把下面那张榜
  * 当成「AI 引用行为的全貌」。
  */
-export function CitationsView() {
-  const [monitored, setMonitored] = useState<{ id: number; name: string }[] | null>(null)
-  const [brandId, setBrandId] = useState<number | null>(null)
+export function CitationsView({ brandId }: { brandId: number }) {
+  const [brandName, setBrandName] = useState<string>('')
   const [domains, setDomains] = useState<CitationDomainsResult | null>(null)
   const [buckets, setBuckets] = useState<CountsResponse | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [attempt, setAttempt] = useState(0)
 
-  // **只列有任务的品牌。**
+  // 品牌 id 从**路由段**来。
   //
-  // `/v1/brands` 返回的是全部品牌，其中绝大多数是**竞品** —— 它们作为对照
-  // 存在于快照里，但没有人为它们跑任务，所以永远不会有引用。
-  // 直接拿 brands[0] 当默认值，一进页面就落在一个竞品上、满屏空态；
-  // 而下拉里 17 个选项有 16 个点进去是空的。
+  // 上一版这里有一整段推断：拉 tasks 和 brands 求交集，只留「有任务的品牌」
+  // 当下拉选项 —— 因为 `/v1/brands` 返回的 17 个里 16 个是竞品，
+  // 直接拿 brands[0] 会一进页面就落在竞品上、满屏空态。
+  // 那段推断是在**补 IA 没说清楚的话**：这一页的主语是谁。
+  // 现在主语写在 URL 里，推断整段删掉。
   //
-  // 「有任务」不是审美判断，是事实：引用榜是按**被监测品牌**看的。
+  // 这里只剩「拿名字显示」这一件事。
   useEffect(() => {
     let alive = true
-    Promise.all([listTasks(), listBrands()])
-      .then(([t, b]) => {
+    listBrands()
+      .then((b) => {
         if (!alive) return
-        const names = brandNameMap(b.items)
-        const seen = new Set<number>()
-        const list: { id: number; name: string }[] = []
-        for (const task of t.items) {
-          if (seen.has(task.brand_id)) continue
-          seen.add(task.brand_id)
-          list.push({ id: task.brand_id, name: names.get(task.brand_id) ?? `#${task.brand_id}` })
-        }
-        setMonitored(list)
-        setBrandId((cur) => cur ?? list[0]?.id ?? null)
+        setBrandName(brandNameMap(b.items).get(brandId) ?? `#${brandId}`)
       })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e : new Error(String(e)))
+      .catch(() => {
+        // 名字取不到不该让整页失败 —— 下面的数据是按 id 取的，和名字无关
+        if (alive) setBrandName(`#${brandId}`)
       })
     return () => {
       alive = false
     }
-  }, [])
+  }, [brandId])
 
   const load = useCallback(() => setAttempt((a) => a + 1), [])
 
   useEffect(() => {
-    if (brandId === null) return
     let alive = true
     setError(null)
     setDomains(null)
@@ -114,12 +106,10 @@ export function CitationsView() {
     }
   }, [brandId, attempt])
 
-  const brandName = monitored?.find((b) => b.id === brandId)?.name ?? ''
-
   return (
     <div className={styles.stack}>
       <PageHead
-        title="引用榜"
+        title={`引用榜 · ${brandName || '…'}`}
         lede={
           <>
             AI 回答里被引用的网页来自哪些站。数据来自千问的 <span className="mono">SSE</span> 流
@@ -128,30 +118,15 @@ export function CitationsView() {
           </>
         }
         action={
-          monitored && monitored.length > 1 ? (
-            <Select
-              value={brandId ?? ''}
-              onChange={(e) => setBrandId(Number(e.target.value))}
-              aria-label="选择被监测品牌"
-            >
-              {monitored.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          ) : null
+          /* 换品牌是**回上一层再进另一个**，不是在这里下拉切 ——
+             这一页现在是某个品牌的视图，主语写在 URL 里。 */
+          <Link href={`/brands/${brandId}`} className={kit.rowLink}>
+            ← 回到品牌
+          </Link>
         }
       />
 
-      {monitored !== null && monitored.length === 0 ? (
-        <Plate>
-          <Blank lead="还没有被监测的品牌">
-            引用榜是按被监测品牌看的。先在「检测任务」里建一个任务，
-            跑过一次之后这里就会有数据。
-          </Blank>
-        </Plate>
-      ) : error ? (
+      {error ? (
         <Fault
           status={error instanceof ApiError ? error.status : 0}
           message={error instanceof ApiError ? error.detail : '加载失败'}

@@ -7,11 +7,20 @@ import { Blank, Fault, PageHead, Plate, Pending, Table, kit } from '@/components
 import { canWrite } from '@/lib/api/auth'
 import { listBrands } from '@/lib/api/brands'
 import { ApiError } from '@/lib/api/client'
+import { listTasks } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
+import { classifyBrands, type ClassifiedBrand } from '@/lib/l3/brand-roles'
 import type { Brand } from '@/lib/types'
 
 /**
- * 品牌列表（A2）。
+ * 品牌列表（A2）—— **只列监测对象**。
+ *
+ * 改版前这里平铺全部 17 个品牌，其中 15 个是作为对照存在的竞品。
+ * 后果不是难看：竞品列 15/17 是空的，而真正该被看见的那 2 行淹在里面。
+ * 现在竞品收进各自监测品牌的详情页（`competitor_ids` 那一栏），
+ * 它们的详情页仍然可达 —— 只是不再和监测对象平级排在这张表上。
+ *
+ * 分类判据在 `lib/l3/brand-roles`（含「刚新建的品牌不能消失」那条），有测试钉着。
  *
  * **`workspace_id` 单独占一列，不是凑数。** 它决定哪些客户账号能看到这个品牌，
  * 而且**建完就改不了**（`BrandUpdate` 里没有这个字段）。把它藏起来的话，
@@ -20,13 +29,22 @@ import type { Brand } from '@/lib/types'
 export function BrandsView() {
   const { me } = useAuth()
   const [brands, setBrands] = useState<Brand[] | null>(null)
+  const [monitored, setMonitored] = useState<ClassifiedBrand[] | null>(null)
+  const [referenceCount, setReferenceCount] = useState(0)
   const [error, setError] = useState<Error | null>(null)
 
   const load = useCallback(() => {
     setError(null)
     setBrands(null)
-    listBrands()
-      .then((b) => setBrands(b.items))
+    setMonitored(null)
+    // 要 tasks 才分得出角色 —— 「有任务」是监测对象最硬的证据
+    Promise.all([listBrands(), listTasks()])
+      .then(([b, t]) => {
+        const roster = classifyBrands(b.items, t.items)
+        setBrands(b.items)
+        setMonitored(roster.monitored)
+        setReferenceCount(roster.reference.length)
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e : new Error(String(e))))
   }, [])
 
@@ -42,15 +60,18 @@ export function BrandsView() {
     )
   }
 
-  // 竞品名要靠 id 关联 —— 列表里显示「比了几个」时也一样，
-  // 不能拿数组下标当身份
-  const nameOf = (id: number) => brands?.find((b) => b.id === id)?.name ?? `#${id}`
-
   return (
     <div className={kit.pageStack}>
       <PageHead
         title="品牌"
         lede="别名决定 L1 能不能认出它；竞品集决定缺口清单和失分量跟谁比。"
+        meta={
+          referenceCount > 0 ? (
+            <span>
+              另有 {referenceCount} 个品牌只作为竞品参照存在，在各自对照的品牌里管理
+            </span>
+          ) : undefined
+        }
         action={
           canWrite(me) ? (
             <Link href="/brands/new" className={kit.link}>
@@ -61,13 +82,13 @@ export function BrandsView() {
       />
 
       <Plate>
-        {brands === null ? (
+        {monitored === null || brands === null ? (
           <div style={{ display: 'grid', gap: 8 }}>
             <Pending height={20} />
             <Pending height={20} />
           </div>
-        ) : brands.length === 0 ? (
-          <Blank lead="还没有品牌">
+        ) : monitored.length === 0 ? (
+          <Blank lead="还没有被监测的品牌">
             {canWrite(me)
               ? '先建一个品牌，配好别名与竞品，才能给它建监测任务。'
               : '你的 workspace 下还没有品牌，请联系运营。'}
@@ -81,10 +102,11 @@ export function BrandsView() {
                 <th>workspace</th>
                 <th>别名</th>
                 <th>竞品</th>
+                <th>任务</th>
               </tr>
             </thead>
             <tbody>
-              {brands.map((b) => (
+              {monitored.map(({ brand: b, taskCount }) => (
                 <tr key={b.id}>
                   <td>
                     <Link href={`/brands/${b.id}`} className={kit.rowLink}>
@@ -124,21 +146,34 @@ export function BrandsView() {
                     )}
                   </td>
                   <td>
-                    {/* 没有竞品用一个淡破折号，**不用徽章**。
-                        这张表里绝大多数品牌本身就是别人的竞品，它们自己没有竞品集
-                        是完全正常的状态 —— 实测 14 行里 13 行如此。给每一行都挂一个
-                        「无」徽章，等于让最普通的情况成为整列最抢眼的东西，
-                        真正该被看见的「7 个」反而被淹掉。
-                        对照：「未配别名」保留红色，那个是真的会让 L1 漏检。 */}
+                    {/* 这张表只剩监测对象之后，「没配竞品」就从常态变成了异常 ——
+                        缺口清单和失分量都要靠竞品集才算得出来。所以它现在值得说话，
+                        而不是像以前那样 15/17 行都是一个淡破折号。 */}
                     {b.competitor_ids.length === 0 ? (
-                      <span style={{ color: 'var(--text-3)' }}>—</span>
+                      <span style={{ color: 'var(--warn)', fontSize: 'var(--fs-label)' }}>
+                        未配竞品
+                      </span>
                     ) : (
                       <span
                         style={{ fontSize: 'var(--fs-label)', color: 'var(--text-2)' }}
-                        title={b.competitor_ids.map(nameOf).join(' · ')}
+                        title={b.competitor_ids
+                          .map((id) => brands.find((x) => x.id === id)?.name ?? `#${id}`)
+                          .join(' · ')}
                       >
                         {b.competitor_ids.length} 个
                       </span>
+                    )}
+                  </td>
+                  <td>
+                    {/* 品牌 → 任务这条路以前是断的（只有一个数字，点不动） */}
+                    {taskCount === 0 ? (
+                      <span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-label)' }}>
+                        还没建
+                      </span>
+                    ) : (
+                      <Link href={`/tasks?brand=${b.id}`} className={kit.rowLink}>
+                        {taskCount} 个
+                      </Link>
                     )}
                   </td>
                 </tr>

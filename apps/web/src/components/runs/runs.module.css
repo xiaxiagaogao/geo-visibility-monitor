@@ -351,3 +351,19 @@
 .tableTwin tr[aria-current] {
   background: var(--accent-wash);
 }
+
+/* 任务页头里指向品牌的链接。徽章本身已经有形，链接只负责把它变成可点的 ——
+   所以不加下划线，只在 hover 时把徽章边框提上来。 */
+.brandLink {
+  display: inline-flex;
+  border-radius: var(--r-sm);
+}
+
+.brandLink:hover > * {
+  border-color: var(--accent);
+}
+
+.brandLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

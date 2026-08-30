@@ -10,7 +10,6 @@ import { test, expect, setTheme, trackFailedRequests } from './fixtures'
 const ROUTES = [
   { path: '/tasks', h1: '检测任务' },
   { path: '/brands', h1: '品牌' },
-  { path: '/citations', h1: '引用榜' },
   { path: '/users', h1: '用户管理' },
 ] as const
 
@@ -41,6 +40,67 @@ test.describe('路由冒烟', () => {
     await expect(page).toHaveURL(/\/tasks\/\d+/)
     await expect(page.locator('h1')).toHaveCount(1)
     await expect(page.getByRole('img', { name: /次运行的提及率记录/ })).toBeVisible()
+  })
+
+  test('引用榜住在品牌之下 —— 不再是顶级入口', async ({ authedPage: page }) => {
+    await page.goto('/brands', { waitUntil: 'networkidle' })
+
+    // 侧栏只剩「检测任务 / 品牌」(+ 超管的「用户管理」)，没有「引用榜」
+    const sidebarLinks = await page
+      .locator('aside a[href^="/"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('href')))
+    expect(sidebarLinks, '引用榜又回到顶级导航了').not.toContain('/citations')
+
+    // 从品牌详情进得去，且 URL 把「这是谁的引用榜」写明白了
+    await page.locator('a[href^="/brands/"]:not([href$="/new"])').first().click()
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('link', { name: /引用榜/ }).click()
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(/\/brands\/\d+\/citations$/)
+    await expect(page.locator('h1')).toHaveCount(1)
+  })
+
+  test('品牌列表只列监测对象，参照品牌不混在里面', async ({ authedPage: page }) => {
+    await page.goto('/brands', { waitUntil: 'networkidle' })
+    await expect(page.locator('tbody tr').first()).toBeVisible()
+
+    // 列表里每一行都必须是监测对象：有任务或有竞品集。
+    // 改版前这里平铺 17 行，其中 15 行是只作为对照存在的竞品。
+    const rows = await page.locator('tbody tr').evaluateAll((trs) =>
+      trs.map((tr) => {
+        const td = tr.querySelectorAll('td')
+        return {
+          name: td[0]?.textContent?.trim() ?? '',
+          competitors: td[4]?.textContent?.trim() ?? '',
+          tasks: td[5]?.textContent?.trim() ?? '',
+        }
+      }),
+    )
+    expect(rows.length, '一个监测对象都没有').toBeGreaterThan(0)
+    for (const r of rows) {
+      const hasSomething = r.competitors !== '未配竞品' || r.tasks !== '还没建'
+      expect(hasSomething, `「${r.name}」既没竞品也没任务，不该出现在监测对象列表里`).toBe(
+        true,
+      )
+    }
+  })
+
+  test('两个核心实体互相到得了', async ({ authedPage: page }) => {
+    // 任务 → 品牌。改版前品牌只是个徽章，点不动。
+    await page.goto('/tasks', { waitUntil: 'networkidle' })
+    await page.locator('a[href^="/tasks/"]:not([href$="/new"])').first().click()
+    await page.waitForLoadState('networkidle')
+    await page.locator('h1 a[href^="/brands/"]').first().click()
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(/\/brands\/\d+$/)
+
+    // 品牌 → 任务，且落在**筛过的**列表上
+    await page.getByRole('link', { name: /个任务/ }).click()
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(/\/tasks\?brand=\d+/)
+    await expect(page.getByText(/只看「.+」的任务/)).toBeVisible()
+    // 筛选态必须有出口
+    await expect(page.getByRole('link', { name: '看全部' })).toBeVisible()
   })
 
   test('品牌详情能从列表点进去', async ({ authedPage: page }) => {
@@ -114,7 +174,13 @@ test.describe('口径不变量', () => {
 
   /** 算不出来显示 —，不显示 0 —— null ≠ 0 是这个产品的第一条口径。 */
   test('页面上不出现「0%」冒充「算不出来」', async ({ authedPage: page }) => {
-    await page.goto('/citations', { waitUntil: 'networkidle' })
+    // 引用榜现在住在品牌之下
+    await page.goto('/brands', { waitUntil: 'networkidle' })
+    const href = await page
+      .locator('a[href^="/brands/"]:not([href$="/new"])')
+      .first()
+      .getAttribute('href')
+    await page.goto(`${href}/citations`, { waitUntil: 'networkidle' })
     const zeroWithoutDenom = await page.evaluate(() => {
       const bad: string[] = []
       for (const el of document.querySelectorAll('*')) {

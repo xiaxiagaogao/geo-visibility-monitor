@@ -118,14 +118,24 @@ export function BrandDetailView({ brandId }: { brandId: number }) {
             <span>{brand.industry || '未填行业'}</span>
             <span>·</span>
             <span className={kit.numeric}>workspace {brand.workspace_id}</span>
-            <span>·</span>
-            <span>{taskCount === null ? '—' : `${taskCount} 个任务`}</span>
           </>
         }
         action={
-          <Link href="/brands" className={kit.rowLink}>
-            ← 品牌列表
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)' }}>
+            {/* 引用榜是这个品牌的一个视图，入口就该在这里 ——
+                它以前挂在侧栏顶级，那等于宣称它和「品牌」是同一类东西。 */}
+            <Link href={`/brands/${brand.id}/citations`} className={kit.link}>
+              引用榜 →
+            </Link>
+            {taskCount !== null && taskCount > 0 ? (
+              <Link href={`/tasks?brand=${brand.id}`} className={kit.link}>
+                {taskCount} 个任务 →
+              </Link>
+            ) : null}
+            <Link href="/brands" className={kit.rowLink}>
+              ← 品牌列表
+            </Link>
+          </div>
         }
       />
 

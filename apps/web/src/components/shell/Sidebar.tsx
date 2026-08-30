@@ -17,10 +17,6 @@ import styles from './shell.module.css'
  */
 const NAV = [
   { href: '/tasks', label: '检测任务', icon: SheetIcon },
-  // 「引用榜」曾经被判定为「不会回来」，理由是 citations 全库 0 行。
-  // **那条结论已经被推翻**：P2-37 打通千问 SSE 之后，库里现在有 144 条引用、
-  // 40 个域名。这是这个产品唯一同行没有的数据，不该只能打接口看。
-  { href: '/citations', label: '引用榜', icon: RankIcon },
   { href: '/brands', label: '品牌', icon: GridIcon },
 ]
 
@@ -145,13 +141,6 @@ function SheetIcon() {
 }
 
 /** 榜：三道长短不一的横条 */
-function RankIcon() {
-  return (
-    <Icon>
-      <path d="M4 6.5h16M4 12h10.5M4 17.5h6" />
-    </Icon>
-  )
-}
 
 function GridIcon() {
   return (
