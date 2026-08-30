@@ -82,7 +82,11 @@ export function PageHead({
     <div className={styles.pageHead}>
       <div className={styles.pageHeadMain}>
         {back ? (
-          <Link href={back.href} className={styles.pageBack}>
+          /* 箭头 `aria-hidden`：读屏念「左箭头 品牌」是噪音，可访问名就该是
+             目的地本身。代价是**测试不能按箭头定位** —— 可访问名里没有它。
+             所以给一个不随文案变的锚点。（端到端测试第一版正是栽在这儿：
+             定位器写 `name: /^←/`，和这里的无障碍决定自相矛盾。） */
+          <Link href={back.href} data-page-back="" className={styles.pageBack}>
             <span aria-hidden="true">←</span> {back.label}
           </Link>
         ) : null}

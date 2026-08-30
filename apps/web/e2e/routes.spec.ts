@@ -149,7 +149,9 @@ test.describe('路由冒烟', () => {
       await page.goto(path, { waitUntil: 'networkidle' })
       await expect(page.locator('h1')).toHaveCount(1)
 
-      const back = page.getByRole('link', { name: /^←/ }).first()
+      // ⚠️ **不能按箭头定位**：箭头是 aria-hidden，可访问名里没有它，
+      // `getByRole('link', { name: /^←/ })` 永远匹配不到。用 data-page-back。
+      const back = page.locator('[data-page-back]').first()
       await expect(back, '这一页没有回上一层的路').toBeVisible()
       // 只写目的地的名字，不写「回到」「返回」—— 箭头已经说了方向
       expect(await back.innerText()).not.toMatch(/回到|返回/)
@@ -160,7 +162,7 @@ test.describe('路由冒烟', () => {
     await page.goto('/tasks', { waitUntil: 'networkidle' })
     await page.locator('a[href^="/tasks/"]:not([href$="/new"])').first().click()
     await page.waitForLoadState('networkidle')
-    const back = page.getByRole('link', { name: /^←/ }).first()
+    const back = page.locator('[data-page-back]').first()
     await expect(back).toBeVisible()
     await back.click()
     await page.waitForLoadState('networkidle')
@@ -204,7 +206,14 @@ test.describe('口径不变量', () => {
                   /^\d+(\.\d+)?\s*%?$/.test((el.textContent ?? '').trim()),
               ).length,
           ),
-        { message: '等了很久也没有任何大号读数渲染出来' },
+        {
+          // 30s 不是随手写的：这条等的是「dev server 冷编译这条路由 +
+          // 一趟打到线上的 API」。点击若发生在 hydration 之前，<Link> 还是
+          // 普通 <a>，会走整页导航、让 Next 从头编译 —— 10s 会偶发不够。
+          // 手动实测热路由是 1.8s。
+          timeout: 30_000,
+          message: '等了很久也没有任何大号读数渲染出来',
+        },
       )
       .toBeGreaterThan(0)
 
