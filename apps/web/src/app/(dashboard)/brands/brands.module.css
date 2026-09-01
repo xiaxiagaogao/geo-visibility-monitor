@@ -70,6 +70,25 @@
   color: var(--text-2);
 }
 
+/* 芯片里的品牌名 —— 通往竞品详情页的唯一入口。
+   不抢眼（继承芯片的颜色），但 hover 时要明确表示它可点。 */
+.chipLink {
+  color: inherit;
+  border-bottom: 1px solid transparent;
+  transition: color var(--dur) var(--ease);
+}
+
+.chipLink:hover {
+  color: var(--text-1);
+  border-bottom-color: var(--border-strong);
+}
+
+.chipLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
 .orderNum {
   font-family: var(--font-mono);
   font-size: var(--fs-micro);

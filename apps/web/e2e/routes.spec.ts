@@ -85,6 +85,37 @@ test.describe('路由冒烟', () => {
     }
   })
 
+  /**
+   * **参照品牌必须还够得着。**
+   *
+   * 把竞品从 `/brands` 拿掉之后，全站一度没有任何路径能到达它们的详情页 ——
+   * 竞品芯片上的名字当时是纯文本。而 L1 靠**别名**在回答正文里认人，
+   * 改不了竞品的别名就等于让它一直漏检。这条钉的就是那条唯一入口。
+   */
+  test('竞品品牌够得着 —— 从监测品牌点进去能改它的别名', async ({
+    authedPage: page,
+  }) => {
+    await page.goto('/brands', { waitUntil: 'networkidle' })
+    await page.locator('a[href^="/brands/"]:not([href$="/new"])').first().click()
+    await page.waitForLoadState('networkidle')
+
+    // 竞品芯片里的名字必须是链接
+    const chip = page
+      .locator('a[href^="/brands/"]')
+      .filter({ hasNotText: /引用榜|品牌列表/ })
+      .last()
+    const href = await chip.getAttribute('href')
+    expect(href, '竞品芯片不是链接 —— 参照品牌又变得够不着了').toMatch(/^\/brands\/\d+$/)
+
+    await chip.click()
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(new RegExp(`${href}$`))
+
+    // 到了之后别名要真的能改 —— 这才是走这条路的目的
+    const aliases = page.locator('textarea').first()
+    await expect(aliases, '到了竞品页但别名编辑不了').toBeEditable()
+  })
+
   test('新建任务只能选监测对象，且会告诉你提问集有多少条', async ({
     authedPage: page,
   }) => {

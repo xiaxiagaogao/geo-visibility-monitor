@@ -372,7 +372,14 @@ function CompetitorPanel({
           ids.map((id, i) => (
             <span key={id} className={styles.orderChip}>
               <span className={styles.orderNum}>{i + 1}</span>
-              {nameOf(id)}
+              {/* ⚠️ **这个链接是竞品品牌唯一的入口。**
+                  竞品从 `/brands` 列表里拿掉之后（它们是参照不是监测对象），
+                  全站再没有第二条路能到达它们的详情页 —— 而 L1 靠**别名**
+                  在回答正文里认人，改不了竞品的别名就等于让它一直漏检。
+                  改动这一块之前先想清楚：拿掉它，竞品就又找不到了。 */}
+              <Link href={`/brands/${id}`} className={styles.chipLink}>
+                {nameOf(id)}
+              </Link>
               {writable ? (
                 <button
                   type="button"
