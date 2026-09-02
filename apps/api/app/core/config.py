@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     api_cookie_samesite: str = "lax"
 
     # CORS：逗号分隔的前端 Origin 白名单，空 = 不启用 CORS（同源部署）。
-    # 例：https://geo.xg22.top,http://localhost:3000
+    # 例：https://geo.example.com,http://localhost:3000
     # 注意：带 Cookie 的跨站请求**不允许**用 "*"，必须逐个列出。
     cors_allow_origins: str = ""
 
@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     # P2-36 的第一块：这条采集是哪台机器报的。空 = 未标注
     crawl_node_label: str = ""
     # P2-34：采集节点走 HTTP worker 模式时的 api 地址，例如
-    # http://100.64.240.17:8200（tailnet）或 https://geo.xg22.top（公网）。
+    # http://100.64.240.17:8200（tailnet）或 https://geo.example.com（公网）。
     # **空 = 隧道模式**（直连数据库跑 run_once），行为与 P2-34 之前一个字节不差 ——
     # 这就是「只加不改」那道闸：回滚只需把这个变量清掉重启容器，不必动代码。
     # 鉴权复用现有 API_KEY（代价见 api/worker.py 的模块 docstring）

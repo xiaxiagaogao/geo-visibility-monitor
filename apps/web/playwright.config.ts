@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
  *
  * ## ⚠️ 这套测试跑在**生产数据**上
  *
- * `next.config.ts` 的 dev rewrites 把 `/v1` 代理到 `https://geo.xg22.top` ——
+ * `next.config.ts` 的 dev rewrites 把 `/v1` 代理到 `https://geo.example.com` ——
  * 本机没有独立后端，也没有测试库。所以：
  *
  *   **每一个测试都必须是只读的。** 绝不能点「立即运行」（真建 job、真花额度、
@@ -32,7 +32,7 @@ export default defineConfig({
   /**
    * **重试一次 —— 因为 `/v1` 打的是公网上的线上服务。**
    *
-   * 实测这台机器到 geo.xg22.top 的 TLS 握手会间歇性被 ECONNRESET
+   * 实测这台机器到 geo.example.com 的 TLS 握手会间歇性被 ECONNRESET
    * （dev 代理日志里是 `Failed to proxy … Client network socket disconnected`），
    * 于是代理返回 500、页面渲染成 Fault、用例找不到任何元素。
    * 同一时刻直连生产 5/5 正常 —— 是瞬时抖动，不是故障。

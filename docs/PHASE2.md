@@ -785,7 +785,7 @@ select(CrawlJob).where(status == "pending").with_for_update(skip_locked=True)
 > 一模一样还在**，它在暂缓所以没动 —— 将来接回豆包时这是第一件要改的。
 
 **链路走 tailnet，公网那条已实测走不通（2026-08-21）。**
-从节点容器实发三种请求：tailnet **200 · 0.22s**；`https://geo.xg22.top` 默认 UA
+从节点容器实发三种请求：tailnet **200 · 0.22s**；`https://geo.example.com` 默认 UA
 **403 `error code: 1010`**（Cloudflare Bot 检查，在到达我们的 API 之前就拒了 ——
 错 key 同样是这个码，连鉴权对错都分不出来）；换成浏览器 UA 能过但 **3.0s**（慢 14 倍），
 390KB 的截图上传要 **16 秒**。

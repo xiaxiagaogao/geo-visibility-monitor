@@ -70,9 +70,9 @@ export GEO_DB_URL='postgresql+psycopg://USER:PASS@100.64.240.17:5433/geo'
 | 链路 | 结果 |
 |---|---|
 | tailnet `http://100.64.240.17:8200` | **200 · 0.22s** |
-| `https://geo.xg22.top` 默认 UA | **403 `error code: 1010`**（CF Bot 检查） |
-| `https://geo.xg22.top` 浏览器 UA | 200 · **3.0s**（慢 14 倍） |
-| `https://geo.xg22.top` 390KB multipart | **16s** |
+| `https://geo.example.com` 默认 UA | **403 `error code: 1010`**（CF Bot 检查） |
+| `https://geo.example.com` 浏览器 UA | 200 · **3.0s**（慢 14 倍） |
+| `https://geo.example.com` 390KB multipart | **16s** |
 
 **Cloudflare 在到达我们的 API 之前就拒了** —— 连 key 对不对都分不出来
 （错 key 同样是 403 1010）。要过去就得**让采集器谎称自己是浏览器**，

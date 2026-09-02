@@ -1,6 +1,6 @@
 # GEO 监测台 · 前端
 
-> **状态：已部署在 https://geo.xg22.top（线上跑的是 v1）。A1–A8 主线已闭合。**
+> **状态：已部署在 https://geo.example.com（线上跑的是 v1）。A1–A8 主线已闭合。**
 > 2026-08-24：视觉世界换成**「暗色情报终端」**（由 `docs/STYLE-BRIEF.md` 钉死），
 > 全站 13 个路由已统一到这套语言，`legacy-aliases.css` / `components/ui/` /
 > `components/charts/` 已删除。**v2 全部在分支上，生产仍是 v1，等做完一次性替换。**
@@ -267,7 +267,7 @@ pnpm lint     # tsc --noEmit
 pnpm build
 ```
 
-开发期取数走 `next.config.ts` 里的 rewrites 代理到 `geo.xg22.top`。
+开发期取数走 `next.config.ts` 里的 rewrites 代理到 `geo.example.com`。
 本机 `localhost:3000` 和线上不是同一个 Origin，代理让浏览器眼里全是同源，
 **和生产行为一致**（生产是 Caddy 按路径分流，也是同源）。
 
@@ -290,10 +290,10 @@ pnpm build
 容器 `geo-web` 端口只绑 `127.0.0.1:3000`（公网只能经 Caddy 进）。
 post-receive 会一并 build 并起它，尾部有直连 3000 的探针。
 
-**前端与 API 同源**，都在 `https://geo.xg22.top`，Caddy 按路径分流：
+**前端与 API 同源**，都在 `https://geo.example.com`，Caddy 按路径分流：
 
 ```caddyfile
-http://geo.xg22.top, https://geo.xg22.top {
+http://geo.example.com, https://geo.example.com {
 	handle /v1/*    { reverse_proxy 127.0.0.1:8200 }
 	handle /qa/*    { reverse_proxy 127.0.0.1:8200 }
 	handle /health* { reverse_proxy 127.0.0.1:8200 }
@@ -477,7 +477,7 @@ dev server 在 `.claude/launch.json` 里叫 `web`、端口 3100，
 登录态会落到 localhost 名下，所以本机能看到真实数据。
 
 推 main 之后 post-receive 仍会自动 build `geo-web`，
-在 https://geo.xg22.top 上看线上效果。
+在 https://geo.example.com 上看线上效果。
 后端需要真库的测试在 VPS 容器里跑，详见 `docs/BACKEND.md` §10。
 
 ### 现网可联调的真实数据

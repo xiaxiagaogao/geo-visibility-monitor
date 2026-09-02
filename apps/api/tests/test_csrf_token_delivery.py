@@ -1,18 +1,18 @@
 """CSRF token 必须能被跨域前端拿到 —— 不需要数据库。
 
 **根因（差点上线才发现）：** 双提交方案原本要求前端读 `geo_csrf` Cookie 回填
-`X-CSRF-Token`。但分离部署下前端在 `geo.xg22.top`、Cookie 是
-`geo-api.xg22.top` 下发的 host-only（`set_cookie` 不带 `domain`），
+`X-CSRF-Token`。但分离部署下前端在 `geo.example.com`、Cookie 是
+`geo-api.example.com` 下发的 host-only（`set_cookie` 不带 `domain`），
 `document.cookie` **读不到它**。
 
 而这是最坏的一类 bug：开发期走 next rewrites 代理时 Cookie 落在 localhost，
 JS 读得到、验证会通过；一上生产就全线 403，且前端无从补救。
 
-给 Cookie 加 `Domain=.xg22.top` 不可行 —— 同机还有 `fund.xg22.top`、
-`option.xg22.top` 两个不相干项目，会把会话 Cookie 发给它们。
+给 Cookie 加 `Domain=.example.com` 不可行 —— 同机还有 `app-a.example.com`、
+`app-b.example.com` 两个不相干项目，会把会话 Cookie 发给它们。
 
 所以改成：**响应体里带上 csrf token**。安全性与双提交等价 ——
-跨站攻击者读不到这个响应体，CORS 只允许 `geo.xg22.top`。
+跨站攻击者读不到这个响应体，CORS 只允许 `geo.example.com`。
 Cookie 仍是服务端那一半，响应体只是前端得知这个值的通道。
 """
 from __future__ import annotations

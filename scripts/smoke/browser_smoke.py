@@ -30,7 +30,8 @@ import os
 import sys
 from typing import List
 
-BASE_URL = os.environ.get("SMOKE_BASE_URL", "https://geo.xg22.top").rstrip("/")
+# 默认是占位符 —— 跑之前设 SMOKE_BASE_URL=https://你的部署域名
+BASE_URL = os.environ.get("SMOKE_BASE_URL", "https://geo.example.com").rstrip("/")
 EMAIL = os.environ.get("SMOKE_EMAIL")
 PASSWORD = os.environ.get("SMOKE_PASSWORD")
 #: 失败时把截图丢这儿，便于区分「部署断了」和「网络抖了」

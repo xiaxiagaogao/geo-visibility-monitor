@@ -8,7 +8,7 @@
 
 ## ⚠️ 它跑在生产数据上
 
-`next.config.ts` 的 dev rewrites 把 `/v1` 代理到 `https://geo.xg22.top`。
+`next.config.ts` 的 dev rewrites 把 `/v1` 代理到 `https://geo.example.com`。
 本机没有独立后端，也没有测试库。所以**每个用例都必须只读**。
 
 这条不靠自觉守：`fixtures.ts` 里装了一道路由拦截，**除登录/登出外，

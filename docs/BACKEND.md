@@ -319,10 +319,10 @@ D2 之前靠「Cookie 只对 GET 有效」挡 CSRF。**会话能用于写之后�
 
 ### 5.4 同源部署：一个域名，按路径分流
 
-前端与 API **同源**，Caddy 在 `geo.xg22.top` 上按路径分流：
+前端与 API **同源**，Caddy 在 `geo.example.com` 上按路径分流：
 
 ```caddyfile
-http://geo.xg22.top, https://geo.xg22.top {
+http://geo.example.com, https://geo.example.com {
 	handle /v1/*    { reverse_proxy 127.0.0.1:8200 }
 	handle /qa/*    { reverse_proxy 127.0.0.1:8200 }
 	handle /health* { reverse_proxy 127.0.0.1:8200 }
@@ -355,7 +355,7 @@ D1 曾把前端拆到独立域名，根因是「前端另成产品」被理解�
 - 服务端拦不了未登录（Next 同样看不到另一个域的 Cookie）
 - 证据截图 `<img src>` 只能靠跨站 Cookie
 
-而 `geo-api.xg22.top` 实际只承接了 `/qa`（7 天 24 个请求，拆开看基本是扫描器）。
+而 `geo-api.example.com` 实际只承接了 `/qa`（7 天 24 个请求，拆开看基本是扫描器）。
 合并后上述六条一次性消失，该域名退役（DNS 记录仍在 Cloudflare，放回 block 即可恢复）。
 
 > CORS 相关代码与测试**保留**：`CORS_ALLOW_ORIGINS` 非空时仍会启用，
@@ -678,7 +678,7 @@ localStorage 按 origin 隔离，没导航过去就没有可写的存储区。
 | 项 | 值 |
 |----|-----|
 | VPS | `96.9.213.230`（Ubuntu 24.04） |
-| 公网入口 | `https://geo.xg22.top`（Cloudflare 橙云 → Caddy 按路径分流 → `127.0.0.1:8200`）。**`geo-api.xg22.top` 已退役** |
+| 公网入口 | `https://geo.example.com`（Cloudflare 橙云 → Caddy 按路径分流 → `127.0.0.1:8200`）。**`geo-api.example.com` 已退役** |
 | 前端 | 同上域名的 `/` → 容器 `geo-web`（Next standalone，只绑 `127.0.0.1:3000`）。2026-08-11 上线 |
 | Caddy | `/etc/caddy/Caddyfile`，**同机还有 fund. / option. 两个别的项目** —— 改完只 `systemctl reload caddy`，勿 restart；改前先备份 |
 | 工作树 / 裸仓 | `/opt/geo-demo` · `/opt/geo-demo.git` |

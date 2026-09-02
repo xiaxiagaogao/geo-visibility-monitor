@@ -19,14 +19,22 @@ import type { NextConfig } from 'next'
  *   VPS 上多一个常驻进程，且要改共用的 Caddyfile（同机还有别的项目，
  *   改前备份、只 reload 不 restart）。
  *
- * 开发期仍走下面的 rewrites 代理：本机 localhost:3000 与线上 geo.xg22.top
+ * 开发期仍走下面的 rewrites 代理：本机 localhost:3000 与线上 geo.example.com
  * 不是同一个 Origin，代理让浏览器眼里全是同源，和生产行为一致。
  * 后端 set_cookie 不带 domain（host-only），Set-Cookie 会落到 localhost 名下；
  * Cookie 带的 Secure 在 http://localhost 上浏览器也放行（localhost 算可信来源）。
  */
-const API_ORIGIN = process.env.API_ORIGIN ?? 'https://geo.xg22.top'
+/**
+ * 开发期 `/v1` 代理到哪。
+ *
+ * **默认值是占位符，本机开发必须自己设** —— 在 `apps/web/.env.local` 里写
+ * `API_ORIGIN=https://你的部署域名`（`.env.local` 被 gitignore，不会进仓库）。
+ * 仓库里不放真实域名：这是个公开仓库，而它把鉴权模型、接口面、部署架构
+ * 都写清楚了，再配上真实地址等于把攻击面一并发出去。
+ */
+const API_ORIGIN = process.env.API_ORIGIN ?? 'https://geo.example.com'
 
-// `/qa` 是后端的运维质检页。同源之后它就在 geo.xg22.top/qa 下，
+// `/qa` 是后端的运维质检页。同源之后它就在 geo.example.com/qa 下，
 // 侧栏那个相对链接**是通的**（分离部署那段时间里它是坏的，已不再是问题）。
 // 等配置类页面（A2-A4）做完，/qa 只剩运维用途，届时再决定要不要从侧栏拿掉。
 const PROXY_PREFIXES = ['/v1', '/qa', '/health']

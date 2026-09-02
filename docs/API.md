@@ -10,8 +10,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Base URL | `https://geo.xg22.top`（与前端**同源**，Caddy 按路径分流到 `geo-api:8200`） |
-| 前端 Origin | `https://geo.xg22.top` —— **同一个域名**，前端在 `/`、API 在 `/v1/*` |
+| Base URL | `https://geo.example.com`（与前端**同源**，Caddy 按路径分流到 `geo-api:8200`） |
+| 前端 Origin | `https://geo.example.com` —— **同一个域名**，前端在 `/`、API 在 `/v1/*` |
 | 跨域 | **没有跨域**。同源，无 CORS。`fetch` 仍建议带 `credentials: 'include'`（同源下是默认行为，写明更清楚） |
 | 内容类型 | 一律 JSON（登录也是 JSON，不是表单） |
 
@@ -372,7 +372,7 @@ cp.slice(first_offset, first_offset + Array.from(matched_term).length).join('') 
 `RawResponseOut.screenshot_path` **已经是 basename**，直接拼即可：
 
 ```html
-<img src="https://geo.xg22.top/v1/media/screenshots/deepseek_1785601999.png">
+<img src="https://geo.example.com/v1/media/screenshots/deepseek_1785601999.png">
 ```
 
 跨站 `<img>` 会自动带上会话 Cookie（`SameSite=None; Secure`）。
@@ -806,27 +806,27 @@ SoV(安踏) = 21 / 137 = 15.3%
 
 ```bash
 # 1. 登录（注意 -c 存 cookie）
-curl -sc /tmp/c.txt -X POST https://geo.xg22.top/v1/auth/login \
+curl -sc /tmp/c.txt -X POST https://geo.example.com/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"...","password":"..."}'
 
 # 2. 我是谁
-curl -sb /tmp/c.txt https://geo.xg22.top/v1/auth/me
+curl -sb /tmp/c.txt https://geo.example.com/v1/auth/me
 
 # 3. 总览四个数
-curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/counts?brand_id=34'
+curl -sb /tmp/c.txt 'https://geo.example.com/v1/counts?brand_id=34'
 
 # 4. 逐提问下钻（矩阵的数据源）
-curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/counts?brand_id=34&group_by=prompt'
+curl -sb /tmp/c.txt 'https://geo.example.com/v1/counts?brand_id=34&group_by=prompt'
 
 # 5. 平台可用性
-curl -sb /tmp/c.txt https://geo.xg22.top/v1/config/platforms
+curl -sb /tmp/c.txt https://geo.example.com/v1/config/platforms
 
 # 6. 某次运行的样本列表（轻量投影，响应里不该出现 full_text / raw_json）
-curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/responses/summary?run_id=27&limit=5'
+curl -sb /tmp/c.txt 'https://geo.example.com/v1/responses/summary?run_id=27&limit=5'
 
 # 7. 这次运行还有几条没回来（失败 job 不产出 response，只在这里看得见）
-curl -sb /tmp/c.txt 'https://geo.xg22.top/v1/crawl-jobs?run_id=27&status=failed&limit=1'
+curl -sb /tmp/c.txt 'https://geo.example.com/v1/crawl-jobs?run_id=27&status=failed&limit=1'
 ```
 
 前端首次接通的判据：**`/v1/counts?brand_id=34` 返回 `n_valid=35`、`m_mentioned=21`**。

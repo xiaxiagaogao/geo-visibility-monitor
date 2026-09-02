@@ -21,7 +21,7 @@ from app.core.config import get_settings
 from app.core.security import QA_COOKIE_NAME, ApiKeyMiddleware, set_qa_cookie
 
 KEY = "split-deploy-key"
-FRONTEND = "https://geo.xg22.top"
+FRONTEND = "https://geo.example.com"
 
 
 def build_app(*, origins: list[str]) -> FastAPI:

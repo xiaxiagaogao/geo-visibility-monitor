@@ -38,8 +38,8 @@ class MeOut(BaseModel):
     #: machine = 共享密钥 / QA 后门（等同超管但没有用户身份）
     kind: str
     #: 双提交用的 CSRF token。**必须放响应体，不能只放 Cookie** ——
-    #: 分离部署下前端在 geo.xg22.top，而 Cookie 是 geo-api.xg22.top 的 host-only，
-    #: document.cookie 读不到。给 Cookie 加 Domain=.xg22.top 也不行：
+    #: 分离部署下前端在 geo.example.com，而 Cookie 是 geo-api.example.com 的 host-only，
+    #: document.cookie 读不到。给 Cookie 加 Domain=.example.com 也不行：
     #: 同机还有 fund./option. 两个不相干项目，会把会话 Cookie 发给它们。
     #: 安全性与双提交等价 —— 跨站攻击者读不到这个响应体（CORS 只允许前端 Origin）。
     #: machine 身份（X-API-Key）不走 Cookie，此字段为 None。
@@ -63,8 +63,8 @@ def _set_csrf_cookie(response: Response, csrf: str) -> None:
     `httponly=False` 是**同源部署**下双提交的原理：前端 JS 读它回填请求头，
     跨站攻击者读不到本站 Cookie，就造不出匹配的头。
 
-    但**分离部署下前端读不到它** —— 它是 `geo-api.xg22.top` 的 host-only Cookie，
-    而前端在 `geo.xg22.top`。所以同一个值还要经 `MeOut.csrf_token` 交给前端，
+    但**分离部署下前端读不到它** —— 它是 `geo-api.example.com` 的 host-only Cookie，
+    而前端在 `geo.example.com`。所以同一个值还要经 `MeOut.csrf_token` 交给前端，
     见那里的注释。这里保留 `httponly=False` 只是为了同源场景（`/qa`、开发期代理）
     仍然能用老办法读。
     """

@@ -230,8 +230,8 @@ def test_client_identifies_itself_honestly():
     2026-08-21 实测（从采集节点容器里发）：
 
         走 tailnet                     200 · 0.22s
-        走 https://geo.xg22.top 默认UA  **403 error code: 1010**（CF Bot 检查）
-        走 https://geo.xg22.top 浏览器UA 200 · 3.0s（慢 14 倍）
+        走 https://geo.example.com 默认UA  **403 error code: 1010**（CF Bot 检查）
+        走 https://geo.example.com 浏览器UA 200 · 3.0s（慢 14 倍）
         390KB multipart 走 CF           16s
 
     **所以公网那条路没有采用**：要过去就得让采集器谎称自己是浏览器，
