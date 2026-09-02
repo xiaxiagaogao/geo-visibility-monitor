@@ -3,8 +3,15 @@
  */
 import { apiFetch } from './client'
 
-interface CrawlJobListResult {
+import type { CrawlJob } from '@/lib/types'
+
+interface CrawlJobCountResult {
   items: unknown[]
+  total: number
+}
+
+interface CrawlJobListResult {
+  items: CrawlJob[]
   total: number
 }
 
@@ -25,8 +32,28 @@ export async function countRunJobs(params: {
   /** `pending` | `running` | `success` | `failed`；不传 = 这次运行的全部采样 */
   status?: string
 }): Promise<number> {
-  const res = await apiFetch<CrawlJobListResult>('/v1/crawl-jobs', {
+  const res = await apiFetch<CrawlJobCountResult>('/v1/crawl-jobs', {
     query: { run_id: params.runId, status: params.status, limit: 1 },
   })
   return res.total
+}
+
+/**
+ * 这次运行**失败的那些采样**，要 items 不只要 total。
+ *
+ * 和 `countRunJobs` 分成两个函数而不是加一个可选参数 —— 和
+ * `fetchBrandCounts` / `fetchRunCounts` 同一条理由：「只要个数」和
+ * 「要逐条看原因」是两个不同的问题，让调用点自己说清要哪个。
+ *
+ * `limit` 有上限是刻意的：这一层只服务「失败原因分布」那一句话，
+ * 不是一个可翻页的失败清单。真要逐条排查是 `/qa` 的事。
+ */
+export async function listFailedJobs(params: {
+  runId: number
+  limit?: number
+}): Promise<CrawlJob[]> {
+  const res = await apiFetch<CrawlJobListResult>('/v1/crawl-jobs', {
+    query: { run_id: params.runId, status: 'failed', limit: params.limit ?? 200 },
+  })
+  return res.items
 }

@@ -29,6 +29,7 @@ export function NewTaskForm() {
   const [platforms, setPlatforms] = useState<PlatformOption[] | null>(null)
   const [crawlMode, setCrawlMode] = useState<string>('')
   const [loadError, setLoadError] = useState<Error | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const [brandId, setBrandId] = useState<number | ''>('')
   const [name, setName] = useState('')
@@ -56,7 +57,7 @@ export function NewTaskForm() {
         if (pickable.length === 1) setBrandId(pickable[0].id)
       })
       .catch((e: unknown) => setLoadError(e instanceof Error ? e : new Error(String(e))))
-  }, [])
+  }, [reloadKey])
 
   /**
    * 选中品牌后去数它有几条**启用中**的提问词。
@@ -118,6 +119,9 @@ export function NewTaskForm() {
       <Fault
         status={loadError instanceof ApiError ? loadError.status : 0}
         message={loadError instanceof ApiError ? loadError.detail : '加载失败'}
+        /* 没有重试的话，这一页初次加载失败就只能离开再回来 —— 而用户
+           多半不知道那是唯一出路，只会以为「新建任务坏了」。 */
+        onRetry={() => setReloadKey((k) => k + 1)}
       />
     )
   }

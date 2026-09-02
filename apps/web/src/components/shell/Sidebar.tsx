@@ -63,7 +63,10 @@ export function Sidebar() {
           <>
             <div className={styles.navSep} />
             {/* 不重做 B7 QA，链过去就行 */}
-            <a className={styles.navItem} href="/qa" target="_blank" rel="noreferrer">
+            {/* 用 `navAside` 不用 `navItem`：它和「检测任务 / 品牌」不是同一类东西。
+                产品导航是客户买的那套；这是运维后门。视觉重量一样的话，
+                等于宣称它们同级。 */}
+            <a className={styles.navAside} href="/qa" target="_blank" rel="noreferrer">
               <ToolIcon />
               运维质检 ↗
             </a>

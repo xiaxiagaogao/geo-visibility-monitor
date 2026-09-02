@@ -177,3 +177,86 @@ test.describe('首屏', () => {
     expect(firstReadoutTop, '读数被推到折叠线以下了').toBeLessThan(800)
   })
 })
+
+test.describe('失败原因', () => {
+  /**
+   * 界面此前只说「另有 N 条采样失败」。七类失败的下一步完全不同 ——
+   * `login_required` 要人去换登录态、`timeout` 等着就行 ——
+   * 只报一个数字等于把「该做什么」留给读者猜。
+   */
+  test('失败提示要说清是哪一类、以及该做什么', async ({ authedPage: page }) => {
+    await openFirstTask(page)
+
+    // 样本列表在 tab 后面，默认显示的是命中矩阵
+    const tab = page.getByRole('tab', { name: /样本列表/ })
+    await tab.click()
+
+    const notice = page.getByText(/另有 \d+ 条采样失败/)
+    if ((await notice.count()) === 0) test.skip(true, '这次运行没有失败的采样')
+
+    // 光有数字不够 —— 必须有分类和下一步
+    const block = notice.locator('xpath=ancestor::p[1]')
+    const text = await block.innerText()
+    expect(text, '只报了数字，没说是哪一类失败').toMatch(
+      /超时|被限流|登录态过期|平台没接|抽不出答案|worker|没认出原因|后端没给分类/,
+    )
+  })
+
+  /**
+   * 语气跟着**要不要人动手**走，不跟着条数走：
+   * 24 条 timeout 会自愈，1 条 parse_error 得立刻处理。
+   */
+  test('全是能自愈的失败时不用红色吓人', async ({ authedPage: page }) => {
+    await openFirstTask(page)
+    await page.getByRole('tab', { name: /样本列表/ }).click()
+
+    const notice = page.getByText(/另有 \d+ 条采样失败/)
+    if ((await notice.count()) === 0) test.skip(true, '这次运行没有失败的采样')
+
+    const block = notice.locator('xpath=ancestor::p[1]')
+    const text = await block.innerText()
+    const border = await block.evaluate((el) => getComputedStyle(el).borderLeftColor)
+
+    // 只出现「超时 / 被限流」这两类 = 能自愈 = 不该是 fault 那档红色
+    const selfHealingOnly = !/登录态过期|平台没接|抽不出答案|worker|没认出原因|后端没给分类/.test(
+      text,
+    )
+    if (selfHealingOnly) {
+      expect(border, '全是能自愈的失败却用了最重的语气').not.toBe('rgb(255, 107, 107)')
+    } else {
+      expect(border, '有要人动手的失败却没抬高语气').toBe('rgb(255, 107, 107)')
+    }
+  })
+})
+
+test.describe('三态与守卫', () => {
+  test('表单初次加载失败要有出路 —— 不能只能离开页面', async ({ authedPage: page }) => {
+    // 让 brands 请求失败，逼出 Fault
+    await page.route('**/v1/brands**', (r) => r.abort('failed'))
+    await page.goto('/tasks/new', { waitUntil: 'domcontentloaded' })
+
+    const retry = page.getByRole('button', { name: /重试/ })
+    await expect(retry, '加载失败了却没有重试按钮').toBeVisible()
+  })
+
+  test('有未保存改动时会拦住关闭页面', async ({ authedPage: page }) => {
+    await page.goto('/brands', { waitUntil: 'networkidle' })
+    await page.locator('a[href^="/brands/"]:not([href$="/new"])').first().click()
+    await page.waitForLoadState('networkidle')
+
+    const input = page.locator('input[type="text"]').first()
+    await expect(input).toBeVisible()
+    await input.fill('改了但没保存')
+
+    // beforeunload 只拦整页卸载。这里直接问：有没有人注册了这个监听。
+    // （拦不住站内跳转是**已知的取舍**，见 lib/use-unsaved-guard。）
+    const guarded = await page.evaluate(() => {
+      let fired = false
+      const e = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(e)
+      fired = e.defaultPrevented
+      return fired
+    })
+    expect(guarded, '有未保存改动，但没有任何东西拦关闭页面').toBe(true)
+  })
+})

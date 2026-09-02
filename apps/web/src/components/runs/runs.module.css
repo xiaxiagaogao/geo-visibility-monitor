@@ -367,3 +367,28 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   失败原因分布 —— 挂在失败提示下面
+   ══════════════════════════════════════════════════════════════════ */
+
+.failureKinds {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+/* 一类一行：短标签 + 条数在前，该做什么跟在后面。
+   不做成卡片网格 —— 这是一句话的补充，不是一组同级的东西。 */
+.failureKind {
+  display: block;
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
+
+.failureAction {
+  margin-left: var(--sp-2);
+  color: var(--text-3);
+}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { Mark, Button, Fault, Plate, Aside, Pending, kit } from '@/components/kit'
 import { ApiError } from '@/lib/api/client'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { fetchPlatforms } from '@/lib/api/config'
 import { updateTask } from '@/lib/api/tasks'
 import type { PlatformOption, Task } from '@/lib/types'
@@ -34,6 +35,7 @@ export function TaskEditPanel({
 }) {
   const [platforms, setPlatforms] = useState<PlatformOption[] | null>(null)
   const [loadError, setLoadError] = useState<Error | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const [name, setName] = useState(task.name)
   const [picked, setPicked] = useState<string[]>(task.platforms)
@@ -55,7 +57,7 @@ export function TaskEditPanel({
     return () => {
       alive = false
     }
-  }, [])
+  }, [reloadKey])
 
   const dirty =
     name !== task.name ||
@@ -63,6 +65,7 @@ export function TaskEditPanel({
     isActive !== task.is_active ||
     picked.length !== task.platforms.length ||
     picked.some((c, i) => c !== task.platforms[i])
+  useUnsavedGuard(dirty)
 
   async function save() {
     setBusy(true)
@@ -88,6 +91,7 @@ export function TaskEditPanel({
         <Fault
           status={loadError instanceof ApiError ? loadError.status : 0}
           message={loadError instanceof ApiError ? loadError.detail : '加载失败'}
+          onRetry={() => setReloadKey((k) => k + 1)}
         />
       </Plate>
     )

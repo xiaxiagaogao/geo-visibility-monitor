@@ -27,6 +27,7 @@ import {
 import { ApiError } from '@/lib/api/client'
 import { listTasks } from '@/lib/api/tasks'
 import { useAuth } from '@/lib/auth-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import {
   formatAliasLines,
   parseAliasLines,
@@ -175,6 +176,7 @@ function BasicPanel({
     name !== brand.name ||
     nameEn !== (brand.name_en ?? '') ||
     industry !== (brand.industry ?? '')
+  useUnsavedGuard(dirty)
 
   async function save() {
     setBusy(true)
@@ -272,6 +274,7 @@ function AliasPanel({
 
   const next = parseAliasLines(text)
   const dirty = !sameList(next, brand.aliases)
+  useUnsavedGuard(dirty)
 
   async function save() {
     setBusy(true)
@@ -334,6 +337,7 @@ function CompetitorPanel({
   const others = allBrands.filter((b) => b.id !== brand.id)
   const nameOf = (id: number) => allBrands.find((b) => b.id === id)?.name ?? `#${id}`
   const dirty = !sameList(ids, brand.competitor_ids)
+  useUnsavedGuard(dirty)
 
   async function save() {
     setBusy(true)

@@ -6,8 +6,13 @@ import { SampleTable } from '@/components/runs/SampleTable'
 import runs from '@/components/runs/runs.module.css'
 import { Aside, Blank, Button, Fault, Pending } from '@/components/kit'
 import { ApiError } from '@/lib/api/client'
-import { countRunJobs } from '@/lib/api/crawl-jobs'
+import { countRunJobs, listFailedJobs } from '@/lib/api/crawl-jobs'
 import { listRunSamples } from '@/lib/api/responses'
+import {
+  failureBreakdown,
+  needsHumanAction,
+  type FailureBreakdown,
+} from '@/lib/l3/failures'
 import { pageLabel } from '@/lib/l3/samples'
 import type { RawResponseSummary } from '@/lib/types'
 
@@ -53,6 +58,8 @@ export function SamplesPanel({
   const [samples, setSamples] = useState<RawResponseSummary[] | null>(null)
   const [total, setTotal] = useState(0)
   const [failed, setFailed] = useState(0)
+  /** 失败的原因分布。null = 还没取到（不是「没有失败」，那是空 groups） */
+  const [breakdown, setBreakdown] = useState<FailureBreakdown | null>(null)
   const [offset, setOffset] = useState(0)
   const [error, setError] = useState<Error | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -72,12 +79,16 @@ export function SamplesPanel({
         searchUsed: searchFilter === 'all' ? undefined : searchFilter,
       }),
       countRunJobs({ runId, status: 'failed' }),
+      // 失败的**原因**要逐条看才知道，只有 total 说不出「该做什么」。
+      // 取不到不该让整页失败 —— 它是附加信息，不是这一页的主体。
+      listFailedJobs({ runId }).catch(() => null),
     ])
-      .then(([page, failedCount]) => {
+      .then(([page, failedCount, failedJobs]) => {
         if (!alive) return
         setSamples(page.items)
         setTotal(page.total)
         setFailed(failedCount)
+        setBreakdown(failedJobs ? failureBreakdown(failedJobs) : null)
       })
       .catch((e: unknown) => {
         if (alive) setError(e instanceof Error ? e : new Error(String(e)))
@@ -167,11 +178,7 @@ export function SamplesPanel({
     <div>
       {failed > 0 ? (
         <div style={{ marginBottom: 'var(--sp-4)' }}>
-          <Aside tone="alert">
-            另有 <strong>{failed}</strong> 条采样失败，没产出回答 ——
-            <strong>它们不在下表里</strong>，也不在任何比率的分母里。
-            分母少一截时所有比率都会偏高，别拿它和一次完整运行直接比。
-          </Aside>
+          <FailureNotice failed={failed} breakdown={breakdown} />
         </div>
       ) : null}
 
@@ -205,5 +212,58 @@ export function SamplesPanel({
         </div>
       </div>
     </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   失败提示 —— 从「N 条失败」变成「N 条失败，为什么，该做什么」
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * 这一块此前只说数字。但七类失败的**下一步完全不同** ——
+ * `login_required` 要人去换登录态，`timeout` 等着就行。
+ * 只报一个数字，等于把「该做什么」留给读者猜。
+ *
+ * 语气跟着**要不要人动手**走，不跟着条数走：3 条 timeout 会自愈，
+ * 1 条 login_required 得立刻处理。
+ */
+function FailureNotice({
+  failed,
+  breakdown,
+}: {
+  failed: number
+  breakdown: FailureBreakdown | null
+}) {
+  const urgent = breakdown ? needsHumanAction(breakdown) : false
+
+  return (
+    <Aside tone={urgent ? 'fault' : 'alert'}>
+      另有 <strong>{failed}</strong> 条采样失败，没产出回答 ——
+      <strong>它们不在下表里</strong>，也不在任何比率的分母里。
+      分母少一截时所有比率都会偏高，别拿它和一次完整运行直接比。
+      {breakdown && breakdown.groups.length > 0 ? (
+        <span className={runs.failureKinds}>
+          {breakdown.groups.map((g) => (
+            <span key={g.kind} className={runs.failureKind}>
+              <strong>
+                {g.label} {g.count}
+              </strong>
+              <span className={runs.failureAction}>{g.action}</span>
+            </span>
+          ))}
+          {/* **没分类的单独说。** 它不是「未知原因」（那是 unknown 那一类）——
+              是后端压根没给分类，属于后端异常，排查方向完全不同。 */}
+          {breakdown.unclassified > 0 ? (
+            <span className={runs.failureKind}>
+              <strong>后端没给分类 {breakdown.unclassified}</strong>
+              <span className={runs.failureAction}>
+                这不是「原因未知」——「原因未知」是上面那一类。这里是后端没有归类，
+                本身就是个异常，要去 /qa 看这几条 job 的原文。
+              </span>
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </Aside>
   )
 }

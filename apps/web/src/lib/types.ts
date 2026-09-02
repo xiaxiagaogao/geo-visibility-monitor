@@ -178,6 +178,21 @@ export interface RawResponseSummary {
 }
 
 /** apps/api/app/schemas/crawl.py :: CrawlJobOut */
+/**
+ * 失败分类（API.md §8.0.1）。
+ *
+ * **`null` 不是 `unknown`。** `null` = 还没失败过；`unknown` = 失败了但没认出来。
+ * 两者的排查方向完全不同，接口文档明确要求前端不许把它们显示成同一个词。
+ */
+export type FailureKind =
+  | 'timeout'
+  | 'rate_limited'
+  | 'login_required'
+  | 'platform_unavailable'
+  | 'parse_error'
+  | 'worker_died'
+  | 'unknown'
+
 export interface CrawlJob {
   id: number
   prompt_id: number
@@ -185,6 +200,12 @@ export interface CrawlJob {
   status: 'pending' | 'running' | 'success' | 'failed'
   sample_index: number
   error_message: string | null
+  /** 见 `FailureKind` —— null 表示还没失败过 */
+  failure_kind: FailureKind | null
+  /** 已经重试过几次 */
+  attempt: number | null
+  /** 退避中的下一次尝试时间。在未来 = 正在等退避（状态仍是 pending） */
+  next_attempt_at: string | null
   started_at: string | null
   finished_at: string | null
   created_at: string

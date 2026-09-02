@@ -122,6 +122,23 @@
   color: var(--accent);
 }
 
+/* 运维入口 —— 和产品导航同一条轨上，但**不是同一类东西**。
+   比 navItem 弱一档：小一号、更淡、图标不给强调色、没有位置指示条。 */
+.navAside {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px var(--sp-3) 7px var(--sp-4);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  transition: color 140ms ease;
+}
+
+.navAside:hover {
+  color: var(--text-2);
+}
+
 .navSep {
   height: 1px;
   background: var(--border);
@@ -301,7 +318,24 @@
     height: 2px;
   }
 
-  .navSep {
+  /* 运维入口 —— 和产品导航同一条轨上，但**不是同一类东西**。
+   比 navItem 弱一档：小一号、更淡、图标不给强调色、没有位置指示条。 */
+.navAside {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px var(--sp-3) 7px var(--sp-4);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  transition: color 140ms ease;
+}
+
+.navAside:hover {
+  color: var(--text-2);
+}
+
+.navSep {
     width: 1px;
     height: 18px;
     margin: 0 var(--sp-2);
