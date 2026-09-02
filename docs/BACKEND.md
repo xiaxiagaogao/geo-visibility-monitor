@@ -677,7 +677,7 @@ localStorage 按 origin 隔离，没导航过去就没有可写的存储区。
 
 | 项 | 值 |
 |----|-----|
-| VPS | `96.9.213.230`（Ubuntu 24.04） |
+| VPS | `203.0.113.20`（Ubuntu 24.04） |
 | 公网入口 | `https://geo.example.com`（Cloudflare 橙云 → Caddy 按路径分流 → `127.0.0.1:8200`）。**`geo-api.example.com` 已退役** |
 | 前端 | 同上域名的 `/` → 容器 `geo-web`（Next standalone，只绑 `127.0.0.1:3000`）。2026-08-11 上线 |
 | Caddy | `/etc/caddy/Caddyfile`，**同机还有 fund. / option. 两个别的项目** —— 改完只 `systemctl reload caddy`，勿 restart；改前先备份 |
@@ -686,7 +686,7 @@ localStorage 按 origin 隔离，没导航过去就没有可写的存储区。
 | 库 | `127.0.0.1:5433`（**勿改 0.0.0.0**；默认口令 `geo/geo` 是弱口令，对外前必须改） |
 | 日志 | `/var/log/geo-demo-deploy.log` |
 | 容器 | `geo-api` · `geo-web` · `geo-postgres` · `geo-crawler`（**冷备，平时停着**，见 §10.1） |
-| tailnet | `sg-dc1` = `100.64.240.17`。postgres 经 `tailscale serve --tcp 5433` 只暴露给 tailnet，**不改 compose 的绑定** |
+| tailnet | `sg-dc1` = `100.64.0.2`。postgres 经 `tailscale serve --tcp 5433` 只暴露给 tailnet，**不改 compose 的绑定** |
 | 勿碰 | `:8100` sillytavern · `:8090` fund-dashboard · 现有 nginx |
 
 ### 10.1 采集在别的机器上（2026-08-14 起）
@@ -700,7 +700,7 @@ run 215 vs run 27/54），而 VPS 在新加坡、服务对象是大陆用户、�
 |---|---|
 | 部署 / 自检 | `scripts/crawl-node/deploy.sh`（不含凭证，全走环境变量）。**crawler 的代码在镜像里，容器只挂 `/data`** —— 更新代码 = `git push vps main`（VPS 上 build）→ `./deploy.sh all`（重传镜像） |
 | 约束与切换 | `scripts/crawl-node/README.md` —— **改任何东西之前先读它** |
-| 链路 | 采集节点 ──tailnet──▶ `100.64.240.17:5433` |
+| 链路 | 采集节点 ──tailnet──▶ `100.64.0.2:5433` |
 
 四条最容易出事的：
 
@@ -742,7 +742,7 @@ checkout，后面 `docker compose up` 和全部健康检查**被静默跳过，�
 且旧的会留一份 `post-receive.prev`。所以改存根的那一次要先手动装再 push：
 
 ```bash
-PEM=~/Desktop/pem/SG-DC1.pem; VPS=root@100.64.240.17     # 走 tailnet
+PEM=~/Desktop/pem/SG-DC1.pem; VPS=root@100.64.0.2     # 走 tailnet
 ssh -i $PEM $VPS 'cp -p /opt/geo-demo.git/hooks/post-receive /root/post-receive.stub-known-good-$(date +%F).bak'
 scp -i $PEM deploy/post-receive.hook $VPS:/opt/geo-demo.git/hooks/post-receive
 ssh -i $PEM $VPS 'chmod +x /opt/geo-demo.git/hooks/post-receive'
@@ -770,7 +770,7 @@ ssh -i $PEM $VPS 'cp /root/post-receive.stub-known-good-2026-08-14.bak /opt/geo-
 ```bash
 # 一次性：配置 push 远端
 export GIT_SSH_COMMAND='ssh -i <pem> -o IdentitiesOnly=yes'   # pem 需 chmod 400
-git remote add vps root@96.9.213.230:/opt/geo-demo.git
+git remote add vps root@203.0.113.20:/opt/geo-demo.git
 
 # 发布（post-receive 自动 build + up）
 git push vps main

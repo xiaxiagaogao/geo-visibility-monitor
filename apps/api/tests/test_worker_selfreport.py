@@ -83,7 +83,7 @@ def client(db):
 
 ENV = {
     "node_label": f"{PROBE}-changsha",
-    "exit_ip": "120.228.64.174",
+    "exit_ip": "203.0.113.10",
     "timezone_id": "Asia/Shanghai",
     "crawl_mode": "real",
     "credential_region": "cn",
@@ -113,7 +113,7 @@ def test_environment_stores_all_six_dimensions(client, db):
     db.expire_all()
     row = db.get(CrawlEnvironment, env_id)
     assert row.node_label == ENV["node_label"]
-    assert row.exit_ip == "120.228.64.174"
+    assert row.exit_ip == "203.0.113.10"
     assert row.timezone_id == "Asia/Shanghai"
     assert row.crawl_mode == "real"
     assert row.credential_region == "cn"
@@ -135,7 +135,7 @@ def test_a_changed_dimension_is_a_different_environment(client, db):
     """出口 IP 变了就是另一种环境 —— 那正是「跨 run 对比要小心」的时刻。"""
     first = client.post("/v1/worker/environment", json=ENV).json()["environment_id"]
     moved = client.post(
-        "/v1/worker/environment", json=dict(ENV, exit_ip="36.157.231.164")
+        "/v1/worker/environment", json=dict(ENV, exit_ip="203.0.113.30")
     ).json()["environment_id"]
 
     assert first != moved

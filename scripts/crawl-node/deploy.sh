@@ -19,9 +19,9 @@
 #
 set -euo pipefail
 
-NODE=${GEO_NODE:?需要 GEO_NODE，例如 root@192.168.2.60}
+NODE=${GEO_NODE:?需要 GEO_NODE，例如 root@192.168.1.100}
 NODE_KEY=${GEO_NODE_KEY:?需要 GEO_NODE_KEY，指向该节点的 ssh 私钥}
-VPS=${GEO_VPS:?需要 GEO_VPS，例如 root@100.64.240.17（走 tailnet）}
+VPS=${GEO_VPS:?需要 GEO_VPS，例如 root@100.64.0.2（走 tailnet）}
 VPS_KEY=${GEO_VPS_KEY:?需要 GEO_VPS_KEY}
 # ── 两种模式，二选一（P2-34）──────────────────────────────────────────
 #
@@ -43,7 +43,7 @@ else
   MODE=tunnel
   # 数据库串走 tailnet。**VPS 上的 postgres 仍只绑 127.0.0.1**，
   # 由 `tailscale serve --tcp 5433 tcp://127.0.0.1:5433` 暴露给 tailnet（见 README）
-  DB_URL=${GEO_DB_URL:?需要 GEO_DB_URL，例如 postgresql+psycopg://user:pass@100.64.240.17:5433/geo}
+  DB_URL=${GEO_DB_URL:?需要 GEO_DB_URL，例如 postgresql+psycopg://user:pass@100.64.0.2:5433/geo}
   API_KEY=""
   # 截图关闭：api 在 VPS，读不到本节点的目录，留着只会让证据页 404
   SHOT_DIR=""

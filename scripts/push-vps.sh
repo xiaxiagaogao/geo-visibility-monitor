@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 PEM="${GEO_VPS_PEM:-$HOME/Desktop/pem/SG-DC1.pem}"
-HOST="${GEO_VPS_HOST:-root@96.9.213.230}"
+HOST="${GEO_VPS_HOST:-root@203.0.113.20}"
 REMOTE_URL="${GEO_VPS_GIT:-$HOST:/opt/geo-demo.git}"
 
 if [[ ! -f "$PEM" ]]; then

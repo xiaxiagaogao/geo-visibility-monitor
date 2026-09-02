@@ -611,7 +611,7 @@ part**。做成 multipart 就是为了截图 —— 迁到大陆节点之后它�
 
 ```jsonc
 // 请求：P2-36 的六个维度
-{ "node_label": "changsha-home", "exit_ip": "120.228.64.174",
+{ "node_label": "changsha-home", "exit_ip": "203.0.113.10",
   "timezone_id": "Asia/Shanghai", "crawl_mode": "real",
   "credential_region": "cn", "waf_kind": "huawei" }
 // 响应 200
@@ -697,9 +697,9 @@ POST /v1/tasks/27/runs
 ```jsonc
 "environments": [{
   "environment_id": 3,
-  "fingerprint": "changsha-home|120.228.64.174|Asia/Shanghai|real|cn|huawei",
+  "fingerprint": "changsha-home|203.0.113.10|Asia/Shanghai|real|cn|huawei",
   "node_label": "changsha-home",
-  "exit_ip": "120.228.64.174",
+  "exit_ip": "203.0.113.10",
   "timezone_id": "Asia/Shanghai",
   "crawl_mode": "real",
   "credential_region": "cn",     // 登录态从哪儿签发的

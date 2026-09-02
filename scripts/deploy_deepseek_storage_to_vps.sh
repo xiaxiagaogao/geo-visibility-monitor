@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PEM="${GEO_VPS_PEM:-$HOME/Desktop/pem/SG-DC1.pem}"
-HOST="${GEO_VPS_HOST:-root@96.9.213.230}"
+HOST="${GEO_VPS_HOST:-root@203.0.113.20}"
 STATE="${1:-$ROOT/deploy/deepseek_storage.json}"
 
 if [[ ! -f "$STATE" ]]; then
@@ -58,6 +58,6 @@ docker logs --tail 30 geo-crawler || true
 REMOTE
 
 echo ">> 完成。可创建任务测试（把 \$API_KEY 换成上面输出的密钥）:"
-echo "curl -s -X POST http://96.9.213.230:8200/v1/crawl-jobs \\"
+echo "curl -s -X POST http://203.0.113.20:8200/v1/crawl-jobs \\"
 echo "  -H 'Content-Type: application/json' -H \"X-API-Key: \$API_KEY\" \\"
 echo "  -d '{\"prompt_id\":1,\"platform\":\"deepseek\",\"samples\":1}'"

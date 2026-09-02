@@ -194,8 +194,8 @@ DeepSeek 用 `storage_state`。过期的表现是一批 job 全 `failed` ——
 #### 部署已完成（2026-08-16），但**还没标 ✅**
 
 采集节点镜像已更新到 `2026-08-16 00:21:46`（与 VPS 侧一致），
-`deploy.sh verify` 五项全过，其中「容器出口 `120.228.64.174` ≠ 代理出口
-`42.200.172.28`」—— 那条唯一会静默毁掉整件事的检查过了。
+`deploy.sh verify` 五项全过，其中「容器出口 `203.0.113.10` ≠ 代理出口
+`198.51.100.10`」—— 那条唯一会静默毁掉整件事的检查过了。
 `GET /v1/health/credentials` 现在是两行：
 
 ```
@@ -225,7 +225,7 @@ doubao    ok  unknown  none      ← unknown 是预期，不是故障
 |---|---|
 | `failure_kind` 是不是 `login_required` | **不是，一条失败都没有** —— 而这本身就是 bug A |
 | `raw_json.session_deleted` | **全是 `false`** —— 见 bug B |
-| `environments[]` | ✅ 19/20 打上同一环境 `changsha-home\|120.228.64.174\|Asia/Shanghai\|real\|cn\|huawei`，单一出口。未打标的 1 条是从没被领取的 pending。**P2-36 工作正常** |
+| `environments[]` | ✅ 19/20 打上同一环境 `changsha-home\|203.0.113.10\|Asia/Shanghai\|real\|cn\|huawei`，单一出口。未打标的 1 条是从没被领取的 pending。**P2-36 工作正常** |
 
 **bug A（已修，commit `b6c4b56`）· 超时被伪装成成功。**
 `_wait_for_answer` 超时后 `return prev`，而豆包不答时 `.md-box-root`
@@ -666,7 +666,7 @@ Playwright 就取了容器的系统时区。于是服务端看到的是
 | 事 | 结论 |
 |---|---|
 | **镜像别从 mcr 拉** | 家宽直连 136KB/s、走代理 386KB/s → 2GB 要 **90 分钟**。**从 VPS `docker save` 经 tailnet 传只要 66 秒**（21MB/s） |
-| **代理：build 走，run 绝不走** | 家里云上 mihomo 在 7890。走代理出口变成香港 `42.200.231.233`，直连才是 `36.157.231.164`（长沙移动）。**crawler 容器不设任何 proxy 环境变量** |
+| **代理：build 走，run 绝不走** | 家里云上 mihomo 在 7890。走代理出口变成香港 `198.51.100.11`，直连才是 `203.0.113.30`（长沙移动）。**crawler 容器不设任何 proxy 环境变量** |
 | **postgres 不改绑定** | 仍只绑 `127.0.0.1:5433`，靠 `tailscale serve --tcp 5433` 暴露给 tailnet。公网已验证连不上。**别为了省事改成 `0.0.0.0`** |
 | **家里云不是空闲机器** | 上面跑着 tradepod（带 API key）· mihomo · jellyfin · qbittorrent。**任何 `pkill`/`pgrep` 都要按精确 PID**，模式匹配会误伤 |
 | **部署会把冷备静默拉起来**（2026-08-14 发现并修） | 旧判断是「容器存在就 `compose up -d`」，而 `docker ps -a` **连已停止的容器一起匹配** —— 于是每推一次代码就把 VPS 那台冷备 crawler 启用一次，而没有任何地方会报错。P2-35 那次部署实际让它跑了 4 小时（碰巧没人发起 run 才没污染）。已修：`deploy/deploy.sh` 对停止态走 `compose create --build`（重建但不启动）。**教训是通用的：靠一条手动 `docker stop` 维持的纪律，会被自动化流程无声撤销** |

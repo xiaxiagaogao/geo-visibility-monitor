@@ -58,7 +58,7 @@ def compute_fingerprint(fields: Dict[str, Any]) -> str:
     """把一组环境维度归一成一个可读的指纹。
 
     **刻意不做哈希。** 排查时一眼要能看出两种环境差在哪 ——
-    `changsha-home|120.228.64.174|Asia/Shanghai|real|cn|huawei` 自己就是答案，
+    `changsha-home|203.0.113.10|Asia/Shanghai|real|cn|huawei` 自己就是答案，
     而一串 sha256 还得去查表。
 
     缺失的维度写成 ``-``，不是省略 —— 否则「没探到 IP」和「IP 是空字符串」

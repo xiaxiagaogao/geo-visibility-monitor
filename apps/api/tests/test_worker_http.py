@@ -190,14 +190,14 @@ def test_http_mode_is_off_unless_an_api_base_is_configured():
 
     assert not http_mode_enabled(_Settings())
     s = _Settings()
-    s.worker_api_base = "http://100.64.240.17:8200"
+    s.worker_api_base = "http://100.64.0.2:8200"
     assert http_mode_enabled(s)
 
 
 def test_client_refuses_to_start_without_a_key():
     """没有 key 的话每一发都会 401，而节点会把它当成「没活干」静静跑一整夜。"""
     with pytest.raises(ValueError):
-        WorkerClient("http://100.64.240.17:8200", "")
+        WorkerClient("http://100.64.0.2:8200", "")
 
 
 def test_blank_database_url_does_not_kill_the_container(monkeypatch):

@@ -13,7 +13,7 @@ from app.services.crawl_env import (
 
 CN = {
     "node_label": "changsha-home",
-    "exit_ip": "120.228.64.174",
+    "exit_ip": "203.0.113.10",
     "timezone_id": "Asia/Shanghai",
     "crawl_mode": "real",
     "credential_region": "cn",
@@ -24,7 +24,7 @@ CN = {
 def test_fingerprint_is_readable_not_hashed():
     """排查时一眼要看出两种环境差在哪。一串 sha256 还得去查表。"""
     assert compute_fingerprint(CN) == (
-        "changsha-home|120.228.64.174|Asia/Shanghai|real|cn|huawei"
+        "changsha-home|203.0.113.10|Asia/Shanghai|real|cn|huawei"
     )
 
 
@@ -71,11 +71,11 @@ def test_cold_standby_is_a_different_environment_than_the_node():
     """切冷备 = 换环境。这条钉的是「三样一起改」在数据上真的能被看出来。"""
     node = describe_environment(
         Settings(crawl_node_label="changsha-home", crawl_timezone_id="Asia/Shanghai"),
-        credential_region="cn", waf_kind="huawei", exit_ip="120.228.64.174",
+        credential_region="cn", waf_kind="huawei", exit_ip="203.0.113.10",
     )
     standby = describe_environment(
         Settings(crawl_node_label="vps-sg", crawl_timezone_id="Asia/Singapore"),
-        credential_region="overseas", waf_kind="aws", exit_ip="96.9.213.230",
+        credential_region="overseas", waf_kind="aws", exit_ip="203.0.113.20",
     )
     assert node["fingerprint"] != standby["fingerprint"]
 
@@ -157,10 +157,10 @@ def test_a_successful_probe_still_records_normally():
     from app.services.crawl_env import describe_environment
 
     fields = describe_environment(_Settings(), credential_region="cn",
-                                  waf_kind="huawei", exit_ip="120.228.64.174")
+                                  waf_kind="huawei", exit_ip="203.0.113.10")
 
-    assert fields["exit_ip"] == "120.228.64.174"
-    assert "120.228.64.174" in fields["fingerprint"]
+    assert fields["exit_ip"] == "203.0.113.10"
+    assert "203.0.113.10" in fields["fingerprint"]
 
 
 def test_probe_retries_before_giving_up(monkeypatch):
@@ -176,11 +176,11 @@ def test_probe_retries_before_giving_up(monkeypatch):
         class _R:
             def __enter__(self_): return self_
             def __exit__(self_, *e): return False
-            def read(self_): return b"120.228.64.174\n"
+            def read(self_): return b"203.0.113.10\n"
         return _R()
 
     monkeypatch.setattr(crawl_env.urllib.request, "urlopen", _flaky)
-    assert crawl_env.probe_exit_ip(timeout=0.01, retry_sleep=0) == "120.228.64.174"
+    assert crawl_env.probe_exit_ip(timeout=0.01, retry_sleep=0) == "203.0.113.10"
     assert calls["n"] == 3
 
 

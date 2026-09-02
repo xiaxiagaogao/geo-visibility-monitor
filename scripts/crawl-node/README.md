@@ -10,7 +10,7 @@
 
 ```text
               tailnet 直连 116ms / 21MB/s
- 采集节点 ←─────────────────────────────→ sg-dc1 (100.64.240.17)
+ 采集节点 ←─────────────────────────────→ sg-dc1 (100.64.0.2)
  podman · Fedora                          docker · Ubuntu
  ┌──────────────────┐                    ┌────────────────────┐
  │ geo-crawler      │  隧道模式：         │ geo-api    :8200   │
@@ -45,18 +45,18 @@
 ## 部署
 
 ```bash
-export GEO_NODE=root@192.168.2.60
+export GEO_NODE=root@192.168.1.100
 export GEO_NODE_KEY=~/path/to/node.pem
-export GEO_VPS=root@100.64.240.17          # 走 tailnet，公网那条 SSH 常抖
+export GEO_VPS=root@100.64.0.2          # 走 tailnet，公网那条 SSH 常抖
 export GEO_VPS_KEY=~/path/to/vps.pem
 
 # —— 二选一 ——
 # A. HTTP worker 模式（P2-34）
-export GEO_API_BASE='http://100.64.240.17:8200'   # 先走 tailnet，稳了再换公网
+export GEO_API_BASE='http://100.64.0.2:8200'   # 先走 tailnet，稳了再换公网
 export GEO_API_KEY='<现有那把 X-API-Key>'
 
 # B. 隧道模式（原样）
-export GEO_DB_URL='postgresql+psycopg://USER:PASS@100.64.240.17:5433/geo'
+export GEO_DB_URL='postgresql+psycopg://USER:PASS@100.64.0.2:5433/geo'
 
 ./deploy.sh all
 ```
@@ -69,7 +69,7 @@ export GEO_DB_URL='postgresql+psycopg://USER:PASS@100.64.240.17:5433/geo'
 
 | 链路 | 结果 |
 |---|---|
-| tailnet `http://100.64.240.17:8200` | **200 · 0.22s** |
+| tailnet `http://100.64.0.2:8200` | **200 · 0.22s** |
 | `https://geo.example.com` 默认 UA | **403 `error code: 1010`**（CF Bot 检查） |
 | `https://geo.example.com` 浏览器 UA | 200 · **3.0s**（慢 14 倍） |
 | `https://geo.example.com` 390KB multipart | **16s** |
@@ -94,7 +94,7 @@ GEO_AUTO_RETRY=true ./deploy.sh start     # 回滚 = 去掉这个变量重跑 st
 
 节点上可能装着代理（我们这台是 mihomo 在 `7890`）。**走代理出口就变成代理的落地**
 ——我们这台走代理是香港，直连才是长沙移动。**具体 IP 会变**（家宽是动态的，
-2026-08-15 已从 `36.157.231.164` 变成 `120.228.64.174`），所以自检比的是
+2026-08-15 已从 `203.0.113.30` 变成 `203.0.113.10`），所以自检比的是
 **两者相不相等**，不是比对某个写死的地址。
 
 **这是唯一会静默毁掉整件事的错误**：走了代理，数据照样采得到，只是全部来自错误
@@ -188,10 +188,10 @@ VPS 上那台 `geo-crawler` **停着**，是冷备：
 
 ```bash
 # 采集节点挂了 → 启用冷备
-ssh root@100.64.240.17 'docker start geo-crawler'
+ssh root@100.64.0.2 'docker start geo-crawler'
 
 # 采集节点恢复了 → 停掉冷备
-ssh root@100.64.240.17 'docker stop geo-crawler'
+ssh root@100.64.0.2 'docker stop geo-crawler'
 ```
 
 ### ⚠️ 冷备是「接替」，不是「并行」

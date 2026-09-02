@@ -23,12 +23,12 @@ pytestmark = pytest.mark.skipif(
 PROBE = "__pytest_env__"
 
 CN = {
-    "node_label": "changsha-home", "exit_ip": "120.228.64.174",
+    "node_label": "changsha-home", "exit_ip": "203.0.113.10",
     "timezone_id": "Asia/Shanghai", "crawl_mode": "real",
     "credential_region": "cn", "waf_kind": "huawei",
 }
 SG = {
-    "node_label": "vps-sg", "exit_ip": "96.9.213.230",
+    "node_label": "vps-sg", "exit_ip": "203.0.113.20",
     "timezone_id": "Asia/Singapore", "crawl_mode": "real",
     "credential_region": "overseas", "waf_kind": "aws",
 }
@@ -176,7 +176,7 @@ def test_single_environment_run(db, fixtures):
 
     envs, unstamped = _run_environments(db, fixtures["run"].id)
     assert len(envs) == 1 and envs[0].n_jobs == 3 and unstamped == 0
-    assert envs[0].exit_ip == "120.228.64.174"
+    assert envs[0].exit_ip == "203.0.113.10"
 
 
 def test_mixed_run_is_visible(db, fixtures):
@@ -198,7 +198,7 @@ def test_mixed_run_is_visible(db, fixtures):
 
     assert len(envs) == 2, "混了两个出口必须看得出来"
     assert envs[0].n_jobs == 4 and envs[1].n_jobs == 1, "按样本数降序，主环境在前"
-    assert {e.exit_ip for e in envs} == {"120.228.64.174", "96.9.213.230"}
+    assert {e.exit_ip for e in envs} == {"203.0.113.10", "203.0.113.20"}
 
 
 def test_old_runs_report_unstamped_not_a_fake_environment(db, fixtures):
