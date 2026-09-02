@@ -74,7 +74,10 @@ read -s -p "密码: " E2E_PASSWORD && export E2E_PASSWORD && export E2E_EMAIL=�
    根本不存在。表现是页面 500、`main` 空、用例超时 —— **失败信息完全不指向真因**。
    `preview_logs` 一看便知；解法是停掉、`rm -rf .next`、重启。
 3. **`/v1` 是不是连得上。** 代理打的是线上，`ECONNRESET`（TLS 被重置）会让
-   `/v1/auth/me` 拿不到，整页渲染不出来。日志里能看到 `Failed to proxy`。
+   `/v1/auth/me` 拿不到 —— 代理返回 **500**，页面渲染成 Fault（「没读到这段记录 ·
+   500」），于是用例找不到任何元素。日志里能看到 `Failed to proxy`。
+   **这个抖动是间歇性的**：同一时刻直连生产 5/5 正常。配了 `retries: 1` 吸收它，
+   重试后才过的会记成 **flaky** 单独报 —— 看到 flaky 就来查这一条。
 
 三条都排除了，再去读 `test-results/<用例>/error-context.md` 的
 **Page snapshot** —— 那里能看出页面当时到底渲染成了什么样。

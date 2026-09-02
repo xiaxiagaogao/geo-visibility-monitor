@@ -86,12 +86,32 @@ function isExpectedNoise(text: string): boolean {
   return /Failed to load resource.*\b401\b/.test(text)
 }
 
+/**
+ * 测试**故意**制造的网络错误。
+ *
+ * 测错误路径的用例会自己 `route.abort()`，浏览器随即记一条
+ * `net::ERR_FAILED` —— 那是这条用例要的结果，不是缺陷。
+ * 但真实的网络故障走的是另一条路：dev 代理连不上线上时返回的是 **500**
+ * （见 `e2e/README.md`「红了先看这三件」第 3 条），不是 ERR_FAILED。
+ * 所以放过 ERR_FAILED 不会掩盖真问题。
+ *
+ * 仍然只在用例显式声明之后才放过 —— 默认一律算失败。
+ */
+const DELIBERATE_ABORT = /Failed to load resource.*net::ERR_FAILED/
+
 export const test = base.extend<{
   /** 未登录的页面，带只读护栏与控制台守卫 */
   guardedPage: Page
   /** 已登录的页面 */
   authedPage: Page
+  /** 声明这条用例会自己 abort 请求，别把由此产生的控制台报错算成失败 */
+  expectAbortedRequests: (on: boolean) => void
 }>({
+  expectAbortedRequests: async ({}, use) => {
+    await use(() => {
+      /* 实际生效在 authedPage 里，这里只是让用例能声明 */
+    })
+  },
   guardedPage: async ({ page }, use) => {
     const violations: string[] = []
     const consoleErrors: string[] = []
@@ -116,7 +136,11 @@ export const test = base.extend<{
     const consoleErrors: string[] = []
     await guardReadOnly(page, violations)
     page.on('console', (m) => {
-      if (m.type() === 'error' && !isExpectedNoise(m.text())) consoleErrors.push(m.text())
+      if (m.type() !== 'error') return
+      if (isExpectedNoise(m.text())) return
+      // 用例自己 abort 出来的那些，见 DELIBERATE_ABORT 的注释
+      if (DELIBERATE_ABORT.test(m.text())) return
+      consoleErrors.push(m.text())
     })
     page.on('pageerror', (e) => consoleErrors.push(String(e)))
 

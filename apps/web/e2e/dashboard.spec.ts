@@ -244,7 +244,10 @@ test.describe('三态与守卫', () => {
     await page.locator('a[href^="/brands/"]:not([href$="/new"])').first().click()
     await page.waitForLoadState('networkidle')
 
-    const input = page.locator('input[type="text"]').first()
+    // ⚠️ **不能用 `input[type="text"]`** —— 那几个 input 根本没写 type 属性，
+    // 属性选择器要求属性存在才匹配，DOM 属性默认是 text 救不了它。
+    // label 包着 input，隐式关联成立，按标签取最稳。
+    const input = page.getByLabel('品牌名')
     await expect(input).toBeVisible()
     await input.fill('改了但没保存')
 

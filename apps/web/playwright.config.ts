@@ -28,6 +28,21 @@ export default defineConfig({
   testDir: './e2e',
   // 生产数据是共享的，并发跑会互相干扰登录态；而且这套本来就只有几十个断言
   workers: 1,
+
+  /**
+   * **重试一次 —— 因为 `/v1` 打的是公网上的线上服务。**
+   *
+   * 实测这台机器到 geo.xg22.top 的 TLS 握手会间歇性被 ECONNRESET
+   * （dev 代理日志里是 `Failed to proxy … Client network socket disconnected`），
+   * 于是代理返回 500、页面渲染成 Fault、用例找不到任何元素。
+   * 同一时刻直连生产 5/5 正常 —— 是瞬时抖动，不是故障。
+   * 用例数从 31 涨到 36 之后撞上的概率明显变高。
+   *
+   * **这不是在掩盖缺陷**：真的断言失败两次都会红；瞬时重置第二次就过。
+   * 而且 Playwright 把重试后才过的记成 **flaky** 单独报，不会伪装成绿。
+   * 看到 flaky 就去看 `preview_logs` 里有没有 `Failed to proxy`。
+   */
+  retries: 1,
   fullyParallel: false,
   // 网络要走一趟公网到 VPS，默认 5s 不够
   timeout: 45_000,
