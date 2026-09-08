@@ -14,9 +14,6 @@ docs/API.md               # 前端对接契约（字段由 openapi 导出核对�
 docs/PHASE2.md            # 二阶段需求与执行顺序
 ```
 
-**三份现状文档只写现状，PHASE2 只写愿望**，两者刻意不混：
-一份把「打算做」和「已经做了」写在一起的文档，读的人分不出哪句能信。
-
 要翻旧文档：`git log --diff-filter=D -- history/`
 
 开发：本机改代码 → `git push vps main` → VPS 运行（细节见 BACKEND.md §10）。
