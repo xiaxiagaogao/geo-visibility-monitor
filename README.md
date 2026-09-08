@@ -1,6 +1,6 @@
 # geo-demo
 
-GEO 可见性监测（学习项目）。前后端分离：
+GEO 可见性监测（个人学习项目）。前后端分离：
 
 - **后端：** 抓取 · 标注 · 计数 API → **[docs/BACKEND.md](docs/BACKEND.md)**（后端唯一核心文档）
 - **对接：** 接口 · 鉴权 · 数据契约 → **[docs/API.md](docs/API.md)**（给前端看的）
